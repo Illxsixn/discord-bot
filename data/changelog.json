@@ -1,0 +1,51 @@
+{
+  "version": "1.2",
+  "releases": [
+    {
+      "version": "1.2",
+      "changes": [
+        "Neu: Turnier-System mit Match-Buttons",
+        "Neu: /turnier_erstellen, Teams, Map-Pool, Bracket",
+        "Match-Ablauf: Sieg melden, bestätigen, Einspruch",
+        "Automatische nächste Runde & Turniersieger-Embed",
+        "Fix: /pet play nur für dich sichtbar"
+      ]
+    },
+    {
+      "version": "1.1",
+      "changes": [
+        "Neu: /changelog",
+        "Neu: /pet dex",
+        "Pet-Dex: 30 Arten, ✅ gefunden / ❓ unbekannt",
+        "Evolutions-Skins: 🌱 ✨ 👑 + Embed-Farben",
+        "Pet-Embeds übersichtlicher (info, ei, play, …)",
+        "Pet-Quests variabel: Play, Info, Aktivität",
+        "2 Pet-Tagesaufgaben pro Tag",
+        "Tagesaufgaben: Level-XP & Pet getrennt (4 gesamt)",
+        "Tagesaufgaben-Embed kompakter",
+        "Seltenheits-XP-Bonus: +2 % bis +10 %",
+        "Bonus gilt für Spieler- & Pet-XP",
+        "15 neue Pet-Arten",
+        "Epic/Legendary-Drop erhöht",
+        "Pet-Play-XP: 8–14 Basis + 3 pro Treffer",
+        "Fix: /changelog öffentlich sichtbar",
+        "Help-Kategorie Allgemein"
+      ]
+    },
+    {
+      "version": "1.0",
+      "changes": [
+        "Pet-System: /pet ei, info, play, display, …",
+        "/pets Sammlung & aktives Pet wechseln",
+        "15 Pet-Arten, Seltenheit, Evolution Lv. 10/25/50",
+        "KI-Portraits (/pet display, Agnes)",
+        "Level-System & /daily-challenges",
+        "Spiele: Zahlenraten, Tic-Tac-Toe, Connect 4",
+        "Moderation, AutoMod, Logs",
+        "Welcome, Leave, Tickets, Umfragen",
+        "Giveaways & Reaktionsrollen",
+        "/help mit Kategorien"
+      ]
+    }
+  ]
+}
