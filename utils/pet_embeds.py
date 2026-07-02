@@ -71,7 +71,7 @@ def build_pet_info_embed(pet: PetRecord, member: discord.Member) -> discord.Embe
     emoji = species_display_emoji(species, pet.evolution_stage)
     current, needed, percent = xp_progress(pet.xp, pet.level)
     rarity = rarity_display(species.rarity) if species else "—"
-    xp_bonus = pet_xp_boost_label(pet.species, pet.evolution_stage) if species else "—"
+    xp_bonus = pet_xp_boost_label(pet.species) if species else "—"
 
     return _pet_embed(
         f"{emoji} {pet.name}",

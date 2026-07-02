@@ -172,7 +172,7 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             "Zero-Stress: Kein Hunger, kein Tod, kein Zwang",
             "Pet-XP durch Aktivität, Spiele, Aufgaben und /pet play",
             "Evolution bei Level 10, 25 und 50 — 🌱 Teen · ✨ Erwachsen · 👑 Meisterform (Farbe & Emoji)",
-            "XP-Bonus (aktives Pet): höchster Wert aus Stufe oder Seltenheit — 10 % bis 50 % (Spieler- & Pet-XP)",
+            "Seltenheits-Bonus (aktives Pet): Common 10 % • Uncommon 20 % • Rare 30 % • Epic 40 % • Legendary 50 % (Spieler- & Pet-XP)",
             f"Duplikat beim Ei: bereits vorhandene Art → **{Config.PET_DUPLICATE_PET_XP} Pet-XP** + **{Config.PET_DUPLICATE_PLAYER_XP} Spieler-XP**",
             "Pet-Befehle werden im Kanal angezeigt (für alle sichtbar)",
             "`/pet dex` — gesammelte ✅, fehlende ❓",

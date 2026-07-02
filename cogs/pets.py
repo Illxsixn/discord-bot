@@ -137,11 +137,7 @@ class PetImpulseView(discord.ui.View):
                     item.disabled = True  # type: ignore[union-attr]
 
                 base_xp, hit_bonus, total_xp = pet_play_xp_for_score(self.score)
-                display_xp = apply_pet_xp_boost(
-                    total_xp,
-                    species_name=self.pet.species,
-                    evolution_stage=self.pet.evolution_stage,
-                )
+                display_xp = apply_pet_xp_boost(total_xp, species_name=self.pet.species)
                 member = interaction.user
                 if isinstance(member, discord.Member) and interaction.guild is not None:
                     channel = interaction.channel if isinstance(
@@ -355,11 +351,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
         """Wendet Pet-XP an und aktualisiert Level/Evolution."""
         old_level = pet.level
         boosted_amount = (
-            apply_pet_xp_boost(
-                amount,
-                species_name=pet.species,
-                evolution_stage=pet.evolution_stage,
-            )
+            apply_pet_xp_boost(amount, species_name=pet.species)
             if apply_boost
             else amount
         )

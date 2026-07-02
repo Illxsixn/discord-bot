@@ -128,15 +128,11 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
             logger.warning("Level-Up Nachricht konnte nicht gesendet werden (Guild %s).", member.guild.id)
 
     async def _boosted_player_xp(self, member: discord.Member, amount: int) -> int:
-        """Wendet den Pet-Bonus (Stufe + Seltenheit) des aktiven Pets auf Spieler-XP an."""
+        """Wendet den Seltenheits-Bonus des aktiven Pets auf Spieler-XP an."""
         pet = await self.db.get_active_pet(member.guild.id, member.id)
         if pet is None:
             return amount
-        return apply_pet_xp_boost(
-            amount,
-            species_name=pet.species,
-            evolution_stage=pet.evolution_stage,
-        )
+        return apply_pet_xp_boost(amount, species_name=pet.species)
 
     async def award_xp(
         self,
