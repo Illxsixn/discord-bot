@@ -74,6 +74,7 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             ("/nickname", "Ändert den Nickname eines Mitglieds"),
             ("/mute", "Mutet ein Mitglied"),
             ("/unmute", "Hebt einen Mute auf"),
+            ("/emoji", "Fügt Server-Emoji hinzu (kopieren oder Bild hochladen)"),
         ],
     },
     HelpCategory.Welcome.value: {
