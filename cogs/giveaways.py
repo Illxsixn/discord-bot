@@ -43,6 +43,25 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
     def cog_unload(self) -> None:
         self.expire_giveaways.cancel()
 
+    async def _resolve_message_channel(
+        self,
+        guild: discord.Guild,
+        channel_id: int,
+    ) -> discord.TextChannel | discord.Thread | None:
+        """Lädt Textkanal oder Thread für eine Gewinnspiel-Nachricht."""
+        channel = self.bot.get_channel(channel_id)
+        if isinstance(channel, (discord.TextChannel, discord.Thread)):
+            return channel
+
+        try:
+            fetched = await self.bot.fetch_channel(channel_id)
+        except (discord.NotFound, discord.Forbidden):
+            return None
+
+        if isinstance(fetched, (discord.TextChannel, discord.Thread)):
+            return fetched
+        return None
+
     def _build_giveaway_embed(self, giveaway: GiveawayRecord) -> discord.Embed:
         """Erstellt Gewinnspiel-Embed."""
         description = spaced_lines(
@@ -64,20 +83,35 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
         apply_brand_footer(embed, prefix=f"Giveaway #{giveaway.id}")
         return embed
 
-    async def _draw_winners(self, giveaway: GiveawayRecord, *, reroll: bool = False) -> GiveawayRecord | None:
+    async def _draw_winners(
+        self,
+        giveaway: GiveawayRecord,
+        *,
+        reroll: bool = False,
+    ) -> tuple[GiveawayRecord | None, str | None]:
         """Lost Gewinner aus und aktualisiert Nachricht."""
         guild = self.bot.get_guild(giveaway.guild_id)
         if guild is None:
-            return None
+            return None, "Server nicht erreichbar."
 
-        channel = guild.get_channel(giveaway.channel_id)
-        if not isinstance(channel, discord.TextChannel):
-            return None
+        channel = await self._resolve_message_channel(guild, giveaway.channel_id)
+        if channel is None:
+            return None, "Gewinnspiel-Kanal nicht gefunden oder nicht unterstützt."
+
+        allowed, msg = bot_can_use_channel(
+            channel,
+            read_history=True,
+            add_reactions=True,
+        )
+        if not allowed:
+            return None, msg or "Mir fehlen Berechtigungen im Gewinnspiel-Kanal."
 
         try:
             message = await channel.fetch_message(giveaway.message_id)
-        except (discord.NotFound, discord.Forbidden):
-            return None
+        except discord.NotFound:
+            return None, "Gewinnspiel-Nachricht wurde gelöscht."
+        except discord.Forbidden:
+            return None, "Ich kann die Gewinnspiel-Nachricht nicht lesen."
 
         entrants = await collect_giveaway_entrants(message, giveaway.emoji)
         member_ids = [member.id for member in entrants]
@@ -87,14 +121,14 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
 
         if not pool:
             if reroll:
-                return giveaway
+                return giveaway, None
             finished = await self.db.finish_giveaway(giveaway.id, [])
             if finished:
                 try:
                     await message.edit(embed=self._build_giveaway_embed(finished))
                 except discord.HTTPException:
                     pass
-            return finished
+            return finished, None
 
         count = min(giveaway.winner_count, len(pool))
         winner_ids = random.sample(pool, count)
@@ -121,7 +155,7 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
                 except discord.Forbidden:
                     pass
 
-        return finished
+        return finished, None
 
     @tasks.loop(seconds=Config.COMMUNITY_TASK_INTERVAL)
     async def expire_giveaways(self) -> None:
@@ -130,7 +164,13 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
         try:
             for giveaway in await self.db.get_active_giveaways():
                 if giveaway.ends_at <= now:
-                    await self._draw_winners(giveaway)
+                    _, error = await self._draw_winners(giveaway)
+                    if error:
+                        logger.warning(
+                            "Giveaway #%s konnte nicht beendet werden: %s",
+                            giveaway.id,
+                            error,
+                        )
         except Exception as exc:
             logger.exception("Giveaway-Ablauf-Task fehlgeschlagen: %s", exc)
 
@@ -179,7 +219,7 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
                 send=True,
                 embed_links=True,
                 add_reactions=True,
-                manage_messages=True,
+                read_history=True,
             )
             if not allowed:
                 await interaction.followup.send(embed=error_embed("Kanal nicht nutzbar", msg), ephemeral=True)
@@ -256,11 +296,14 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
                 await interaction.followup.send(embed=error_embed("Fehler", "Giveaway ist bereits beendet."), ephemeral=True)
                 return
 
-            result = await self._draw_winners(giveaway)
+            result, error = await self._draw_winners(giveaway)
             if result:
                 await interaction.followup.send(embed=success_embed("Giveaway beendet", "Gewinner wurden ausgelost."), ephemeral=True)
             else:
-                await interaction.followup.send(embed=error_embed("Fehler", "Auslosung fehlgeschlagen."), ephemeral=True)
+                await interaction.followup.send(
+                    embed=error_embed("Fehler", error or "Auslosung fehlgeschlagen."),
+                    ephemeral=True,
+                )
         except Exception as exc:
             logger.exception("Giveaway end fehlgeschlagen: %s", exc)
             await interaction.followup.send(embed=error_embed("Fehler", str(exc)), ephemeral=True)
@@ -284,7 +327,7 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
                 return
 
             # Für Reroll temporär als aktiv markieren durch direkte Auslosung
-            result = await self._draw_winners(giveaway, reroll=True)
+            result, error = await self._draw_winners(giveaway, reroll=True)
             if result and result.winner_ids:
                 await interaction.followup.send(
                     embed=success_embed("Reroll", f"Neue Gewinner: {', '.join(f'<@{uid}>' for uid in result.winner_ids)}"),
@@ -292,7 +335,10 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
                 )
             else:
                 await interaction.followup.send(
-                    embed=error_embed("Fehler", "Keine weiteren gültigen Teilnehmer für Reroll."),
+                    embed=error_embed(
+                        "Fehler",
+                        error or "Keine weiteren gültigen Teilnehmer für Reroll.",
+                    ),
                     ephemeral=True,
                 )
         except Exception as exc:

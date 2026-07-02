@@ -60,6 +60,38 @@ class Config:
     LEVEL_XP_COOLDOWN: int = 10
     LEVEL_LEADERBOARD_LIMIT: int = 10
     GAME_WIN_XP: int = 25
+    GAME_WIN_GOLD_MIN: int = 5
+    GAME_WIN_GOLD_MAX: int = 15
+
+    # Lootbox & Gold
+    LOOTBOX_PRICE: int = 75
+    LOOTBOX_XP_CHANCE_MIN: int = 5
+    LOOTBOX_XP_CHANCE_MAX: int = 30
+    LOOTBOX_XP_REWARD: int = 50
+    LOOTBOX_BATCH_MAX: int = 10
+    LOOTBOX_LEADERBOARD_LIMIT: int = 10
+
+    # Dungeons (getrennt von Lootboxen — Gold nur über Runs/Spiele)
+    DUNGEON_ROOM_MIN: int = 3
+    DUNGEON_ROOM_MAX: int = 5
+    DUNGEON_RUN_COOLDOWN: int = 600
+    DUNGEON_VIEW_TIMEOUT: float = 180.0
+    DUNGEON_RUN_TIMEOUT: int = 1800
+    DUNGEON_PLAYER_HP_BASE: int = 100
+    DUNGEON_PET_HP_BASE: int = 80
+    DUNGEON_HP_REGEN_AMOUNT: int = 15
+    DUNGEON_HP_REGEN_INTERVAL: int = 480
+    DUNGEON_HEAL_GOLD_COST: int = 30
+    DUNGEON_PET_RECOVERY_SECONDS: int = 1200
+    DUNGEON_COMPLETE_GOLD_BONUS: int = 20
+    DUNGEON_FOUNTAIN_HEAL: int = 22
+
+    # Slot-Maschine
+    SLOT_BET_OPTIONS: tuple[int, ...] = (5, 10, 25, 50)
+    SLOT_DEFAULT_BET: int = 10
+    SLOT_VIEW_TIMEOUT: float = 180.0
+    SLOT_SPIN_COOLDOWN: float = 2.0
+
     CHALLENGE_XP_MIN: int = 15
     CHALLENGE_XP_MAX: int = 40
     CHALLENGE_PET_XP_MIN: int = 20

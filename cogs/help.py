@@ -38,6 +38,8 @@ class HelpCategory(enum.Enum):
     Pets = "pets"
     Spiele = "games"
     Challenges = "challenges"
+    Lootbox = "lootbox"
+    Dungeons = "dungeons"
     ReactionRoles = "reactionrole"
     Polls = "poll"
     Giveaways = "giveaway"
@@ -152,6 +154,7 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
         "hints": [
             "5 XP pro Nachricht (10 Sekunden Cooldown)",
             "Bonus-XP durch Spiele und tägliche Aufgaben",
+            "`/levels level` zeigt auch Gold & Dungeon-HP",
         ],
     },
     HelpCategory.Pets.value: {
@@ -176,6 +179,7 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             f"Duplikat beim Ei: bereits vorhandene Art → **{Config.PET_DUPLICATE_PET_XP} Pet-XP** + **{Config.PET_DUPLICATE_PLAYER_XP} Spieler-XP**",
             "Pet-Befehle werden im Kanal angezeigt (für alle sichtbar)",
             "`/pet dex` — gesammelte ✅, fehlende ❓",
+            "`/pet info` zeigt auch Gold & Dungeon-HP",
         ],
     },
     HelpCategory.Spiele.value: {
@@ -186,10 +190,47 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             ("/guess-start", "Startet Zahlenraten (1–100) im Kanal"),
             ("/guess", "Gibt einen Tipp ab (5 Min. Cooldown)"),
             ("/guess-leaderboard", "Bestenliste Zahlenraten"),
+            ("/slots", "Gold-Slot-Maschine mit Einsatz-Buttons"),
         ],
         "hints": [
             f"Gewinner erhalten **{Config.GAME_WIN_XP} XP** (wenn Level-System aktiv ist)",
+            f"Gewinner erhalten **{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX} Gold**",
+            f"`/slots` — Einsatz **{', '.join(str(b) for b in Config.SLOT_BET_OPTIONS)}** Gold",
             f"`/guess` hat einen Cooldown von **{Config.GUESS_COOLDOWN // 60} Minuten**",
+        ],
+    },
+    HelpCategory.Lootbox.value: {
+        "label": "Lootbox",
+        "emoji": "📦",
+        "access": "Alle",
+        "commands": [
+            ("/lootbox shop", "Preis, Chancen, Gold und Inventar"),
+            ("/lootbox buy", "Lootboxen mit Gold kaufen"),
+            ("/lootbox open", "Lootboxen öffnen"),
+            ("/lootbox leaderboard", "Gold-Rangliste des Servers"),
+        ],
+        "hints": [
+            f"Preis: **{Config.LOOTBOX_PRICE} Gold** pro Box",
+            f"Jackpot: **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** Chance auf "
+            f"**{Config.LOOTBOX_XP_REWARD}** Spieler-XP **+** **{Config.LOOTBOX_XP_REWARD}** Pet-XP",
+            f"Gold durch Spielsiege (**{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}**)",
+            "Pet-XP nur mit aktivem Pet; Spieler-XP wenn Level-System aktiv ist",
+        ],
+    },
+    HelpCategory.Dungeons.value: {
+        "label": "Dungeons",
+        "emoji": "🗺️",
+        "access": "Alle",
+        "commands": [
+            ("/dungeon start", "Dungeon mit aktivem Pet starten"),
+            ("/dungeon status", "HP, Gold, Cooldown — Heilen & Weiter"),
+        ],
+        "hints": [
+            f"**{Config.DUNGEON_ROOM_MIN}–{Config.DUNGEON_ROOM_MAX} Räume** — Button **Weiter**",
+            "Gold & HP auch in `/levels level` und `/pet info`",
+            f"Heilung: **{Config.DUNGEON_HEAL_GOLD_COST} Gold** · Regen alle **{Config.DUNGEON_HP_REGEN_INTERVAL // 60} Min.**",
+            f"Cooldown **{Config.DUNGEON_RUN_COOLDOWN // 60} Min.** · Pet-Erholung **{Config.DUNGEON_PET_RECOVERY_SECONDS // 60} Min.**",
+            "Getrennt von Lootboxen — kein Pet-Tod",
         ],
     },
     HelpCategory.Challenges.value: {
@@ -235,6 +276,10 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             ("/giveaway create", "Gewinnspiel erstellen"),
             ("/giveaway end", "Gewinnspiel vorzeitig beenden"),
             ("/giveaway reroll", "Neue Gewinner auslosen"),
+        ],
+        "hints": [
+            "Bot braucht: Nachrichten senden, Links einbetten, Reaktionen, Verlauf lesen",
+            "Teilnahme per Reaktion auf die Gewinnspiel-Nachricht",
         ],
     },
     HelpCategory.Tickets.value: {

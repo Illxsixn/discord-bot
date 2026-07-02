@@ -164,25 +164,62 @@ def inject_brand_into_send_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
     return kwargs
 
 
+def inject_brand_into_edit_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Embed-Footer beim Bearbeiten — ohne files= (Message.edit nutzt attachments=)."""
+    embeds = _collect_embeds(kwargs)
+    if not embeds:
+        return kwargs
+
+    icon = brand_icon_file()
+    if icon is None:
+        return kwargs
+
+    for embed in embeds:
+        footer = embed.footer
+        if footer.icon_url:
+            continue
+        if not footer.text:
+            apply_brand_footer(embed)
+        elif Config.BOT_BRAND_NAME not in footer.text:
+            apply_brand_footer(embed, prefix=footer.text)
+        else:
+            embed.set_footer(
+                text=footer.text,
+                icon_url=f"attachment://{BRAND_ICON_ATTACHMENT}",
+            )
+
+    # Anhang bleibt von der ursprünglichen send()-Nachricht erhalten.
+    kwargs.pop("files", None)
+    kwargs.pop("file", None)
+    return kwargs
+
+
 def install_brand_send_hooks() -> None:
     """Hängt das Marken-Icon an alle Embed-Nachrichten (send/edit)."""
     import discord.abc
     import discord.interactions
     import discord.webhook.async_ as webhook_async
 
-    def _wrap(method: Any) -> Any:
+    def _wrap_send(method: Any) -> Any:
         async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
             kwargs = inject_brand_into_send_kwargs(kwargs)
             return await method(self, *args, **kwargs)
 
         return wrapper
 
-    discord.abc.Messageable.send = _wrap(discord.abc.Messageable.send)
-    discord.interactions.InteractionResponse.send_message = _wrap(
+    def _wrap_edit(method: Any) -> Any:
+        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            kwargs = inject_brand_into_edit_kwargs(kwargs)
+            return await method(self, *args, **kwargs)
+
+        return wrapper
+
+    discord.abc.Messageable.send = _wrap_send(discord.abc.Messageable.send)
+    discord.interactions.InteractionResponse.send_message = _wrap_send(
         discord.interactions.InteractionResponse.send_message
     )
-    webhook_async.Webhook.send = _wrap(webhook_async.Webhook.send)
-    discord.Message.edit = _wrap(discord.Message.edit)
+    webhook_async.Webhook.send = _wrap_send(webhook_async.Webhook.send)
+    discord.Message.edit = _wrap_edit(discord.Message.edit)
 
 
 def success_embed(

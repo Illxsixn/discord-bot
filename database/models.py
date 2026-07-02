@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -165,6 +165,126 @@ class UserLevelRecord:
 
 
 @dataclass
+class PlayerEconomyRecord:
+    """Gold, Lootbox-Inventar und Dungeon-Ressourcen pro Guild."""
+
+    guild_id: int
+    user_id: int
+    gold: int = 0
+    lootbox_count: int = 0
+    player_hp: int = 0
+    player_hp_max: int = 0
+    last_hp_regen_at: datetime | None = None
+    last_dungeon_at: datetime | None = None
+    dungeons_completed: int = 0
+    pet_recovery_until: datetime | None = None
+    pet_recovery_pet_id: int | None = None
+
+    @classmethod
+    def from_row(cls, row: dict[str, Any]) -> "PlayerEconomyRecord":
+        last_regen = row.get("last_hp_regen_at")
+        last_dungeon = row.get("last_dungeon_at")
+        recovery = row.get("pet_recovery_until")
+        return cls(
+            guild_id=row["guild_id"],
+            user_id=row["user_id"],
+            gold=int(row.get("gold") or 0),
+            lootbox_count=int(row.get("lootbox_count") or 0),
+            player_hp=int(row.get("player_hp") or 0),
+            player_hp_max=int(row.get("player_hp_max") or 0),
+            last_hp_regen_at=(
+                datetime.fromisoformat(last_regen)
+                if isinstance(last_regen, str) and last_regen
+                else None
+            ),
+            last_dungeon_at=(
+                datetime.fromisoformat(last_dungeon)
+                if isinstance(last_dungeon, str) and last_dungeon
+                else None
+            ),
+            dungeons_completed=int(row.get("dungeons_completed") or 0),
+            pet_recovery_until=(
+                datetime.fromisoformat(recovery)
+                if isinstance(recovery, str) and recovery
+                else None
+            ),
+            pet_recovery_pet_id=row.get("pet_recovery_pet_id"),
+        )
+
+
+class DungeonRunStatus(str, Enum):
+    """Status eines Dungeon-Laufs."""
+
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    ABANDONED = "abandoned"
+
+
+class DungeonEventType(str, Enum):
+    """Ereignistyp in einem Dungeon-Raum."""
+
+    FIGHT = "fight"
+    TRAP = "trap"
+    TREASURE = "treasure"
+    FOUNTAIN = "fountain"
+    GOLD = "gold"
+    PET_XP = "pet_xp"
+
+
+@dataclass
+class DungeonRunRecord:
+    """Laufender oder abgeschlossener Dungeon."""
+
+    guild_id: int
+    user_id: int
+    pet_id: int
+    status: str
+    current_room: int
+    total_rooms: int
+    player_hp: int
+    player_hp_max: int
+    pet_hp: int
+    pet_hp_max: int
+    started_at: datetime
+    updated_at: datetime
+    id: int = 0
+    rooms_cleared: int = 0
+    session_gold: int = 0
+    events: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_row(cls, row: dict[str, Any]) -> "DungeonRunRecord":
+        raw_events = row.get("events_json") or "[]"
+        try:
+            events = json.loads(raw_events)
+        except (json.JSONDecodeError, TypeError):
+            events = []
+        if not isinstance(events, list):
+            events = []
+        started = row.get("started_at")
+        updated = row.get("updated_at")
+        return cls(
+            id=row["id"],
+            guild_id=row["guild_id"],
+            user_id=row["user_id"],
+            pet_id=row["pet_id"],
+            status=row.get("status") or DungeonRunStatus.ACTIVE.value,
+            current_room=int(row.get("current_room") or 0),
+            total_rooms=int(row.get("total_rooms") or 0),
+            rooms_cleared=int(row.get("rooms_cleared") or 0),
+            player_hp=int(row.get("player_hp") or 0),
+            player_hp_max=int(row.get("player_hp_max") or 0),
+            pet_hp=int(row.get("pet_hp") or 0),
+            pet_hp_max=int(row.get("pet_hp_max") or 0),
+            session_gold=int(row.get("session_gold") or 0),
+            events=[str(e) for e in events],
+            started_at=datetime.fromisoformat(started) if isinstance(started, str) else datetime.now(timezone.utc),
+            updated_at=datetime.fromisoformat(updated) if isinstance(updated, str) else datetime.now(timezone.utc),
+        )
+
+
+@dataclass
 class ReactionRoleRecord:
     """Reaktionsrolle an eine Nachricht gebunden."""
 
@@ -270,9 +390,13 @@ class GiveawayRecord:
         except (json.JSONDecodeError, TypeError, ValueError):
             winner_ids = []
 
-        ends_at = datetime.fromisoformat(row["ends_at"]) if row.get("ends_at") else datetime.utcnow()
+        ends_at = datetime.fromisoformat(row["ends_at"]) if row.get("ends_at") else datetime.now(timezone.utc)
+        if ends_at.tzinfo is None:
+            ends_at = ends_at.replace(tzinfo=timezone.utc)
         created_raw = row.get("created_at")
-        created_at = datetime.fromisoformat(created_raw) if isinstance(created_raw, str) else datetime.utcnow()
+        created_at = datetime.fromisoformat(created_raw) if isinstance(created_raw, str) else datetime.now(timezone.utc)
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
 
         return cls(
             id=row["id"],

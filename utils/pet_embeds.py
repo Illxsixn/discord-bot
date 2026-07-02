@@ -65,13 +65,28 @@ def _pet_embed(
     return embed
 
 
-def build_pet_info_embed(pet: PetRecord, member: discord.Member) -> discord.Embed:
+def build_pet_info_embed(
+    pet: PetRecord,
+    member: discord.Member,
+    *,
+    gold: int | None = None,
+    dungeon_hp: str | None = None,
+) -> discord.Embed:
     """Übersichtliches Profil des aktiven Pets."""
     species = get_species_by_name(pet.species)
     emoji = species_display_emoji(species, pet.evolution_stage)
     current, needed, percent = xp_progress(pet.xp, pet.level)
     rarity = rarity_display(species.rarity) if species else "—"
     xp_bonus = pet_xp_boost_label(pet.species) if species else "—"
+
+    overview_lines = [
+        f"Level **{pet.level}** · **{pet.xp:,}** XP",
+        f"`{current:,}` / `{needed:,}` XP (**{percent} %**)",
+    ]
+    if gold is not None:
+        overview_lines.append(f"**Gold:** {gold:,} 🪙")
+    if dungeon_hp is not None:
+        overview_lines.append(f"**Dungeon-HP:** {dungeon_hp}")
 
     return _pet_embed(
         f"{emoji} {pet.name}",
@@ -83,10 +98,7 @@ def build_pet_info_embed(pet: PetRecord, member: discord.Member) -> discord.Embe
         fields=[
             (
                 "📊 Fortschritt",
-                spaced_lines(
-                    f"Level **{pet.level}** · **{pet.xp:,}** XP",
-                    f"`{current:,}` / `{needed:,}` XP (**{percent} %**)",
-                ),
+                spaced_lines(*overview_lines),
                 False,
             ),
             (

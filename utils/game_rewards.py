@@ -8,6 +8,7 @@ import discord
 from discord.ext import commands
 
 from config import Config
+from utils.economy_rewards import award_game_gold
 from utils.pet_rewards import award_pet_game_xp
 
 
@@ -23,4 +24,5 @@ async def award_game_xp(
         return False
     result = await levels.award_xp(member, Config.GAME_WIN_XP, channel=channel)  # type: ignore[attr-defined]
     await award_pet_game_xp(bot, member, channel=channel)
+    await award_game_gold(bot, member)
     return result
