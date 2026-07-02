@@ -184,10 +184,6 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             ("/guess-start", "Startet Zahlenraten (1–100) im Kanal"),
             ("/guess", "Gibt einen Tipp ab (5 Min. Cooldown)"),
             ("/guess-leaderboard", "Bestenliste Zahlenraten"),
-            ("/tictactoe", "Fordert ein Mitglied zu Tic-Tac-Toe heraus"),
-            ("/connect4", "Fordert ein Mitglied zu Connect Four heraus"),
-            ("/game cancel", "Bricht dein laufendes Brettspiel ab"),
-            ("/game cleanup", "Bricht alle offenen Brettspiele ab (Admin)"),
         ],
         "hints": [
             f"Gewinner erhalten **{Config.GAME_WIN_XP} XP** (wenn Level-System aktiv ist)",

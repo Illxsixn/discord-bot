@@ -15,7 +15,6 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from database.models import GuessStatsRecord
-from utils.board_game_lifecycle import build_active_game_error_embed
 from utils.embeds import error_embed, info_embed, success_embed
 from utils.game_locks import game_lock
 from utils.game_rewards import award_game_xp
@@ -82,13 +81,6 @@ class GuessCog(commands.Cog):
             return
 
         channel_id = interaction.channel.id
-        existing = await self.db.user_in_active_board_game(interaction.guild.id, interaction.user.id)
-        if existing is not None:
-            await interaction.followup.send(
-                embed=build_active_game_error_embed(interaction.guild, existing, interaction.user.id),
-                ephemeral=True,
-            )
-            return
 
         async with game_lock(channel_id):
             if await self.db.get_guess_game(channel_id) is not None:

@@ -320,22 +320,6 @@ class WarningRecord:
         )
 
 
-class BoardGameType(str, Enum):
-    """Typ eines Brettspiels."""
-
-    TICTACTOE = "tictactoe"
-    CONNECT4 = "connect4"
-
-
-class BoardGameStatus(str, Enum):
-    """Status eines Brettspiels."""
-
-    PENDING = "pending"
-    ACTIVE = "active"
-    FINISHED = "finished"
-    CANCELLED = "cancelled"
-
-
 class ChallengeType(str, Enum):
     """Typ einer täglichen Aufgabe."""
 
@@ -503,70 +487,6 @@ class GuessStatsRecord:
         if self.games_won <= 0:
             return None
         return self.win_attempts_sum / self.games_won
-
-
-@dataclass
-class BoardGameRecord:
-    """Persistiertes Brettspiel (Tic-Tac-Toe / Connect Four)."""
-
-    id: int
-    guild_id: int
-    channel_id: int
-    message_id: int | None
-    game_type: BoardGameType
-    player1_id: int
-    player2_id: int
-    board_json: str
-    current_player_id: int
-    status: BoardGameStatus
-    winner_id: int | None
-    created_at: datetime
-
-    @classmethod
-    def from_row(cls, row: dict[str, Any]) -> "BoardGameRecord":
-        created = row.get("created_at")
-        created_at = datetime.fromisoformat(created) if isinstance(created, str) else datetime.utcnow()
-        return cls(
-            id=row["id"],
-            guild_id=row["guild_id"],
-            channel_id=row["channel_id"],
-            message_id=row.get("message_id"),
-            game_type=BoardGameType(row["game_type"]),
-            player1_id=row["player1_id"],
-            player2_id=row["player2_id"],
-            board_json=row["board_json"],
-            current_player_id=row["current_player_id"],
-            status=BoardGameStatus(row["status"]),
-            winner_id=row.get("winner_id"),
-            created_at=created_at,
-        )
-
-
-@dataclass
-class GameStatsRecord:
-    """Siege/Niederlagen/Unentschieden für Brettspiele."""
-
-    guild_id: int
-    user_id: int
-    ttt_wins: int = 0
-    ttt_losses: int = 0
-    ttt_draws: int = 0
-    c4_wins: int = 0
-    c4_losses: int = 0
-    c4_draws: int = 0
-
-    @classmethod
-    def from_row(cls, row: dict[str, Any]) -> "GameStatsRecord":
-        return cls(
-            guild_id=row["guild_id"],
-            user_id=row["user_id"],
-            ttt_wins=int(row.get("ttt_wins") or 0),
-            ttt_losses=int(row.get("ttt_losses") or 0),
-            ttt_draws=int(row.get("ttt_draws") or 0),
-            c4_wins=int(row.get("c4_wins") or 0),
-            c4_losses=int(row.get("c4_losses") or 0),
-            c4_draws=int(row.get("c4_draws") or 0),
-        )
 
 
 @dataclass
