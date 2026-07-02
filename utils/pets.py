@@ -109,12 +109,19 @@ RARITY_EMOJIS: dict[PetRarity, str] = {
     PetRarity.LEGENDARY: "🟡",
 }
 
-RARITY_XP_BOOST: dict[PetRarity, float] = {
-    PetRarity.COMMON: 1.02,
-    PetRarity.UNCOMMON: 1.04,
-    PetRarity.RARE: 1.06,
-    PetRarity.EPIC: 1.08,
-    PetRarity.LEGENDARY: 1.10,
+STAGE_XP_BOOST_PERCENT: dict[str, int] = {
+    PetEvolutionStage.BABY.value: 10,
+    PetEvolutionStage.TEEN.value: 20,
+    PetEvolutionStage.ADULT.value: 30,
+    PetEvolutionStage.LEGENDARY.value: 40,
+}
+
+RARITY_XP_BOOST_PERCENT: dict[PetRarity, int] = {
+    PetRarity.COMMON: 10,
+    PetRarity.UNCOMMON: 20,
+    PetRarity.RARE: 30,
+    PetRarity.EPIC: 40,
+    PetRarity.LEGENDARY: 50,
 }
 
 CATCHPHRASES: dict[str, tuple[str, ...]] = {
@@ -259,18 +266,36 @@ def get_species_rarity(species_name: str) -> PetRarity | None:
     return species.rarity if species else None
 
 
-def apply_rarity_xp_boost(amount: int, rarity: PetRarity | None) -> int:
-    """Wendet den Seltenheits-XP-Bonus auf eine Basis-XP-Menge an."""
-    if amount <= 0 or rarity is None:
+def pet_xp_boost_percent(*, evolution_stage: str, rarity: PetRarity | None) -> int:
+    """XP-Bonus in Prozent — höchster Wert aus Evolutionsstufe oder Seltenheit."""
+    stage_percent = STAGE_XP_BOOST_PERCENT.get(evolution_stage, 10)
+    rarity_percent = RARITY_XP_BOOST_PERCENT.get(rarity, 10) if rarity else 10
+    return max(stage_percent, rarity_percent)
+
+
+def apply_pet_xp_boost(
+    amount: int,
+    *,
+    species_name: str,
+    evolution_stage: str,
+) -> int:
+    """Wendet den Pet-XP-Bonus (Stufe + Seltenheit) auf eine Basis-XP-Menge an."""
+    if amount <= 0:
         return amount
-    multiplier = RARITY_XP_BOOST.get(rarity, 1.0)
-    return max(1, round(amount * multiplier))
+    percent = pet_xp_boost_percent(
+        evolution_stage=evolution_stage,
+        rarity=get_species_rarity(species_name),
+    )
+    return max(1, round(amount * (1 + percent / 100)))
 
 
-def rarity_xp_boost_label(rarity: PetRarity) -> str:
-    """Formatiert den Seltenheits-XP-Bonus für Embeds."""
-    percent = (RARITY_XP_BOOST.get(rarity, 1.0) - 1.0) * 100
-    return f"+{percent:.1f} %".replace(".", ",")
+def pet_xp_boost_label(species_name: str, evolution_stage: str) -> str:
+    """Formatiert den Pet-XP-Bonus für Embeds."""
+    percent = pet_xp_boost_percent(
+        evolution_stage=evolution_stage,
+        rarity=get_species_rarity(species_name),
+    )
+    return f"+{percent} %"
 
 
 def random_species() -> PetSpeciesDefinition:

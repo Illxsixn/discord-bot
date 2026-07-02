@@ -30,6 +30,7 @@ from utils.pet_ai_images import (
 from utils.pet_embeds import (
     build_leaderboard_line,
     build_pet_collection_embed,
+    build_pet_duplicate_embed,
     build_pet_display_embed,
     build_pet_dex_embed,
     build_pet_hatch_embed,
@@ -46,7 +47,8 @@ from utils.pet_play import (
     random_impulse_id,
 )
 from utils.pets import (
-    apply_rarity_xp_boost,
+    apply_pet_xp_boost,
+    pet_xp_boost_label,
     default_pet_name,
     evolution_display,
     evolution_stage_from_level,
@@ -135,7 +137,11 @@ class PetImpulseView(discord.ui.View):
                     item.disabled = True  # type: ignore[union-attr]
 
                 base_xp, hit_bonus, total_xp = pet_play_xp_for_score(self.score)
-                display_xp = apply_rarity_xp_boost(total_xp, get_species_rarity(self.pet.species))
+                display_xp = apply_pet_xp_boost(
+                    total_xp,
+                    species_name=self.pet.species,
+                    evolution_stage=self.pet.evolution_stage,
+                )
                 member = interaction.user
                 if isinstance(member, discord.Member) and interaction.guild is not None:
                     channel = interaction.channel if isinstance(
@@ -344,10 +350,19 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
         channel: discord.TextChannel | discord.Thread | None = None,
         count_interaction: bool = False,
         announce_evolution: bool = True,
+        apply_boost: bool = True,
     ) -> PetRecord:
         """Wendet Pet-XP an und aktualisiert Level/Evolution."""
         old_level = pet.level
-        boosted_amount = apply_rarity_xp_boost(amount, get_species_rarity(pet.species))
+        boosted_amount = (
+            apply_pet_xp_boost(
+                amount,
+                species_name=pet.species,
+                evolution_stage=pet.evolution_stage,
+            )
+            if apply_boost
+            else amount
+        )
         pet.xp += boosted_amount
         pet.level = level_from_xp(pet.xp)
         pet.evolution_stage = evolution_stage_from_level(pet.level)
@@ -531,6 +546,48 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
         now = datetime.now(timezone.utc)
 
         existing = await self.db.get_pets_by_owner(interaction.guild.id, interaction.user.id)
+        owned_species = {pet.species for pet in existing}
+
+        await self._set_cooldown(
+            interaction.guild.id,
+            interaction.user.id,
+            PetCooldownType.EGG,
+            Config.PET_EGG_COOLDOWN,
+        )
+
+        if species.name in owned_species:
+            duplicate_pet = next((pet for pet in existing if pet.species == species.name), None)
+            if duplicate_pet is not None:
+                await self._apply_pet_xp(
+                    duplicate_pet,
+                    Config.PET_DUPLICATE_PET_XP,
+                    member=interaction.user,
+                    channel=interaction.channel
+                    if isinstance(interaction.channel, (discord.TextChannel, discord.Thread))
+                    else None,
+                    apply_boost=False,
+                )
+
+            levels = self.bot.get_cog("LevelsCog")
+            if levels is not None:
+                await levels.award_xp(  # type: ignore[attr-defined]
+                    interaction.user,
+                    Config.PET_DUPLICATE_PLAYER_XP,
+                    channel=interaction.channel
+                    if isinstance(interaction.channel, (discord.TextChannel, discord.Thread))
+                    else None,
+                    apply_pet_boost=False,
+                )
+
+            embed = build_pet_duplicate_embed(
+                interaction.user,
+                species,
+                pet_xp=Config.PET_DUPLICATE_PET_XP,
+                player_xp=Config.PET_DUPLICATE_PLAYER_XP,
+            )
+            await interaction.followup.send(embed=embed)
+            return
+
         has_active = any(p.is_active for p in existing)
 
         pet = PetRecord(
@@ -548,13 +605,6 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             is_active=not has_active,
         )
         created = await self.db.create_pet(pet)
-
-        await self._set_cooldown(
-            interaction.guild.id,
-            interaction.user.id,
-            PetCooldownType.EGG,
-            Config.PET_EGG_COOLDOWN,
-        )
 
         embed = build_pet_hatch_embed(
             interaction.user,

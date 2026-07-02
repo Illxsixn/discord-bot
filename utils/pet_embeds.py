@@ -19,7 +19,7 @@ from utils.pets import (
     mood_display,
     pet_birthday,
     rarity_display,
-    rarity_xp_boost_label,
+    pet_xp_boost_label,
     species_display_emoji,
     xp_progress,
 )
@@ -71,7 +71,7 @@ def build_pet_info_embed(pet: PetRecord, member: discord.Member) -> discord.Embe
     emoji = species_display_emoji(species, pet.evolution_stage)
     current, needed, percent = xp_progress(pet.xp, pet.level)
     rarity = rarity_display(species.rarity) if species else "—"
-    xp_bonus = rarity_xp_boost_label(species.rarity) if species else "—"
+    xp_bonus = pet_xp_boost_label(pet.species, pet.evolution_stage) if species else "—"
 
     return _pet_embed(
         f"{emoji} {pet.name}",
@@ -121,6 +121,28 @@ def build_pet_info_embed(pet: PetRecord, member: discord.Member) -> discord.Embe
                 False,
             ),
         ],
+    )
+
+
+def build_pet_duplicate_embed(
+    member: discord.Member,
+    species: PetSpeciesDefinition,
+    *,
+    pet_xp: int,
+    player_xp: int,
+) -> discord.Embed:
+    """Embed wenn ein bereits besessenes Pet gezogen wurde."""
+    emoji = species_display_emoji(species, PetEvolutionStage.BABY.value)
+    return _pet_embed(
+        f"🔄 {emoji} Duplikat — {species.name}",
+        description=spaced_lines(
+            f"{member.mention}, du hast **{species.name}** bereits in deiner Sammlung!",
+            "Statt eines zweiten Exemplars erhältst du:",
+            f"🐾 **+{pet_xp} Pet-XP** (dein {species.name})\n"
+            f"📈 **+{player_xp} Spieler-XP**",
+        ),
+        evolution_stage=PetEvolutionStage.BABY.value,
+        color=Config.COLOR_WARNING,
     )
 
 

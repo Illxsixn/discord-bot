@@ -19,7 +19,7 @@ from database.database import Database
 from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, success_embed
 from utils.levels import level_from_xp, progress_bar, xp_progress
 from utils.permissions import bot_can_use_channel, is_admin
-from utils.pets import apply_rarity_xp_boost, get_species_rarity
+from utils.pets import apply_pet_xp_boost
 
 logger = logging.getLogger(__name__)
 
@@ -128,11 +128,15 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
             logger.warning("Level-Up Nachricht konnte nicht gesendet werden (Guild %s).", member.guild.id)
 
     async def _boosted_player_xp(self, member: discord.Member, amount: int) -> int:
-        """Wendet den Seltenheits-Bonus des aktiven Pets auf Spieler-XP an."""
+        """Wendet den Pet-Bonus (Stufe + Seltenheit) des aktiven Pets auf Spieler-XP an."""
         pet = await self.db.get_active_pet(member.guild.id, member.id)
         if pet is None:
             return amount
-        return apply_rarity_xp_boost(amount, get_species_rarity(pet.species))
+        return apply_pet_xp_boost(
+            amount,
+            species_name=pet.species,
+            evolution_stage=pet.evolution_stage,
+        )
 
     async def award_xp(
         self,
@@ -140,6 +144,7 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         amount: int,
         *,
         channel: discord.TextChannel | discord.Thread | None = None,
+        apply_pet_boost: bool = True,
     ) -> bool:
         """
         Vergibt XP an ein Mitglied (z. B. durch Spiele oder Aufgaben).
@@ -154,7 +159,7 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         if not settings.levels_enabled:
             return False
 
-        amount = await self._boosted_player_xp(member, amount)
+        amount = await self._boosted_player_xp(member, amount) if apply_pet_boost else amount
         record = await self.db.get_user_level(member.guild.id, member.id)
         old_level = record.level
         record.xp += amount

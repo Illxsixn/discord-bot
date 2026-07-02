@@ -86,6 +86,8 @@ class Config:
     PET_XP_GAME_MIN: int = 2
     PET_XP_GAME_MAX: int = 5
     PET_EGG_COOLDOWN: int = 86400
+    PET_DUPLICATE_PET_XP: int = 25
+    PET_DUPLICATE_PLAYER_XP: int = 25
     PET_PLAY_COOLDOWN: int = 300  # 5 Minuten
     PET_RENAME_COOLDOWN: int = 604800
     PET_NAME_MAX_LENGTH: int = 15
