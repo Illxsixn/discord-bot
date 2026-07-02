@@ -578,12 +578,11 @@ class PetEvolutionStage(str, Enum):
 
 
 class PetMood(str, Enum):
-    """Stimmung eines Pets (intern englisch, Anzeige deutsch)."""
+    """Impuls-Zustand eines Pets (identisch mit /pet play)."""
 
-    HAPPY = "happy"
-    PLAYFUL = "playful"
-    SLEEPY = "sleepy"
-    CURIOUS = "curious"
+    FOCUS = "focus"
+    ENERGY = "energy"
+    LUCK = "luck"
 
 
 class PetCooldownType(str, Enum):
@@ -606,7 +605,7 @@ class PetRecord:
     species: str
     level: int = 1
     xp: int = 0
-    mood: str = PetMood.HAPPY.value
+    mood: str = PetMood.FOCUS.value
     favorite_activity: str = ""
     personality: str = ""
     catchphrase: str = ""
@@ -628,7 +627,7 @@ class PetRecord:
             species=row["species"],
             level=int(row.get("level") or 1),
             xp=int(row.get("xp") or 0),
-            mood=row.get("mood") or PetMood.HAPPY.value,
+            mood=row.get("mood") or PetMood.FOCUS.value,
             favorite_activity=row.get("favorite_activity") or "",
             personality=row.get("personality") or "",
             catchphrase=row.get("catchphrase") or "",

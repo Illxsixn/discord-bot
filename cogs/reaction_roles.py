@@ -14,7 +14,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from database.database import Database
-from utils.embeds import error_embed, info_embed, success_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, split_embed_fields, success_embed
 from utils.permissions import bot_can_use_channel, is_admin
 from utils.reactions import (
     bot_can_manage_role,
@@ -160,14 +160,16 @@ class ReactionRolesCog(commands.GroupCog, group_name="reactionrole", group_descr
                 role = interaction.guild.get_role(record.role_id)
                 role_text = role.mention if role else f"`{record.role_id}` (gelöscht)"
                 lines.append(
-                    f"**#{record.id}** • {emoji_display(record.emoji)} → {role_text}\n"
-                    f"> Nachricht `{record.message_id}` in <#{record.channel_id}>"
+                    spaced_lines(
+                        f"**#{record.id}** · {emoji_display(record.emoji)} → {role_text}",
+                        f"Nachricht `{record.message_id}` in <#{record.channel_id}>",
+                    )
                 )
 
             embed = info_embed(
                 "Reaktionsrollen",
                 f"**{len(records)}** Eintrag/Einträge",
-                fields=[("Übersicht", "\n\n".join(lines), False)],
+                fields=split_embed_fields("Übersicht", lines),
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as exc:

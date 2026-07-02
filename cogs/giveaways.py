@@ -18,7 +18,7 @@ from discord.ext import commands, tasks
 from config import Config
 from database.database import Database
 from database.models import GiveawayRecord
-from utils.embeds import apply_brand_footer, error_embed, info_embed, success_embed
+from utils.embeds import apply_brand_footer, error_embed, info_embed, spaced_lines, success_embed
 from utils.helpers import parse_duration_minutes
 from utils.permissions import bot_can_use_channel, can_manage_giveaways
 from utils.reactions import (
@@ -45,10 +45,10 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
 
     def _build_giveaway_embed(self, giveaway: GiveawayRecord) -> discord.Embed:
         """Erstellt Gewinnspiel-Embed."""
-        description = (
-            f"🎁 **Preis:** {giveaway.prize}\n"
-            f"🏆 **Gewinner:** {giveaway.winner_count}\n"
-            f"{emoji_display(giveaway.emoji)} Reagiere mit {emoji_display(giveaway.emoji)} um teilzunehmen!"
+        description = spaced_lines(
+            f"🎁 **Preis:** {giveaway.prize}",
+            f"🏆 **Gewinner:** {giveaway.winner_count}",
+            f"{emoji_display(giveaway.emoji)} Reagiere mit {emoji_display(giveaway.emoji)} um teilzunehmen!",
         )
         if not giveaway.ended:
             description += f"\n\n⏱ Endet: {discord.utils.format_dt(giveaway.ends_at, 'R')}"

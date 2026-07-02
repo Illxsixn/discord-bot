@@ -17,7 +17,7 @@ from database.models import (
     TournamentRecord,
     TournamentStatus,
 )
-from utils.embeds import apply_brand_footer, error_embed, info_embed, success_embed
+from utils.embeds import apply_brand_footer, error_embed, info_embed, spaced_lines, spaced_list, split_embed_fields, success_embed
 from utils.helpers import truncate_text
 from utils.permissions import bot_can_use_channel, is_admin
 from utils.tournament_bracket import (
@@ -158,9 +158,15 @@ class TournamentCog(commands.Cog):
             f"Match #{match.id} – Runde {match.round}",
             description,
             fields=[
-                ("Map", match.map_name or "—", True),
-                ("Status", status_text, True),
-                ("Turnier", f"#{match.tournament_id}", True),
+                (
+                    "Details",
+                    spaced_lines(
+                        f"**Map:** {match.map_name or '—'}",
+                        f"**Status:** {status_text}",
+                        f"**Turnier:** #{match.tournament_id}",
+                    ),
+                    False,
+                ),
             ],
         )
         apply_brand_footer(embed, prefix=f"Match #{match.id}")
@@ -678,11 +684,14 @@ class TournamentCog(commands.Cog):
             )
             return
         lines = [
-            f"**#{t.id}** {t.name} ({t.game}) – {TOURNAMENT_STATUS_LABELS[t.status]}"
+            spaced_lines(
+                f"**#{t.id}** {t.name}",
+                f"{t.game} · {TOURNAMENT_STATUS_LABELS[t.status]}",
+            )
             for t in tournaments[:25]
         ]
         await interaction.response.send_message(
-            embed=info_embed("Turniere", "\n".join(lines)),
+            embed=info_embed("Turniere", spaced_list(lines)),
             ephemeral=True,
         )
 
@@ -701,19 +710,28 @@ class TournamentCog(commands.Cog):
         registered = sum(1 for t in teams if t.registered)
         maps = await self.db.get_tournament_maps(turnier_id)
         fields = [
-            ("Spiel", tournament.game, True),
-            ("Status", TOURNAMENT_STATUS_LABELS[tournament.status], True),
-            ("Teams", f"{registered}/{tournament.max_teams} angemeldet", True),
-            ("Maps", ", ".join(maps) if maps else "—", False),
+            (
+                "📋 Übersicht",
+                spaced_lines(
+                    f"**Spiel:** {tournament.game}",
+                    f"**Status:** {TOURNAMENT_STATUS_LABELS[tournament.status]}",
+                    f"**Teams:** {registered}/{tournament.max_teams} angemeldet",
+                ),
+                False,
+            ),
+            ("🗺️ Maps", ", ".join(maps) if maps else "—", False),
         ]
         if tournament.description:
             fields.append(("Beschreibung", truncate_text(tournament.description, 900), False))
         team_lines = [
-            f"{'✅' if t.registered else '⏳'} **{t.name}** (Captain: <@{t.captain_id}>)"
+            spaced_lines(
+                f"{'✅' if t.registered else '⏳'} **{t.name}**",
+                f"Captain: <@{t.captain_id}>",
+            )
             for t in teams[:20]
         ]
         if team_lines:
-            fields.append(("Teamliste", "\n".join(team_lines), False))
+            fields.extend(split_embed_fields("Teams", team_lines))
         embed = info_embed(f"Turnier #{tournament.id}: {tournament.name}", fields=fields)
         apply_brand_footer(embed, prefix=f"Turnier #{tournament.id}")
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -1174,20 +1192,26 @@ class TournamentCog(commands.Cog):
                 ephemeral=True,
             )
             return
-        lines: list[str] = []
+        entries: list[str] = []
         current_round = 0
         for match in matches:
             if match.round != current_round:
                 current_round = match.round
-                lines.append(f"\n**Runde {current_round}**")
+                entries.append(f"**— Runde {current_round} —**")
             t1 = await self._team_name(interaction.guild, match.team1_id)
             t2 = await self._team_name(interaction.guild, match.team2_id)
             status = MATCH_STATUS_LABELS.get(match.status, match.status.value)
-            lines.append(f"`#{match.id}` {t1} vs {t2} | {match.map_name or '—'} | {status}")
+            entries.append(
+                spaced_lines(
+                    f"`#{match.id}` **{t1}** vs **{t2}**",
+                    f"Map: {match.map_name or '—'} · {status}",
+                )
+            )
+        fields = split_embed_fields("Matches", entries)
         await interaction.response.send_message(
             embed=info_embed(
                 f"Bracket – Turnier #{turnier_id}",
-                truncate_text("\n".join(lines), 3900),
+                fields=fields,
             ),
             ephemeral=True,
         )

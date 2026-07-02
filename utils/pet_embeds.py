@@ -10,7 +10,7 @@ import discord
 
 from config import Config
 from database.models import PetEvolutionStage, PetRarity, PetRecord
-from utils.embeds import apply_brand_footer
+from utils.embeds import apply_brand_footer, split_embed_fields, spaced_lines
 from utils.pets import (
     PET_SPECIES,
     PetSpeciesDefinition,
@@ -75,26 +75,49 @@ def build_pet_info_embed(pet: PetRecord, member: discord.Member) -> discord.Embe
 
     return _pet_embed(
         f"{emoji} {pet.name}",
-        description=f"**{evolution_display(pet.evolution_stage)}** · Besitzer {member.mention}",
+        description=spaced_lines(
+            f"**{evolution_display(pet.evolution_stage)}**",
+            f"Besitzer: {member.mention}",
+        ),
         evolution_stage=pet.evolution_stage,
         fields=[
             (
                 "📊 Fortschritt",
-                f"Level **{pet.level}** · **{pet.xp:,}** XP\n"
-                f"`{current:,}` / `{needed:,}` XP (**{percent} %**)",
+                spaced_lines(
+                    f"Level **{pet.level}** · **{pet.xp:,}** XP",
+                    f"`{current:,}` / `{needed:,}` XP (**{percent} %**)",
+                ),
                 False,
             ),
-            ("🧬 Art", f"**{pet.species}**", True),
-            ("✨ Seltenheit", rarity, True),
-            ("⚡ XP-Bonus", xp_bonus, True),
-            ("😊 Stimmung", mood_display(pet.mood), True),
-            ("🎭 Persönlichkeit", f"**{pet.personality}**", True),
-            ("🎯 Lieblingsaktivität", f"**{pet.favorite_activity}**", True),
+            (
+                "🧬 Profil",
+                spaced_lines(
+                    f"**Art:** {pet.species}",
+                    f"**Seltenheit:** {rarity}",
+                    f"**XP-Bonus:** {xp_bonus}",
+                ),
+                False,
+            ),
+            (
+                "⚡ Impuls",
+                mood_display(pet.mood),
+                False,
+            ),
+            (
+                "🎭 Charakter",
+                spaced_lines(
+                    f"**Persönlichkeit:** {pet.personality}",
+                    f"**Lieblingsaktivität:** {pet.favorite_activity}",
+                ),
+                False,
+            ),
             ("💬 Catchphrase", f"*{pet.catchphrase}*", False),
             (
                 "📅 Meta",
-                f"Geburtstag: **{pet_birthday(pet.adoption_date)}**\n"
-                f"Interaktionen: **{pet.total_interactions:,}**",
+                spaced_lines(
+                    f"**Geburtstag:** {pet_birthday(pet.adoption_date)}",
+                    f"**Interaktionen:** {pet.total_interactions:,}",
+                ),
                 False,
             ),
         ],
@@ -117,14 +140,17 @@ def build_pet_hatch_embed(
 
     return _pet_embed(
         f"🐣 {emoji} {pet.name}",
-        description=(
-            f"{member.mention} hat ein neues Pet adoptiert!\n\n"
-            f"**{species.name}** · {rarity_display(species.rarity)}\n"
-            f"{personality} · {mood_display(mood)} · {favorite}\n\n"
-            f"*{catchphrase}*"
+        description=spaced_lines(
+            f"{member.mention} hat ein neues Pet adoptiert!",
+            f"**{species.name}** · {rarity_display(species.rarity)}",
+            f"{personality} · {mood_display(mood)} · {favorite}",
+            f"*{catchphrase}*",
         ),
         evolution_stage=pet.evolution_stage,
-        fields=[("Status", status, True), ("Evolution", evolution_display(pet.evolution_stage), True)],
+        fields=[
+            ("Status", status, False),
+            ("Evolution", evolution_display(pet.evolution_stage), False),
+        ],
         color=Config.COLOR_SUCCESS,
     )
 
@@ -138,8 +164,10 @@ def build_pet_collection_embed(owner_name: str, pets: list[PetRecord]) -> discor
         active = "⭐ " if pet.is_active else ""
         rarity = rarity_display(species.rarity) if species else "—"
         lines.append(
-            f"{active}{emoji} **{pet.name}**\n"
-            f"└ Lv. **{pet.level}** · {evolution_display(pet.evolution_stage)} · {rarity}"
+            spaced_lines(
+                f"{active}{emoji} **{pet.name}**",
+                f"Lv. **{pet.level}** · {evolution_display(pet.evolution_stage)} · {rarity}",
+            )
         )
 
     return _pet_embed(
@@ -197,7 +225,7 @@ def build_pet_leaderboard_embed(
     return _pet_embed(
         f"🏆 Pet-Rangliste · {guild_name}",
         description=f"Sortierung: **{sort_label}**",
-        fields=[("Top Pets", "\n\n".join(lines) if lines else "—", False)],
+        fields=split_embed_fields("Top Pets", lines) if lines else [("Top Pets", "—", False)],
     )
 
 
@@ -221,22 +249,24 @@ def build_pet_play_embed(
     """Embed für das Impuls-Minispiel (/pet play)."""
     emoji = species_display_emoji(species, pet.evolution_stage)
     bar = _impulse_score_bar(score, total_rounds)
-
-    lines = [f"*{pet.catchphrase}*", "", f"{bar} · Runde **{round_num}/{total_rounds}**"]
+    description_parts = [
+        f"*{pet.catchphrase}*",
+        f"{bar} · Runde **{round_num}/{total_rounds}**",
+    ]
     if feedback:
-        lines.append(feedback)
+        description_parts.append(feedback)
     if xp_gain is not None:
         xp_line = f"**+{xp_gain} Pet-XP**"
         if xp_breakdown:
             xp_line += f" · {xp_breakdown}"
-        lines.append(xp_line)
-        lines.append(f"⏳ Nächstes Spiel in **{Config.PET_PLAY_COOLDOWN // 60} Min.**")
+        description_parts.append(xp_line)
+        description_parts.append(f"⏳ Nächstes Spiel in **{Config.PET_PLAY_COOLDOWN // 60} Min.**")
     else:
-        lines.append("**Welchen Impuls zeigt dein Pet?**")
+        description_parts.append("**Welchen Impuls zeigt dein Pet?**")
 
     return _pet_embed(
         f"{emoji} Impuls-Rush · {pet.name}",
-        description="\n".join(lines),
+        description=spaced_lines(*description_parts),
         evolution_stage=pet.evolution_stage,
     )
 
@@ -273,7 +303,7 @@ def build_leaderboard_line(
     species = get_species_by_name(pet.species)
     emoji = species_display_emoji(species, pet.evolution_stage)
     return (
-        f"{medal_prefix} {emoji} **{pet.name}** · {owner_name}\n"
-        f"└ Lv. **{pet.level}** · **{pet.xp:,}** XP · "
+        f"{medal_prefix} {emoji} **{pet.name}** · {owner_name}\n\n"
+        f"Lv. **{pet.level}** · **{pet.xp:,}** XP\n"
         f"{evolution_display(pet.evolution_stage)} · **{pet.total_interactions}** Interaktionen"
     )

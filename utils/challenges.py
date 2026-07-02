@@ -164,6 +164,7 @@ def challenge_progress_text(task: ChallengeTask) -> str:
 def format_challenge_task_line(index: int, task: ChallengeTask) -> str:
     """Formatiert eine Tagesaufgabe übersichtlich."""
     return (
-        f"**{index}.** {task.label}\n"
-        f"└ {challenge_progress_text(task)} · Belohnung: {task.reward_text}"
+        f"**{task.label}**\n\n"
+        f"{challenge_progress_text(task)}\n"
+        f"Belohnung: {task.reward_text}"
     )

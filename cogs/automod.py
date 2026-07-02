@@ -16,7 +16,7 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from database.models import AutoModPunishment
-from utils.embeds import error_embed, success_embed, warning_embed
+from utils.embeds import error_embed, spaced_list, success_embed, warning_embed
 from utils.helpers import (
     contains_bad_word,
     contains_discord_invite,
@@ -313,7 +313,7 @@ class AutoModCog(commands.GroupCog, group_name="automod", group_description="Aut
                 if not words:
                     text = "Keine Wörter konfiguriert."
                 else:
-                    text = ", ".join(f"`{w}`" for w in words)
+                    text = spaced_list([f"`{w}`" for w in words])
                 await interaction.followup.send(embed=success_embed("Bad Words", text), ephemeral=True)
 
             elif action.value == "toggle":
