@@ -40,6 +40,7 @@ COGS: list[str] = [
     "cogs.leave",
     "cogs.automod",
     "cogs.moderation",
+    "cogs.emoji",
     "cogs.levels",
     "cogs.pets",
     "cogs.guess",
