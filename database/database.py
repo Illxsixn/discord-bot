@@ -248,7 +248,7 @@ CREATE TABLE IF NOT EXISTS pets (
     species TEXT NOT NULL,
     level INTEGER DEFAULT 1,
     xp INTEGER DEFAULT 0,
-    mood TEXT DEFAULT 'happy',
+    mood TEXT DEFAULT 'focus',
     favorite_activity TEXT,
     personality TEXT,
     catchphrase TEXT,

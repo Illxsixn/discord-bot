@@ -25,7 +25,7 @@ from database.models import (
     TicketSettings,
     TicketStatus,
 )
-from utils.embeds import apply_brand_footer, error_embed, info_embed, log_event_embed, success_embed
+from utils.embeds import apply_brand_footer, error_embed, info_embed, log_event_embed, spaced_lines, spaced_list, split_embed_fields, success_embed
 from utils.helpers import format_placeholders, truncate_text
 from utils.permissions import bot_can_use_channel, is_admin
 
@@ -1141,15 +1141,19 @@ class TicketsCog(commands.GroupCog, group_name="ticket", group_description="Supp
                 else "—"
             )
             lines.append(
-                f"**#{ticket.id}** • {channel_ref}\n"
-                f"Status: **{_status_label(ticket.status)}** • Ersteller: {opener_name} • Staff: {claimed}"
+                spaced_lines(
+                    f"**#{ticket.id}** · {channel_ref}",
+                    f"Status: **{_status_label(ticket.status)}**",
+                    f"Ersteller: {opener_name}",
+                    f"Staff: {claimed}",
+                )
             )
 
         await interaction.followup.send(
             embed=info_embed(
                 f"Offene Tickets — {interaction.guild.name}",
                 f"**{len(tickets)}** offene(s) Ticket(s)",
-                fields=[("Tickets", "\n\n".join(lines), False)],
+                fields=split_embed_fields("Tickets", lines),
             ),
             ephemeral=True,
         )

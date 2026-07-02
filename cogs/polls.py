@@ -17,7 +17,7 @@ from discord.ext import commands, tasks
 from config import Config
 from database.database import Database
 from database.models import PollRecord, PollType
-from utils.embeds import apply_brand_footer, error_embed, info_embed, success_embed
+from utils.embeds import apply_brand_footer, error_embed, info_embed, spaced_list, success_embed
 from utils.helpers import parse_duration_minutes
 from utils.permissions import bot_can_use_channel, can_manage_community
 from utils.reactions import (
@@ -45,14 +45,18 @@ class PollsCog(commands.GroupCog, group_name="poll", group_description="Umfragen
     async def _build_poll_embed(self, poll: PollRecord, *, footer: str | None = None) -> discord.Embed:
         """Erstellt Umfrage-Embed."""
         if poll.poll_type == PollType.YES_NO:
-            options_text = "\n".join(
-                f"{emoji} — **{label}**"
-                for emoji, label in zip(POLL_YES_NO_EMOJIS, ("Ja", "Nein"), strict=True)
+            options_text = spaced_list(
+                [
+                    f"{emoji} — **{label}**"
+                    for emoji, label in zip(POLL_YES_NO_EMOJIS, ("Ja", "Nein"), strict=True)
+                ]
             )
         else:
-            options_text = "\n".join(
-                f"{POLL_NUMBER_EMOJIS[index]} — **{option}**"
-                for index, option in enumerate(poll.options)
+            options_text = spaced_list(
+                [
+                    f"{POLL_NUMBER_EMOJIS[index]} — **{option}**"
+                    for index, option in enumerate(poll.options)
+                ]
             )
 
         description = poll.question

@@ -17,7 +17,7 @@ from discord.ext import commands
 
 from config import Config
 from database.database import Database
-from utils.embeds import error_embed, info_embed, moderation_embed, success_embed, warn_embed
+from utils.embeds import error_embed, info_embed, moderation_embed, spaced_lines, split_embed_fields, success_embed, warn_embed
 from utils.helpers import parse_duration_minutes
 from utils.permissions import has_guild_permissions, user_can_moderate
 
@@ -357,12 +357,18 @@ class ModerationCog(commands.Cog):
             lines = []
             for w in records:
                 mod = interaction.guild.get_member(w.moderator_id) or f"`{w.moderator_id}`"
-                lines.append(f"**#{w.id}** • {w.created_at.strftime('%d.%m.%Y')} • {mod}\n> {w.reason}")
+                lines.append(
+                    spaced_lines(
+                        f"**#{w.id}** · {w.created_at.strftime('%d.%m.%Y')}",
+                        f"Moderator: {mod}",
+                        f"**Grund:** {w.reason}",
+                    )
+                )
 
             embed = info_embed(
                 f"Warnungen – {user.display_name}",
                 f"Anzahl: **{len(records)}**",
-                fields=[("Einträge", "\n\n".join(lines), False)],
+                fields=split_embed_fields("Einträge", lines),
             )
             embed.set_thumbnail(url=user.display_avatar.url)
             await interaction.followup.send(embed=embed, ephemeral=True)

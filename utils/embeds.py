@@ -15,6 +15,69 @@ import discord
 from config import Config
 
 BRAND_ICON_ATTACHMENT = "anarchy_icon.png"
+DISCORD_FIELD_VALUE_LIMIT = 1024
+
+
+def spaced_lines(*parts: str) -> str:
+    """Verbindet Textblöcke mit Leerzeile dazwischen."""
+    cleaned = [part.strip() for part in parts if part and part.strip()]
+    return "\n\n".join(cleaned)
+
+
+def spaced_list(items: list[str]) -> str:
+    """Formatiert eine Liste mit Leerzeilen zwischen Einträgen."""
+    return spaced_lines(*items)
+
+
+def split_embed_fields(
+    name: str,
+    entries: list[str],
+    *,
+    inline: bool = False,
+    joiner: str = "\n\n",
+    max_length: int = DISCORD_FIELD_VALUE_LIMIT,
+) -> list[tuple[str, str, bool]]:
+    """
+    Teilt lange Eintragslisten in mehrere Embed-Felder (Discord-Limit).
+
+    Args:
+        name: Feldname (bei Fortsetzung mit „(2)“ usw.).
+        entries: Einzelne Einträge.
+        inline: Ob Felder inline sind.
+        joiner: Trenner zwischen Einträgen im selben Feld.
+        max_length: Maximale Zeichen pro Feldwert.
+
+    Returns:
+        Liste von (name, value, inline) Tupeln.
+    """
+    if not entries:
+        return [(name, "—", inline)]
+
+    fields: list[tuple[str, str, bool]] = []
+    chunk: list[str] = []
+    chunk_len = 0
+    part = 1
+
+    for raw in entries:
+        entry = raw.strip()
+        if not entry:
+            continue
+        extra = len(entry) + (len(joiner) if chunk else 0)
+        if chunk and chunk_len + extra > max_length:
+            label = name if part == 1 else f"{name} ({part})"
+            fields.append((label, joiner.join(chunk), inline))
+            chunk = [entry]
+            chunk_len = len(entry)
+            part += 1
+        else:
+            chunk.append(entry)
+            chunk_len = chunk_len + extra if chunk else len(entry)
+
+    if chunk:
+        label = name if part == 1 and not fields else (name if not fields else f"{name} ({part})")
+        fields.append((label, joiner.join(chunk), inline))
+
+    return fields
 
 
 def brand_name() -> str:
@@ -280,7 +343,11 @@ def warn_embed(
         timestamp=datetime.now(timezone.utc),
     )
     embed.add_field(name="Grund", value=reason, inline=False)
-    embed.add_field(name="Moderator", value=f"{moderator.mention} (`{moderator.id}`)", inline=True)
+    embed.add_field(
+        name="Moderator",
+        value=f"{moderator.mention}\n`{moderator.id}`",
+        inline=True,
+    )
     if warning_id is not None:
         embed.add_field(name="Warn-ID", value=f"**#{warning_id}**", inline=True)
     if total_warnings is not None:
@@ -316,10 +383,14 @@ def moderation_embed(
         color=color or Config.COLOR_INFO,
         timestamp=datetime.now(timezone.utc),
     )
-    embed.add_field(name="Benutzer", value=f"{target.mention} (`{target.id}`)", inline=True)
+    embed.add_field(
+        name="Benutzer",
+        value=f"{target.mention}\n`{target.id}`",
+        inline=True,
+    )
     embed.add_field(
         name="Moderator",
-        value=f"{moderator.mention} (`{moderator.id}`)",
+        value=f"{moderator.mention}\n`{moderator.id}`",
         inline=True,
     )
     embed.add_field(name="Grund", value=reason or "Kein Grund angegeben", inline=False)

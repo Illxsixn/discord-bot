@@ -16,7 +16,7 @@ from discord.ext import commands
 
 from config import Config
 from database.database import Database
-from utils.embeds import error_embed, info_embed, success_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, success_embed
 from utils.levels import level_from_xp, progress_bar, xp_progress
 from utils.permissions import bot_can_use_channel, is_admin
 from utils.pets import apply_rarity_xp_boost, get_species_rarity
@@ -62,21 +62,29 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
 
         embed = info_embed(
             f"Level — {member.display_name}",
-            f"**{member.mention}** auf **{guild.name}**",
+            member.mention,
             fields=[
-                ("Level", f"**{record.level}**", True),
-                ("Rang", f"**#{rank}**", True),
-                ("XP gesamt", f"**{record.xp:,}**", True),
+                (
+                    "📊 Übersicht",
+                    spaced_lines(
+                        f"**Level:** {record.level}",
+                        f"**Rang:** #{rank}",
+                        f"**XP gesamt:** {record.xp:,}",
+                    ),
+                    False,
+                ),
                 (
                     "Fortschritt",
-                    f"`{progress_bar(percent)}` **{percent}%**\n"
-                    f"**{current:,}** / **{needed:,}** XP bis Level **{next_level}**",
+                    spaced_lines(
+                        f"`{progress_bar(percent)}` **{percent}%**",
+                        f"**{current:,}** / **{needed:,}** XP bis Level **{next_level}**",
+                    ),
                     False,
                 ),
                 (
                     "XP pro Nachricht",
                     f"**{Config.XP_PER_MESSAGE} XP** (Cooldown: **{Config.LEVEL_XP_COOLDOWN}s**)",
-                    True,
+                    False,
                 ),
             ],
         )
@@ -260,12 +268,17 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
             member = interaction.guild.get_member(record.user_id)  # type: ignore[union-attr]
             name = member.display_name if member else f"User `{record.user_id}`"
             prefix = medals[index - 1] if index <= 3 else f"**{index}.**"
-            lines.append(f"{prefix} {name} — Level **{record.level}** • **{record.xp:,}** XP")
+            lines.append(
+                spaced_lines(
+                    f"{prefix} **{name}**",
+                    f"Level **{record.level}** · **{record.xp:,}** XP",
+                )
+            )
 
         embed = info_embed(
             f"Leaderboard — {interaction.guild.name}",  # type: ignore[union-attr]
             f"Top **{len(records)}** aktivste Mitglieder",
-            fields=[("Rangliste", "\n".join(lines), False)],
+            fields=[("Rangliste", spaced_list(lines), False)],
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
 

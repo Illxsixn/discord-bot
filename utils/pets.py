@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 from config import Config
 from database.models import PetEvolutionStage, PetMood, PetRarity
+from utils.pet_play import PET_IMPULSES
 from utils.helpers import contains_bad_word
 
 
@@ -85,19 +86,20 @@ FAVORITE_ACTIVITIES: tuple[str, ...] = (
     "Abenteuer",
 )
 
-MOOD_LABELS: dict[str, str] = {
-    PetMood.HAPPY.value: "fröhlich",
-    PetMood.PLAYFUL.value: "verspielt",
-    PetMood.SLEEPY.value: "müde",
-    PetMood.CURIOUS.value: "neugierig",
+LEGACY_MOOD_MAP: dict[str, str] = {
+    "happy": PetMood.FOCUS.value,
+    "playful": PetMood.ENERGY.value,
+    "sleepy": PetMood.LUCK.value,
+    "curious": PetMood.FOCUS.value,
 }
 
-MOOD_EMOJIS: dict[str, str] = {
-    PetMood.HAPPY.value: "😊",
-    PetMood.PLAYFUL.value: "🎾",
-    PetMood.SLEEPY.value: "😴",
-    PetMood.CURIOUS.value: "🔍",
+MOOD_LABELS: dict[str, str] = {
+    impulse_id: label for impulse_id, _emoji, label in PET_IMPULSES
 }
+MOOD_EMOJIS: dict[str, str] = {
+    impulse_id: emoji for impulse_id, emoji, _label in PET_IMPULSES
+}
+PET_MOOD_IDS: tuple[str, ...] = tuple(MOOD_LABELS.keys())
 
 RARITY_EMOJIS: dict[PetRarity, str] = {
     PetRarity.COMMON: "⚪",
@@ -282,9 +284,17 @@ def random_personality() -> str:
     return random.choice(PERSONALITIES)
 
 
+def normalize_mood(mood: str) -> str:
+    """Mappt alte Stimmungswerte auf die drei Pet-Play-Impulse."""
+    normalized = LEGACY_MOOD_MAP.get(mood, mood)
+    if normalized in MOOD_LABELS:
+        return normalized
+    return PetMood.FOCUS.value
+
+
 def random_mood() -> str:
-    """Wählt zufällig eine Stimmung."""
-    return random.choice(list(MOOD_LABELS.keys()))
+    """Wählt zufällig einen Impuls-Zustand."""
+    return random.choice(PET_MOOD_IDS)
 
 
 def random_favorite_activity() -> str:
@@ -305,7 +315,8 @@ def default_pet_name(species: PetSpeciesDefinition) -> str:
 
 
 def mood_display(mood: str) -> str:
-    """Formatiert Stimmung mit Emoji und deutschem Label."""
+    """Formatiert Impuls-Zustand mit Emoji und Label."""
+    mood = normalize_mood(mood)
     emoji = MOOD_EMOJIS.get(mood, "🐾")
     label = MOOD_LABELS.get(mood, mood)
     return f"{emoji} {label}"

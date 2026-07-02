@@ -18,6 +18,7 @@ import discord
 from PIL import Image, ImageDraw, ImageFont
 
 from config import Config
+from utils.embeds import spaced_lines
 
 if TYPE_CHECKING:
     from database.models import GuildSettings
@@ -207,28 +208,55 @@ def guild_settings_to_fields(settings: "GuildSettings") -> list[tuple[str, str, 
         Liste von (name, value, inline) Tupeln.
     """
     def ch(channel_id: int | None) -> str:
-        return f"<#{channel_id}>" if channel_id else "Nicht gesetzt"
+        return f"<#{channel_id}>" if channel_id else "— Nicht gesetzt"
+
+    def onoff(enabled: bool) -> str:
+        return "✅ Aktiv" if enabled else "❌ Inaktiv"
 
     return [
-        ("Welcome", "✅ Aktiv" if settings.welcome_enabled else "❌ Inaktiv", True),
-        ("Welcome-Kanal", ch(settings.welcome_channel_id), True),
-        ("Leave", "✅ Aktiv" if settings.leave_enabled else "❌ Inaktiv", True),
-        ("Leave-Kanal", ch(settings.leave_channel_id), True),
-        ("Logs", "✅ Aktiv" if settings.logs_enabled else "❌ Inaktiv", True),
-        ("Log-Kanal", ch(settings.logs_channel_id), True),
-        ("AutoMod", "✅ Aktiv" if settings.automod_enabled else "❌ Inaktiv", True),
-        ("Spam-Schutz", "✅" if settings.spam_protection else "❌", True),
-        ("Invite-Blocker", "✅" if settings.invite_blocker else "❌", True),
-        ("Link-Blocker", "✅" if settings.link_blocker else "❌", True),
-        ("Bad-Word-Filter", "✅" if settings.bad_word_filter else "❌", True),
-        ("AutoMod-Strafe", settings.automod_punishment.value.title(), True),
-        ("Mute-Rolle", f"<@&{settings.mute_role_id}>" if settings.mute_role_id else "Nicht gesetzt", True),
-        ("Level-System", "✅ Aktiv" if settings.levels_enabled else "❌ Inaktiv", True),
-        ("Level-XP", f"{Config.XP_PER_MESSAGE} pro Nachricht", True),
         (
-            "Level-Up Kanal",
-            f"<#{settings.levels_announce_channel_id}>" if settings.levels_announce_channel_id else "Nachrichtenkanal",
-            True,
+            "👋 Welcome & Leave",
+            spaced_lines(
+                f"**Welcome:** {onoff(settings.welcome_enabled)}",
+                f"**Welcome-Kanal:** {ch(settings.welcome_channel_id)}",
+                f"**Leave:** {onoff(settings.leave_enabled)}",
+                f"**Leave-Kanal:** {ch(settings.leave_channel_id)}",
+            ),
+            False,
+        ),
+        (
+            "📋 Logs",
+            spaced_lines(
+                f"**Logs:** {onoff(settings.logs_enabled)}",
+                f"**Log-Kanal:** {ch(settings.logs_channel_id)}",
+            ),
+            False,
+        ),
+        (
+            "🤖 AutoMod",
+            spaced_lines(
+                f"**AutoMod:** {onoff(settings.automod_enabled)}",
+                f"**Spam-Schutz:** {'✅' if settings.spam_protection else '❌'}",
+                f"**Invite-Blocker:** {'✅' if settings.invite_blocker else '❌'}",
+                f"**Link-Blocker:** {'✅' if settings.link_blocker else '❌'}",
+                f"**Bad-Word-Filter:** {'✅' if settings.bad_word_filter else '❌'}",
+                f"**Strafe:** {settings.automod_punishment.value.title()}",
+                f"**Mute-Rolle:** {f'<@&{settings.mute_role_id}>' if settings.mute_role_id else '— Nicht gesetzt'}",
+            ),
+            False,
+        ),
+        (
+            "📈 Level-System",
+            spaced_lines(
+                f"**Level-System:** {onoff(settings.levels_enabled)}",
+                f"**XP pro Nachricht:** {Config.XP_PER_MESSAGE}",
+                (
+                    f"**Level-Up Kanal:** <#{settings.levels_announce_channel_id}>"
+                    if settings.levels_announce_channel_id
+                    else "**Level-Up Kanal:** Nachrichtenkanal"
+                ),
+            ),
+            False,
         ),
     ]
 

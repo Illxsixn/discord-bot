@@ -16,7 +16,7 @@ from config import Config
 from database.database import Database
 from database.models import GuessStatsRecord
 from utils.board_game_lifecycle import build_active_game_error_embed
-from utils.embeds import error_embed, info_embed, success_embed
+from utils.embeds import error_embed, info_embed, spaced_list, success_embed
 from utils.game_locks import game_lock
 from utils.game_rewards import award_game_xp
 
@@ -264,9 +264,9 @@ class GuessCog(commands.Cog):
             f"Zahlenraten — {interaction.guild.name}",
             "Bestenliste für diesen Server.",
             fields=[
-                ("Meiste Siege", "\n".join(win_lines), False),
-                ("Wenigste Ø Versuche", "\n".join(attempt_lines), False),
-                ("Schnellster Sieg", "\n".join(fast_lines), False),
+                ("Meiste Siege", spaced_list(win_lines), False),
+                ("Wenigste Ø Versuche", spaced_list(attempt_lines), False),
+                ("Schnellster Sieg", spaced_list(fast_lines), False),
             ],
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
