@@ -70,7 +70,7 @@ def build_pet_info_embed(
     member: discord.Member,
     *,
     gold: int | None = None,
-    dungeon_hp: str | None = None,
+    survival_stat: str | None = None,
 ) -> discord.Embed:
     """Übersichtliches Profil des aktiven Pets."""
     species = get_species_by_name(pet.species)
@@ -85,8 +85,8 @@ def build_pet_info_embed(
     ]
     if gold is not None:
         overview_lines.append(f"**Gold:** {gold:,} 🪙")
-    if dungeon_hp is not None:
-        overview_lines.append(f"**Dungeon-HP:** {dungeon_hp}")
+    if survival_stat is not None:
+        overview_lines.append(f"**Zombie Survival:** {survival_stat}")
 
     return _pet_embed(
         f"{emoji} {pet.name}",

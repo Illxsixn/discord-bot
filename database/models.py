@@ -166,122 +166,140 @@ class UserLevelRecord:
 
 @dataclass
 class PlayerEconomyRecord:
-    """Gold, Lootbox-Inventar und Dungeon-Ressourcen pro Guild."""
+    """Gold und Lootbox-Inventar pro Guild."""
 
     guild_id: int
     user_id: int
     gold: int = 0
     lootbox_count: int = 0
-    player_hp: int = 0
-    player_hp_max: int = 0
-    last_hp_regen_at: datetime | None = None
-    last_dungeon_at: datetime | None = None
-    dungeons_completed: int = 0
-    pet_recovery_until: datetime | None = None
-    pet_recovery_pet_id: int | None = None
 
     @classmethod
     def from_row(cls, row: dict[str, Any]) -> "PlayerEconomyRecord":
-        last_regen = row.get("last_hp_regen_at")
-        last_dungeon = row.get("last_dungeon_at")
-        recovery = row.get("pet_recovery_until")
         return cls(
             guild_id=row["guild_id"],
             user_id=row["user_id"],
             gold=int(row.get("gold") or 0),
             lootbox_count=int(row.get("lootbox_count") or 0),
-            player_hp=int(row.get("player_hp") or 0),
-            player_hp_max=int(row.get("player_hp_max") or 0),
-            last_hp_regen_at=(
-                datetime.fromisoformat(last_regen)
-                if isinstance(last_regen, str) and last_regen
-                else None
-            ),
-            last_dungeon_at=(
-                datetime.fromisoformat(last_dungeon)
-                if isinstance(last_dungeon, str) and last_dungeon
-                else None
-            ),
-            dungeons_completed=int(row.get("dungeons_completed") or 0),
-            pet_recovery_until=(
-                datetime.fromisoformat(recovery)
-                if isinstance(recovery, str) and recovery
-                else None
-            ),
-            pet_recovery_pet_id=row.get("pet_recovery_pet_id"),
         )
 
 
-class DungeonRunStatus(str, Enum):
-    """Status eines Dungeon-Laufs."""
+class ZombieRunStatus(str, Enum):
+    """Status eines Zombie-Survival-Laufs."""
 
     ACTIVE = "active"
     COMPLETED = "completed"
     FAILED = "failed"
-    ABANDONED = "abandoned"
+    EXPIRED = "expired"
 
 
-class DungeonEventType(str, Enum):
-    """Ereignistyp in einem Dungeon-Raum."""
+class ZombieCooldownType(str, Enum):
+    """Cooldown-Typen für Zombie Survival."""
 
-    FIGHT = "fight"
-    TRAP = "trap"
-    TREASURE = "treasure"
-    FOUNTAIN = "fountain"
-    GOLD = "gold"
-    PET_XP = "pet_xp"
+    RUN = "run"
 
 
 @dataclass
-class DungeonRunRecord:
-    """Laufender oder abgeschlossener Dungeon."""
+class ZombiePlayerRecord:
+    """Permanentes Zombie-Survival-Profil pro Guild."""
 
     guild_id: int
     user_id: int
-    pet_id: int
-    status: str
-    current_room: int
-    total_rooms: int
-    player_hp: int
-    player_hp_max: int
-    pet_hp: int
-    pet_hp_max: int
-    started_at: datetime
-    updated_at: datetime
-    id: int = 0
-    rooms_cleared: int = 0
-    session_gold: int = 0
-    events: list[str] = field(default_factory=list)
+    level: int = 1
+    xp: int = 0
+    highest_wave: int = 0
+    total_kills: int = 0
+    boss_kills: int = 0
+    runs_completed: int = 0
+    runs_failed: int = 0
+    perks_json: str = "{}"
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
-    def from_row(cls, row: dict[str, Any]) -> "DungeonRunRecord":
-        raw_events = row.get("events_json") or "[]"
-        try:
-            events = json.loads(raw_events)
-        except (json.JSONDecodeError, TypeError):
-            events = []
-        if not isinstance(events, list):
-            events = []
-        started = row.get("started_at")
+    def from_row(cls, row: dict[str, Any]) -> "ZombiePlayerRecord":
+        created = row.get("created_at")
         updated = row.get("updated_at")
         return cls(
-            id=row["id"],
             guild_id=row["guild_id"],
             user_id=row["user_id"],
-            pet_id=row["pet_id"],
-            status=row.get("status") or DungeonRunStatus.ACTIVE.value,
-            current_room=int(row.get("current_room") or 0),
-            total_rooms=int(row.get("total_rooms") or 0),
-            rooms_cleared=int(row.get("rooms_cleared") or 0),
-            player_hp=int(row.get("player_hp") or 0),
-            player_hp_max=int(row.get("player_hp_max") or 0),
-            pet_hp=int(row.get("pet_hp") or 0),
-            pet_hp_max=int(row.get("pet_hp_max") or 0),
-            session_gold=int(row.get("session_gold") or 0),
-            events=[str(e) for e in events],
-            started_at=datetime.fromisoformat(started) if isinstance(started, str) else datetime.now(timezone.utc),
+            level=int(row.get("level") or 1),
+            xp=int(row.get("xp") or 0),
+            highest_wave=int(row.get("highest_wave") or 0),
+            total_kills=int(row.get("total_kills") or 0),
+            boss_kills=int(row.get("boss_kills") or 0),
+            runs_completed=int(row.get("runs_completed") or 0),
+            runs_failed=int(row.get("runs_failed") or 0),
+            perks_json=row.get("perks_json") or "{}",
+            created_at=datetime.fromisoformat(created) if isinstance(created, str) else datetime.now(timezone.utc),
             updated_at=datetime.fromisoformat(updated) if isinstance(updated, str) else datetime.now(timezone.utc),
         )
+
+
+@dataclass
+class ZombieRunRecord:
+    """Laufender oder abgeschlossener Zombie-Survival-Run."""
+
+    id: int
+    guild_id: int
+    user_id: int
+    status: str
+    wave: int
+    max_waves: int
+    player_hp: int
+    player_max_hp: int
+    created_at: datetime
+    updated_at: datetime
+    channel_id: int | None = None
+    message_id: int | None = None
+    run_gold: int = 0
+    current_zombie_key: str | None = None
+    current_zombie_hp: int = 0
+    zombies_remaining: int = 0
+    pet_action_cooldown: int = 0
+    luck_bonus_uses: int = 0
+    focus_active: int = 0
+    total_damage: int = 0
+    last_action_text: str = ""
+    shop_available: int = 0
+
+    @classmethod
+    def from_row(cls, row: dict[str, Any]) -> "ZombieRunRecord":
+        created = row.get("created_at")
+        updated = row.get("updated_at")
+        return cls(
+            id=int(row["id"]),
+            guild_id=row["guild_id"],
+            user_id=row["user_id"],
+            channel_id=row.get("channel_id"),
+            message_id=row.get("message_id"),
+            status=row.get("status") or ZombieRunStatus.ACTIVE.value,
+            wave=int(row.get("wave") or 1),
+            max_waves=int(row.get("max_waves") or 3),
+            player_hp=int(row.get("player_hp") or 0),
+            player_max_hp=int(row.get("player_max_hp") or 0),
+            run_gold=int(row.get("run_gold") or 0),
+            current_zombie_key=row.get("current_zombie_key"),
+            current_zombie_hp=int(row.get("current_zombie_hp") or 0),
+            zombies_remaining=int(row.get("zombies_remaining") or 0),
+            pet_action_cooldown=int(row.get("pet_action_cooldown") or 0),
+            luck_bonus_uses=int(row.get("luck_bonus_uses") or 0),
+            focus_active=int(row.get("focus_active") or 0),
+            total_damage=int(row.get("total_damage") or 0),
+            last_action_text=row.get("last_action_text") or "",
+            shop_available=int(row.get("shop_available") or 0),
+            created_at=datetime.fromisoformat(created) if isinstance(created, str) else datetime.now(timezone.utc),
+            updated_at=datetime.fromisoformat(updated) if isinstance(updated, str) else datetime.now(timezone.utc),
+        )
+
+    @property
+    def in_combat(self) -> bool:
+        """True wenn ein Zombie aktiv ist."""
+        return bool(self.current_zombie_key) and self.current_zombie_hp > 0
+
+    @property
+    def between_waves(self) -> bool:
+        """True zwischen Wellen (Wellenpause erlaubt)."""
+        return not self.in_combat and self.shop_available == 1
 
 
 @dataclass

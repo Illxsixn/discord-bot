@@ -46,8 +46,7 @@ from utils.pet_play import (
     pet_play_xp_for_score,
     random_impulse_id,
 )
-from utils.dungeons import player_hp_max
-from utils.economy_display import format_dungeon_hp_line, get_profile_economy
+from utils.economy_display import format_zombie_stat_line, get_profile_economy
 from utils.pets import (
     apply_pet_xp_boost,
     pet_xp_boost_label,
@@ -661,12 +660,12 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             return
         level = (await self.db.get_user_level(interaction.guild.id, interaction.user.id)).level
         economy = await get_profile_economy(self.db, interaction.guild.id, interaction.user.id, level)
-        hp_max = player_hp_max(level)
+        zombie_line = await format_zombie_stat_line(self.db, interaction.guild.id, interaction.user.id)
         embed = build_pet_info_embed(
             pet,
             interaction.user,
             gold=economy.gold,
-            dungeon_hp=format_dungeon_hp_line(economy, hp_max),
+            survival_stat=zombie_line,
         )
         await interaction.followup.send(embed=embed)
         await self._track_pet_challenge(

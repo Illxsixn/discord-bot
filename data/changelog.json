@@ -1,6 +1,22 @@
 {
-  "version": "1.5",
+  "version": "1.6",
   "releases": [
+    {
+      "version": "1.6",
+      "changes": [
+        "Neu: /zombies — Zombie Survival (3 Wellen, Boss)",
+        "Nahkampf, Pet-Aktion, Shop, Interface, Leaderboard",
+        "Persistente Runs · 12h Inaktivität · kein Abbrechen",
+        "Ersetzt Pet-Dungeons (/dungeon)",
+        "Neu: /shop — zentraler Marktplatz für Lootboxen",
+        "Zombie-GIFs via Agnes-API (scripts/generate_zombie_assets.py)",
+        "Fix: Dungeon-Altcode entfernt, /lootbox buy → /shop",
+        "Fix: Wellenpause-Button, generische GIF-Namen",
+        "Fix: Economy-Modell ohne Dungeon-Felder",
+        "Fix: Abgelaufene Runs geben Trostbelohnung (auch beim Start)",
+        "Balance: Zombie-Kampf HP, Schaden & Wellenheilung"
+      ]
+    },
     {
       "version": "1.5",
       "changes": [

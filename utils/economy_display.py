@@ -1,12 +1,11 @@
 """
-Anzeige-Hilfen für Gold und Dungeon-HP in Profil-Embeds.
+Anzeige-Hilfen für Gold und Zombie-Survival in Profil-Embeds.
 """
 
 from __future__ import annotations
 
 from database.database import Database
 from database.models import PlayerEconomyRecord
-from utils.dungeons import apply_hp_regen, player_hp_max
 
 
 async def get_profile_economy(
@@ -15,10 +14,8 @@ async def get_profile_economy(
     user_id: int,
     player_level: int,
 ) -> PlayerEconomyRecord:
-    """Lädt Economy-Daten inkl. HP-Regen für Profil-Anzeige."""
-    economy = await db.get_player_economy(guild_id, user_id)
-    hp_max = player_hp_max(player_level)
-    return apply_hp_regen(economy, hp_max)
+    """Lädt Economy-Daten für Profil-Anzeige."""
+    return await db.get_player_economy(guild_id, user_id)
 
 
 def format_gold_line(economy: PlayerEconomyRecord) -> str:
@@ -26,8 +23,7 @@ def format_gold_line(economy: PlayerEconomyRecord) -> str:
     return f"**{economy.gold:,}** 🪙"
 
 
-def format_dungeon_hp_line(economy: PlayerEconomyRecord, hp_max: int) -> str:
-    """Dungeon-HP-Zeile für Embeds."""
-    from utils.dungeon_embeds import format_hp_bar
-
-    return format_hp_bar(economy.player_hp, hp_max)
+async def format_zombie_stat_line(db: Database, guild_id: int, user_id: int) -> str:
+    """Kurzzeile Zombie-Survival für Profil-Embeds."""
+    profile = await db.get_zombie_player(guild_id, user_id)
+    return f"Level **{profile.level}** · Welle **{profile.highest_wave}** · **{profile.total_kills}** Kills"

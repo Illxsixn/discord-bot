@@ -39,7 +39,8 @@ class HelpCategory(enum.Enum):
     Spiele = "games"
     Challenges = "challenges"
     Lootbox = "lootbox"
-    Dungeons = "dungeons"
+    Shop = "shop"
+    Zombies = "zombies"
     ReactionRoles = "reactionrole"
     Polls = "poll"
     Giveaways = "giveaway"
@@ -154,7 +155,7 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
         "hints": [
             "5 XP pro Nachricht (10 Sekunden Cooldown)",
             "Bonus-XP durch Spiele und tägliche Aufgaben",
-            "`/levels level` zeigt auch Gold & Dungeon-HP",
+            "`/levels level` zeigt auch Gold & Zombie Survival",
         ],
     },
     HelpCategory.Pets.value: {
@@ -179,7 +180,7 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             f"Duplikat beim Ei: bereits vorhandene Art → **{Config.PET_DUPLICATE_PET_XP} Pet-XP** + **{Config.PET_DUPLICATE_PLAYER_XP} Spieler-XP**",
             "Pet-Befehle werden im Kanal angezeigt (für alle sichtbar)",
             "`/pet dex` — gesammelte ✅, fehlende ❓",
-            "`/pet info` zeigt auch Gold & Dungeon-HP",
+            "`/pet info` zeigt auch Gold & Zombie Survival",
         ],
     },
     HelpCategory.Spiele.value: {
@@ -204,33 +205,50 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
         "emoji": "📦",
         "access": "Alle",
         "commands": [
-            ("/lootbox shop", "Preis, Chancen, Gold und Inventar"),
-            ("/lootbox buy", "Lootboxen mit Gold kaufen"),
             ("/lootbox open", "Lootboxen öffnen"),
             ("/lootbox leaderboard", "Gold-Rangliste des Servers"),
         ],
         "hints": [
-            f"Preis: **{Config.LOOTBOX_PRICE} Gold** pro Box",
+            f"Kaufen nur im **`/shop`** (**{Config.LOOTBOX_PRICE} Gold** pro Box)",
             f"Jackpot: **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** Chance auf "
             f"**{Config.LOOTBOX_XP_REWARD}** Spieler-XP **+** **{Config.LOOTBOX_XP_REWARD}** Pet-XP",
             f"Gold durch Spielsiege (**{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}**)",
             "Pet-XP nur mit aktivem Pet; Spieler-XP wenn Level-System aktiv ist",
         ],
     },
-    HelpCategory.Dungeons.value: {
-        "label": "Dungeons",
-        "emoji": "🗺️",
+    HelpCategory.Shop.value: {
+        "label": "Shop",
+        "emoji": "🏪",
         "access": "Alle",
         "commands": [
-            ("/dungeon start", "Dungeon mit aktivem Pet starten"),
-            ("/dungeon status", "HP, Gold, Cooldown — Heilen & Weiter"),
+            ("/shop", "Lootboxen & kaufbare Produkte anzeigen und kaufen"),
         ],
         "hints": [
-            f"**{Config.DUNGEON_ROOM_MIN}–{Config.DUNGEON_ROOM_MAX} Räume** — Button **Weiter**",
-            "Gold & HP auch in `/levels level` und `/pet info`",
-            f"Heilung: **{Config.DUNGEON_HEAL_GOLD_COST} Gold** · Regen alle **{Config.DUNGEON_HP_REGEN_INTERVAL // 60} Min.**",
-            f"Cooldown **{Config.DUNGEON_RUN_COOLDOWN // 60} Min.** · Pet-Erholung **{Config.DUNGEON_PET_RECOVERY_SECONDS // 60} Min.**",
-            "Getrennt von Lootboxen — kein Pet-Tod",
+            f"Lootbox: **{Config.LOOTBOX_PRICE} Gold** · "
+            f"Jackpot **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %**",
+            "Öffnen weiterhin mit `/lootbox open`",
+            "Zombie-Perks — **Coming soon**",
+        ],
+    },
+    HelpCategory.Zombies.value: {
+        "label": "Zombie Survival",
+        "emoji": "🧟",
+        "access": "Alle",
+        "commands": [
+            ("/zombies start", "Neuen Zombie-Run starten (3 Wellen)"),
+            ("/zombies status", "Aktiven Run wiederherstellen"),
+            ("/zombies profil", "Zombie-Profil, Kills & Gold"),
+            ("/zombies interface", "Steuerzentrale mit Buttons"),
+            ("/zombies leaderboard", "Rangliste Kills, Boss, Level, Gold"),
+            ("/zombies help", "Kurze Modus-Erklärung"),
+        ],
+        "hints": [
+            f"**{Config.ZOMBIE_MAX_WAVES} Wellen** — Nahkampf & Pet-Aktion",
+            "Kein Abbrechen — Run endet durch Sieg, Niederlage oder 12h Inaktivität",
+            f"Cooldown nach Run: **{Config.ZOMBIE_RUN_COOLDOWN // 60} Min.**",
+            f"**+{Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT} %** HP nach jeder geschafften Welle",
+            "Lootboxen & Produkte nur unter **`/shop`**",
+            "Pet optional — ohne Pet ist Pet-Aktion deaktiviert",
         ],
     },
     HelpCategory.Challenges.value: {

@@ -18,8 +18,8 @@ from utils.lootboxes import apply_lootbox_roll, roll_lootbox
 logger = logging.getLogger(__name__)
 
 
-class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Lootboxen kaufen und öffnen"):
-    """Gold-Währung und Lootbox-Shop."""
+class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Lootboxen öffnen und Gold-Rangliste"):
+    """Lootbox-Inventar öffnen und Gold-Rangliste."""
 
     def __init__(self, bot: commands.Bot, db: Database) -> None:
         self.bot = bot
@@ -47,69 +47,6 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
             return interaction.channel
         return None
 
-    @app_commands.command(name="shop", description="Zeigt Lootbox-Preis, Chancen und dein Gold")
-    @app_commands.guild_only()
-    async def shop(self, interaction: discord.Interaction) -> None:
-        """Shop-Übersicht."""
-        assert interaction.guild is not None
-        economy = await self.db.get_player_economy(interaction.guild.id, interaction.user.id)
-        embed = info_embed(
-            "Lootbox-Shop",
-            "Kaufe Lootboxen mit **Gold** und öffne sie für Bonus-XP!",
-            fields=[
-                ("Dein Gold", f"**{economy.gold:,}** 🪙", True),
-                ("Lootboxen", f"**{economy.lootbox_count}** 📦", True),
-                ("Preis", f"**{Config.LOOTBOX_PRICE}** Gold pro Box", True),
-                (
-                    "XP-Jackpot",
-                    f"**{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** Chance pro Box\n"
-                    f"Gewinn: **{Config.LOOTBOX_XP_REWARD}** Spieler-XP **+** **{Config.LOOTBOX_XP_REWARD}** Pet-XP",
-                    False,
-                ),
-                (
-                    "Gold verdienen",
-                    f"Spielsiege: **{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}** Gold",
-                    False,
-                ),
-            ],
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @app_commands.command(name="buy", description="Kauft Lootboxen mit Gold")
-    @app_commands.guild_only()
-    @app_commands.describe(anzahl="Anzahl Lootboxen (1–10)")
-    async def buy(
-        self,
-        interaction: discord.Interaction,
-        anzahl: app_commands.Range[int, 1, Config.LOOTBOX_BATCH_MAX],
-    ) -> None:
-        """Lootboxen kaufen."""
-        assert interaction.guild is not None
-        count = int(anzahl)
-        total_cost = Config.LOOTBOX_PRICE * count
-        economy = await self.db.get_player_economy(interaction.guild.id, interaction.user.id)
-
-        if economy.gold < total_cost:
-            embed = error_embed(
-                "Nicht genug Gold",
-                f"Du brauchst **{total_cost:,}** Gold, hast aber nur **{economy.gold:,}** 🪙.\n"
-                f"Spielsiege bringen **{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}** Gold.",
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-
-        economy.gold -= total_cost
-        economy.lootbox_count += count
-        await self.db.save_player_economy(economy)
-
-        embed = success_embed(
-            "Lootboxen gekauft",
-            f"**{count}** Lootbox(en) für **{total_cost:,}** Gold.\n"
-            f"Inventar: **{economy.lootbox_count}** 📦 · Gold: **{economy.gold:,}** 🪙\n\n"
-            "Öffne sie mit `/lootbox open`.",
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
     @app_commands.command(name="open", description="Öffnet Lootboxen aus deinem Inventar")
     @app_commands.guild_only()
     @app_commands.describe(anzahl="Anzahl zu öffnender Lootboxen (1–10)")
@@ -134,7 +71,7 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
             embed = error_embed(
                 "Keine Lootboxen",
                 f"Du hast nur **{economy.lootbox_count}** Lootbox(en).\n"
-                f"Kaufe welche mit `/lootbox buy` (**{Config.LOOTBOX_PRICE}** Gold pro Stück).",
+                f"Kaufe welche im **`/shop`** (**{Config.LOOTBOX_PRICE}** Gold pro Stück).",
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return

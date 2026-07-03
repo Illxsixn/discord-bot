@@ -6,17 +6,15 @@ Bilder werden einmal generiert, lokal gecacht und bei Evolution neu erzeugt.
 
 from __future__ import annotations
 
-import base64
 import logging
 from io import BytesIO
 from pathlib import Path
-
-import aiohttp
 
 from PIL import Image
 
 from config import Config
 from database.models import PetEvolutionStage, PetRarity, PetRecord
+from utils.agnes_images import AgnesImageError, agnes_configured, request_agnes_image
 from utils.pet_appearance import secret_evolution_traits_prompt, secret_visual_traits_prompt
 from utils.pets import PetSpeciesDefinition, evolution_display, get_species_by_name, rarity_display
 
@@ -77,11 +75,6 @@ class PetPortraitError(Exception):
     """Fehler bei der Portrait-Generierung."""
 
 
-def agnes_configured() -> bool:
-    """True wenn ein Agnes-API-Key gesetzt ist."""
-    return bool(Config.AGNES_API_KEY)
-
-
 def pet_portrait_path(pet_id: int, evolution_stage: str) -> Path:
     """Absoluter Pfad zur gecachten Portrait-PNG."""
     filename = f"{pet_id}_{evolution_stage}_v{Config.PET_PORTRAIT_PROMPT_VERSION}.png"
@@ -126,52 +119,10 @@ async def _request_portrait_image(prompt: str) -> bytes:
             "KI-Portraits sind nicht konfiguriert. "
             "Trage `AGNES_API_KEY` in der `.env` ein."
         )
-
-    payload = {
-        "model": Config.AGNES_IMAGE_MODEL,
-        "prompt": prompt,
-        "size": Config.AGNES_IMAGE_SIZE,
-        "return_base64": True,
-    }
-    headers = {
-        "Authorization": f"Bearer {Config.AGNES_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    timeout = aiohttp.ClientTimeout(total=Config.AGNES_REQUEST_TIMEOUT)
-
     try:
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.post(Config.AGNES_API_URL, json=payload, headers=headers) as response:
-                body = await response.json(content_type=None)
-                if response.status >= 400:
-                    message = body.get("error", {}).get("message") if isinstance(body, dict) else None
-                    detail = message or str(body)
-                    raise PetPortraitError(f"Agnes-API Fehler ({response.status}): {detail}")
-
-                if not isinstance(body, dict):
-                    raise PetPortraitError("Ungültige Antwort der Agnes-API.")
-
-                data = body.get("data") or []
-                if not data:
-                    raise PetPortraitError("Agnes-API hat kein Bild geliefert.")
-
-                item = data[0]
-                if isinstance(item, dict):
-                    b64_data = item.get("b64_json")
-                    if b64_data:
-                        return base64.b64decode(b64_data)
-
-                    image_url = item.get("url")
-                    if image_url:
-                        async with session.get(image_url) as image_response:
-                            if image_response.status >= 400:
-                                raise PetPortraitError("Portrait-Download fehlgeschlagen.")
-                            return await image_response.read()
-
-                raise PetPortraitError("Agnes-API Antwort enthält kein Bild.")
-    except aiohttp.ClientError as exc:
-        logger.exception("Agnes-API Netzwerkfehler")
-        raise PetPortraitError("Verbindung zur Agnes-API fehlgeschlagen.") from exc
+        return await request_agnes_image(prompt)
+    except AgnesImageError as exc:
+        raise PetPortraitError(str(exc)) from exc
 
 
 async def ensure_pet_portrait(pet: PetRecord) -> Path:

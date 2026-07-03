@@ -127,7 +127,7 @@ class SlotsCog(commands.Cog):
                 embed=error_embed(
                     "Nicht genug Gold",
                     f"Du brauchst **{view.bet:,}** 🪙, hast **{economy.gold:,}**.\n"
-                    "Gold durch Dungeons, Spiele oder Minigames.",
+                    "Gold durch /zombies, Spiele oder Minigames.",
                 ),
                 ephemeral=True,
             )

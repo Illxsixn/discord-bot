@@ -23,9 +23,6 @@ from database.models import (
     ChallengeTask,
     ChallengeType,
     DailyChallengeRecord,
-    DungeonRunRecord,
-    DungeonRunStatus,
-    GameStatsRecord,
     GuessGameRecord,
     GuessStatsRecord,
     GuildSettings,
@@ -46,6 +43,10 @@ from database.models import (
     PlayerEconomyRecord,
     UserLevelRecord,
     WarningRecord,
+    ZombiePlayerRecord,
+    ZombieRunRecord,
+    ZombieRunStatus,
+    ZombieCooldownType,
 )
 
 logger = logging.getLogger(__name__)
@@ -111,28 +112,6 @@ CREATE TABLE IF NOT EXISTS player_economy (
 
 CREATE INDEX IF NOT EXISTS idx_player_economy_guild_gold
     ON player_economy (guild_id, gold DESC);
-
-CREATE TABLE IF NOT EXISTS dungeon_runs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    guild_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    pet_id INTEGER NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active',
-    current_room INTEGER DEFAULT 0,
-    total_rooms INTEGER NOT NULL,
-    rooms_cleared INTEGER DEFAULT 0,
-    player_hp INTEGER NOT NULL,
-    player_hp_max INTEGER NOT NULL,
-    pet_hp INTEGER NOT NULL,
-    pet_hp_max INTEGER NOT NULL,
-    session_gold INTEGER DEFAULT 0,
-    events_json TEXT DEFAULT '[]',
-    started_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_dungeon_runs_active
-    ON dungeon_runs (guild_id, user_id, status);
 
 CREATE TABLE IF NOT EXISTS reaction_roles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -331,6 +310,64 @@ CREATE TABLE IF NOT EXISTS turnier_matches (
 
 CREATE INDEX IF NOT EXISTS idx_turnier_matches_tournament
     ON turnier_matches (tournament_id, round);
+
+CREATE TABLE IF NOT EXISTS zombie_players (
+    guild_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    level INTEGER DEFAULT 1,
+    xp INTEGER DEFAULT 0,
+    highest_wave INTEGER DEFAULT 0,
+    total_kills INTEGER DEFAULT 0,
+    boss_kills INTEGER DEFAULT 0,
+    runs_completed INTEGER DEFAULT 0,
+    runs_failed INTEGER DEFAULT 0,
+    perks_json TEXT DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_zombie_players_guild_level
+    ON zombie_players (guild_id, level DESC);
+
+CREATE INDEX IF NOT EXISTS idx_zombie_players_guild_wave
+    ON zombie_players (guild_id, highest_wave DESC);
+
+CREATE TABLE IF NOT EXISTS zombie_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    channel_id INTEGER,
+    message_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'active',
+    wave INTEGER DEFAULT 1,
+    max_waves INTEGER DEFAULT 3,
+    player_hp INTEGER NOT NULL,
+    player_max_hp INTEGER NOT NULL,
+    run_gold INTEGER DEFAULT 0,
+    current_zombie_key TEXT,
+    current_zombie_hp INTEGER DEFAULT 0,
+    zombies_remaining INTEGER DEFAULT 0,
+    pet_action_cooldown INTEGER DEFAULT 0,
+    luck_bonus_uses INTEGER DEFAULT 0,
+    focus_active INTEGER DEFAULT 0,
+    total_damage INTEGER DEFAULT 0,
+    last_action_text TEXT DEFAULT '',
+    shop_available INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_zombie_runs_active
+    ON zombie_runs (guild_id, user_id, status);
+
+CREATE TABLE IF NOT EXISTS zombie_cooldowns (
+    guild_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    cooldown_type TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id, cooldown_type)
+);
 """
 
 _GUILD_SETTINGS_MIGRATIONS = [
@@ -421,7 +458,7 @@ class Database:
                 pass
 
     async def _migrate_player_economy(self) -> None:
-        """Fügt Dungeon-Spalten zu player_economy hinzu (idempotent)."""
+        """Fügt Legacy-Spalten zu player_economy hinzu (idempotent, ungenutzt)."""
         for sql in _PLAYER_ECONOMY_MIGRATIONS:
             try:
                 await self._connection.execute(sql)
@@ -694,41 +731,20 @@ class Database:
         return PlayerEconomyRecord.from_row(dict(row))
 
     async def save_player_economy(self, record: PlayerEconomyRecord) -> PlayerEconomyRecord:
-        """Speichert Gold, Lootbox-Inventar und Dungeon-Daten."""
-        last_regen = record.last_hp_regen_at.isoformat() if record.last_hp_regen_at else None
-        last_dungeon = record.last_dungeon_at.isoformat() if record.last_dungeon_at else None
-        recovery = record.pet_recovery_until.isoformat() if record.pet_recovery_until else None
+        """Speichert Gold und Lootbox-Inventar."""
         await self.conn.execute(
             """
-            INSERT INTO player_economy (
-                guild_id, user_id, gold, lootbox_count,
-                player_hp, player_hp_max, last_hp_regen_at, last_dungeon_at,
-                dungeons_completed, pet_recovery_until, pet_recovery_pet_id
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO player_economy (guild_id, user_id, gold, lootbox_count)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(guild_id, user_id) DO UPDATE SET
                 gold = excluded.gold,
-                lootbox_count = excluded.lootbox_count,
-                player_hp = excluded.player_hp,
-                player_hp_max = excluded.player_hp_max,
-                last_hp_regen_at = excluded.last_hp_regen_at,
-                last_dungeon_at = excluded.last_dungeon_at,
-                dungeons_completed = excluded.dungeons_completed,
-                pet_recovery_until = excluded.pet_recovery_until,
-                pet_recovery_pet_id = excluded.pet_recovery_pet_id
+                lootbox_count = excluded.lootbox_count
             """,
             (
                 record.guild_id,
                 record.user_id,
                 record.gold,
                 record.lootbox_count,
-                record.player_hp,
-                record.player_hp_max,
-                last_regen,
-                last_dungeon,
-                record.dungeons_completed,
-                recovery,
-                record.pet_recovery_pet_id,
             ),
         )
         await self.conn.commit()
@@ -765,83 +781,174 @@ class Database:
         rows = await cursor.fetchall()
         return [PlayerEconomyRecord.from_row(dict(row)) for row in rows]
 
-    # ── Dungeons ────────────────────────────────────────────────────
+    # ── Zombie Survival ─────────────────────────────────────────────
 
-    async def get_active_dungeon_run(self, guild_id: int, user_id: int) -> DungeonRunRecord | None:
-        """Lädt den aktiven Dungeon-Lauf eines Nutzers."""
+    async def get_zombie_player(self, guild_id: int, user_id: int) -> ZombiePlayerRecord:
+        """Lädt oder erstellt ein Zombie-Profil."""
+        cursor = await self.conn.execute(
+            "SELECT * FROM zombie_players WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        )
+        row = await cursor.fetchone()
+        if row:
+            return ZombiePlayerRecord.from_row(dict(row))
+        now = datetime.now(timezone.utc).isoformat()
+        await self.conn.execute(
+            """
+            INSERT INTO zombie_players (
+                guild_id, user_id, level, xp, highest_wave, total_kills, boss_kills,
+                runs_completed, runs_failed, perks_json, created_at, updated_at
+            ) VALUES (?, ?, 1, 0, 0, 0, 0, 0, 0, '{}', ?, ?)
+            """,
+            (guild_id, user_id, now, now),
+        )
+        await self.conn.commit()
+        return ZombiePlayerRecord(
+            guild_id=guild_id,
+            user_id=user_id,
+            created_at=datetime.fromisoformat(now),
+            updated_at=datetime.fromisoformat(now),
+        )
+
+    async def save_zombie_player(self, record: ZombiePlayerRecord) -> ZombiePlayerRecord:
+        """Speichert Zombie-Profil."""
+        record.updated_at = datetime.now(timezone.utc)
+        await self.conn.execute(
+            """
+            INSERT INTO zombie_players (
+                guild_id, user_id, level, xp, highest_wave, total_kills, boss_kills,
+                runs_completed, runs_failed, perks_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                level = excluded.level,
+                xp = excluded.xp,
+                highest_wave = excluded.highest_wave,
+                total_kills = excluded.total_kills,
+                boss_kills = excluded.boss_kills,
+                runs_completed = excluded.runs_completed,
+                runs_failed = excluded.runs_failed,
+                perks_json = excluded.perks_json,
+                updated_at = excluded.updated_at
+            """,
+            (
+                record.guild_id,
+                record.user_id,
+                record.level,
+                record.xp,
+                record.highest_wave,
+                record.total_kills,
+                record.boss_kills,
+                record.runs_completed,
+                record.runs_failed,
+                record.perks_json,
+                record.created_at.isoformat(),
+                record.updated_at.isoformat(),
+            ),
+        )
+        await self.conn.commit()
+        return record
+
+    async def get_active_zombie_run(self, guild_id: int, user_id: int) -> ZombieRunRecord | None:
+        """Lädt den aktiven Zombie-Run eines Nutzers."""
         cursor = await self.conn.execute(
             """
-            SELECT * FROM dungeon_runs
+            SELECT * FROM zombie_runs
             WHERE guild_id = ? AND user_id = ? AND status = ?
             ORDER BY id DESC LIMIT 1
             """,
-            (guild_id, user_id, DungeonRunStatus.ACTIVE.value),
+            (guild_id, user_id, ZombieRunStatus.ACTIVE.value),
         )
         row = await cursor.fetchone()
-        return DungeonRunRecord.from_row(dict(row)) if row else None
+        return ZombieRunRecord.from_row(dict(row)) if row else None
 
-    async def get_dungeon_run(self, run_id: int) -> DungeonRunRecord | None:
-        """Lädt einen Dungeon-Lauf per ID."""
+    async def get_zombie_run(self, run_id: int) -> ZombieRunRecord | None:
+        """Lädt einen Zombie-Run per ID."""
         cursor = await self.conn.execute(
-            "SELECT * FROM dungeon_runs WHERE id = ?",
+            "SELECT * FROM zombie_runs WHERE id = ?",
             (run_id,),
         )
         row = await cursor.fetchone()
-        return DungeonRunRecord.from_row(dict(row)) if row else None
+        return ZombieRunRecord.from_row(dict(row)) if row else None
 
-    async def save_dungeon_run(self, run: DungeonRunRecord) -> DungeonRunRecord:
-        """Speichert oder aktualisiert einen Dungeon-Lauf."""
-        events_json = json.dumps(run.events)
-        started = run.started_at.isoformat()
+    async def get_all_active_zombie_runs(self) -> list[ZombieRunRecord]:
+        """Lädt alle aktiven Runs (für persistente Views)."""
+        cursor = await self.conn.execute(
+            "SELECT * FROM zombie_runs WHERE status = ?",
+            (ZombieRunStatus.ACTIVE.value,),
+        )
+        rows = await cursor.fetchall()
+        return [ZombieRunRecord.from_row(dict(row)) for row in rows]
+
+    async def save_zombie_run(self, run: ZombieRunRecord) -> ZombieRunRecord:
+        """Speichert oder aktualisiert einen Zombie-Run."""
+        run.updated_at = datetime.now(timezone.utc)
         updated = run.updated_at.isoformat()
         if run.id:
             await self.conn.execute(
                 """
-                UPDATE dungeon_runs SET
-                    status = ?, current_room = ?, total_rooms = ?, rooms_cleared = ?,
-                    player_hp = ?, player_hp_max = ?, pet_hp = ?, pet_hp_max = ?, session_gold = ?,
-                    events_json = ?, updated_at = ?
+                UPDATE zombie_runs SET
+                    channel_id = ?, message_id = ?, status = ?, wave = ?, max_waves = ?,
+                    player_hp = ?, player_max_hp = ?, run_gold = ?,
+                    current_zombie_key = ?, current_zombie_hp = ?, zombies_remaining = ?,
+                    pet_action_cooldown = ?, luck_bonus_uses = ?, focus_active = ?,
+                    total_damage = ?, last_action_text = ?, shop_available = ?,
+                    updated_at = ?
                 WHERE id = ?
                 """,
                 (
+                    run.channel_id,
+                    run.message_id,
                     run.status,
-                    run.current_room,
-                    run.total_rooms,
-                    run.rooms_cleared,
+                    run.wave,
+                    run.max_waves,
                     run.player_hp,
-                    run.player_hp_max,
-                    run.pet_hp,
-                    run.pet_hp_max,
-                    run.session_gold,
-                    events_json,
+                    run.player_max_hp,
+                    run.run_gold,
+                    run.current_zombie_key,
+                    run.current_zombie_hp,
+                    run.zombies_remaining,
+                    run.pet_action_cooldown,
+                    run.luck_bonus_uses,
+                    run.focus_active,
+                    run.total_damage,
+                    run.last_action_text,
+                    run.shop_available,
                     updated,
                     run.id,
                 ),
             )
         else:
+            created = run.created_at.isoformat()
             cursor = await self.conn.execute(
                 """
-                INSERT INTO dungeon_runs (
-                    guild_id, user_id, pet_id, status, current_room, total_rooms,
-                    rooms_cleared, player_hp, player_hp_max, pet_hp, pet_hp_max, session_gold,
-                    events_json, started_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO zombie_runs (
+                    guild_id, user_id, channel_id, message_id, status, wave, max_waves,
+                    player_hp, player_max_hp, run_gold, current_zombie_key, current_zombie_hp,
+                    zombies_remaining, pet_action_cooldown, luck_bonus_uses, focus_active,
+                    total_damage, last_action_text, shop_available, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run.guild_id,
                     run.user_id,
-                    run.pet_id,
+                    run.channel_id,
+                    run.message_id,
                     run.status,
-                    run.current_room,
-                    run.total_rooms,
-                    run.rooms_cleared,
+                    run.wave,
+                    run.max_waves,
                     run.player_hp,
-                    run.player_hp_max,
-                    run.pet_hp,
-                    run.pet_hp_max,
-                    run.session_gold,
-                    events_json,
-                    started,
+                    run.player_max_hp,
+                    run.run_gold,
+                    run.current_zombie_key,
+                    run.current_zombie_hp,
+                    run.zombies_remaining,
+                    run.pet_action_cooldown,
+                    run.luck_bonus_uses,
+                    run.focus_active,
+                    run.total_damage,
+                    run.last_action_text,
+                    run.shop_available,
+                    created,
                     updated,
                 ),
             )
@@ -849,24 +956,90 @@ class Database:
         await self.conn.commit()
         return run
 
-    async def abandon_stale_dungeon_runs(self, max_age_seconds: int) -> int:
-        """Markiert abgelaufene aktive Runs als abandoned."""
-        cutoff = datetime.now(timezone.utc).timestamp() - max_age_seconds
+    async def get_stale_active_zombie_runs(self, max_inactivity_seconds: int) -> list[ZombieRunRecord]:
+        """Lädt aktive Runs, die länger als max_inactivity_seconds inaktiv sind."""
+        cutoff = datetime.now(timezone.utc).timestamp() - max_inactivity_seconds
         cutoff_iso = datetime.fromtimestamp(cutoff, tz=timezone.utc).isoformat()
         cursor = await self.conn.execute(
             """
-            UPDATE dungeon_runs SET status = ?, updated_at = ?
-            WHERE status = ? AND started_at < ?
+            SELECT * FROM zombie_runs
+            WHERE status = ? AND updated_at < ?
             """,
-            (
-                DungeonRunStatus.ABANDONED.value,
-                datetime.now(timezone.utc).isoformat(),
-                DungeonRunStatus.ACTIVE.value,
-                cutoff_iso,
-            ),
+            (ZombieRunStatus.ACTIVE.value, cutoff_iso),
+        )
+        rows = await cursor.fetchall()
+        return [ZombieRunRecord.from_row(dict(row)) for row in rows]
+
+    async def set_zombie_cooldown(
+        self,
+        guild_id: int,
+        user_id: int,
+        cooldown_type: str,
+        expires_at: datetime,
+    ) -> None:
+        """Setzt einen Zombie-Cooldown."""
+        await self.conn.execute(
+            """
+            INSERT INTO zombie_cooldowns (guild_id, user_id, cooldown_type, expires_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(guild_id, user_id, cooldown_type) DO UPDATE SET
+                expires_at = excluded.expires_at
+            """,
+            (guild_id, user_id, cooldown_type, expires_at.isoformat()),
         )
         await self.conn.commit()
-        return cursor.rowcount
+
+    async def get_zombie_cooldown(
+        self,
+        guild_id: int,
+        user_id: int,
+        cooldown_type: str,
+    ) -> datetime | None:
+        """Lädt Ablaufzeit eines Cooldowns."""
+        cursor = await self.conn.execute(
+            """
+            SELECT expires_at FROM zombie_cooldowns
+            WHERE guild_id = ? AND user_id = ? AND cooldown_type = ?
+            """,
+            (guild_id, user_id, cooldown_type),
+        )
+        row = await cursor.fetchone()
+        if not row or not row["expires_at"]:
+            return None
+        return datetime.fromisoformat(row["expires_at"])
+
+    async def get_zombie_leaderboard(
+        self,
+        guild_id: int,
+        sort_by: str,
+        limit: int = 10,
+    ) -> list[ZombiePlayerRecord]:
+        """Lädt Zombie-Rangliste nach Spalte."""
+        allowed = {
+            "kills": "total_kills",
+            "boss_kills": "boss_kills",
+            "level": "level",
+        }
+        column = allowed.get(sort_by, "total_kills")
+        cursor = await self.conn.execute(
+            f"""
+            SELECT * FROM zombie_players
+            WHERE guild_id = ?
+            ORDER BY {column} DESC, xp DESC
+            LIMIT ?
+            """,
+            (guild_id, limit),
+        )
+        rows = await cursor.fetchall()
+        return [ZombiePlayerRecord.from_row(dict(row)) for row in rows]
+
+    async def get_zombie_gold_leaderboard(
+        self,
+        guild_id: int,
+        limit: int = 10,
+    ) -> list[PlayerEconomyRecord]:
+        """Gold-Rangliste für Zombie-Leaderboard."""
+        return await self.get_gold_leaderboard(guild_id, limit)
 
     # ── Reaktionsrollen ─────────────────────────────────────────────
 

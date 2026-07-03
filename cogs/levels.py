@@ -17,9 +17,8 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, success_embed
-from utils.economy_display import format_dungeon_hp_line, get_profile_economy
+from utils.economy_display import format_gold_line, format_zombie_stat_line, get_profile_economy
 from utils.levels import level_from_xp, progress_bar, xp_progress
-from utils.dungeons import player_hp_max
 from utils.permissions import bot_can_use_channel, is_admin
 from utils.pets import apply_pet_xp_boost
 
@@ -62,7 +61,7 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         current, needed, percent = xp_progress(record.xp, record.level)
         next_level = record.level + 1
         economy = await get_profile_economy(self.db, guild.id, member.id, record.level)
-        hp_max = player_hp_max(record.level)
+        zombie_line = await format_zombie_stat_line(self.db, guild.id, member.id)
 
         embed = info_embed(
             f"Level — {member.display_name}",
@@ -75,7 +74,7 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
                         f"**Rang:** #{rank}",
                         f"**XP gesamt:** {record.xp:,}",
                         f"**Gold:** {economy.gold:,} 🪙",
-                        f"**Dungeon-HP:** {format_dungeon_hp_line(economy, hp_max)}",
+                        f"**Zombie Survival:** {zombie_line}",
                     ),
                     False,
                 ),
