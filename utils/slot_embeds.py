@@ -47,7 +47,5 @@ def build_slots_embed(
     )
     embed.add_field(name="Einsatz", value=f"**{bet:,}** 🪙", inline=True)
     embed.add_field(name="Dein Gold", value=f"**{gold:,}** 🪙", inline=True)
-    embed.set_footer(text="Wähle Einsatz unten · /zombies & Spiele bringen Gold")
-    apply_brand_footer(embed)
-    embed.set_image(url="https://media.tenor.com/m/koF9C6Zc0pAAAAAd/coins.gif")
+    apply_brand_footer(embed, prefix="Wähle Einsatz unten · /zombies & Spiele bringen Gold")
     return embed

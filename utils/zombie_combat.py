@@ -8,7 +8,8 @@ import random
 from dataclasses import dataclass, field
 
 from config import Config
-from database.models import PetMood, PetRecord, PetRarity, ZombieRunRecord
+from database.models import PetRecord, PetRarity, ZombieRunRecord
+from utils.pet_play import impulse_by_id
 from utils.pets import get_species_rarity
 from utils.zombie_content import ZOMBIES, get_zombie, melee_base_damage, wave_zombie_list
 
@@ -206,57 +207,73 @@ def perform_melee(
     return result
 
 
-def perform_pet_action(run: ZombieRunRecord, pet: PetRecord | None) -> CombatResult:
-    """Pet-Spezialaktion basierend auf Impuls/Mood."""
+def perform_pet_action(
+    run: ZombieRunRecord,
+    pet: PetRecord | None,
+    impulse_id: str,
+) -> CombatResult:
+    """Pet-Bonusangriff — gewählter Impuls, zusätzlich zum Spieler-Nahkampf."""
     result = CombatResult()
     if pet is None:
-        result.lines.append("Kein aktives Pet — Pet-Aktion deaktiviert.")
+        result.lines.append("Kein aktives Pet — Pet-Angriff deaktiviert.")
         return result
     if run.pet_action_cooldown > 0:
-        result.lines.append(f"Pet-Aktion auf Cooldown (**{run.pet_action_cooldown}** Runde(n)).")
+        result.lines.append(
+            f"Pet-Angriff auf Cooldown (**{run.pet_action_cooldown}** Angriff(e) verbleibend)."
+        )
         return result
-    if not run.in_combat:
+    if not run.in_combat or not run.current_zombie_key:
         result.lines.append("Kein Zombie aktiv.")
         return result
 
-    mood = pet.mood or PetMood.FOCUS.value
-    if mood == PetMood.FOCUS.value:
+    impulse = impulse_by_id(impulse_id)
+    if impulse is None:
+        result.lines.append("Unbekannter Impuls.")
+        return result
+
+    _, emoji, label = impulse
+
+    if impulse_id == "focus":
+        dmg = random.randint(8, 14)
         run.focus_active = 1
-        result.lines.append(f"**{pet.name}** — **Fokus**: Nächster Nahkampf +50 % Schaden.")
-    elif mood == PetMood.ENERGY.value:
+        result.lines.append(
+            f"**{pet.name}** — {emoji} **{label}**: Bonus **{dmg}** Schaden · "
+            "Nächster Nahkampf **+50 %**."
+        )
+    elif impulse_id == "energy":
         dmg = random.randint(15, 30)
-        run.current_zombie_hp = max(0, run.current_zombie_hp - dmg)
-        run.total_damage += dmg
-        result.lines.append(f"**{pet.name}** — **Power**: **{dmg}** Schaden!")
-        if run.current_zombie_hp <= 0 and run.current_zombie_key:
-            kill_result = _on_zombie_killed(run, run.current_zombie_key)
-            result.lines.extend(kill_result.lines)
-            result.zombie_killed = kill_result.zombie_killed
-            result.wave_cleared = kill_result.wave_cleared
-            result.run_completed = kill_result.run_completed
-            result.boss_killed = kill_result.boss_killed
-    elif mood == PetMood.LUCK.value:
+        result.lines.append(f"**{pet.name}** — {emoji} **{label}**: Bonus **{dmg}** Schaden!")
+    elif impulse_id == "luck":
+        dmg = random.randint(5, 12)
         max_uses = Config.ZOMBIE_LUCK_BONUS_MAX // Config.ZOMBIE_LUCK_BONUS_PERCENT
         if run.luck_bonus_uses < max_uses:
             run.luck_bonus_uses += 1
             pct = run.luck_bonus_uses * Config.ZOMBIE_LUCK_BONUS_PERCENT
             result.lines.append(
-                f"**{pet.name}** — **Glück**: Endbonus **+{pct} %** (max. {Config.ZOMBIE_LUCK_BONUS_MAX} %)."
+                f"**{pet.name}** — {emoji} **{label}**: Bonus **{dmg}** Schaden · "
+                f"Endbonus **+{pct} %** (max. {Config.ZOMBIE_LUCK_BONUS_MAX} %)."
             )
         else:
-            result.lines.append(f"**{pet.name}** — Glück-Bonus bereits maximal.")
+            result.lines.append(
+                f"**{pet.name}** — {emoji} **{label}**: Bonus **{dmg}** Schaden · "
+                "Glück-Bonus bereits maximal."
+            )
     else:
-        run.focus_active = 1
-        result.lines.append(f"**{pet.name}** konzentriert sich — nächster Angriff verstärkt.")
+        dmg = random.randint(8, 14)
+        result.lines.append(f"**{pet.name}** — Bonus **{dmg}** Schaden!")
+
+    run.current_zombie_hp = max(0, run.current_zombie_hp - dmg)
+    run.total_damage += dmg
+
+    if run.current_zombie_hp <= 0 and run.current_zombie_key:
+        kill_result = _on_zombie_killed(run, run.current_zombie_key)
+        result.lines.extend(kill_result.lines)
+        result.zombie_killed = kill_result.zombie_killed
+        result.wave_cleared = kill_result.wave_cleared
+        result.run_completed = kill_result.run_completed
+        result.boss_killed = kill_result.boss_killed
 
     run.pet_action_cooldown = Config.ZOMBIE_PET_ACTION_COOLDOWN
-
-    if run.in_combat and run.current_zombie_key and not result.run_completed:
-        result.lines.extend(_zombie_attack(run, run.current_zombie_key))
-
-    tick_cooldowns(run)
-    if run.player_hp <= 0:
-        result.run_failed = True
     return result
 
 

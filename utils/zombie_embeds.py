@@ -7,8 +7,9 @@ from __future__ import annotations
 import discord
 
 from config import Config
-from database.models import PetMood, PetRecord, PlayerEconomyRecord, ZombiePlayerRecord, ZombieRunRecord
+from database.models import PetRecord, PlayerEconomyRecord, ZombiePlayerRecord, ZombieRunRecord
 from utils.embeds import info_embed, success_embed, error_embed
+from utils.pet_play import PET_IMPULSES
 from utils.levels import progress_bar, xp_progress
 from utils.zombie_content import get_zombie, upgrade_lines, wave_intro_text, wave_location
 from utils.zombie_rewards import RunRewards
@@ -26,14 +27,40 @@ def _pet_action_label(run: ZombieRunRecord, pet: PetRecord | None) -> str:
     if pet is None:
         return "Kein Pet — deaktiviert"
     if run.pet_action_cooldown > 0:
-        return f"Cooldown: **{run.pet_action_cooldown}** Runde(n)"
-    mood = pet.mood or PetMood.FOCUS.value
-    labels = {
-        PetMood.FOCUS.value: "🎯 Fokus — bereit",
-        PetMood.ENERGY.value: "⚡ Power — bereit",
-        PetMood.LUCK.value: "🍀 Glück — bereit",
-    }
-    return labels.get(mood, "Spezialaktion bereit")
+        return f"Cooldown: **{run.pet_action_cooldown}** Angriff(e)"
+    return "Bonus-Angriff bereit — **Pet-Angriff** öffnet Impuls-Auswahl"
+
+
+def build_pet_impulse_embed(
+    run: ZombieRunRecord,
+    pet: PetRecord,
+) -> discord.Embed:
+    """Separates Fenster zur Impuls-Auswahl für den Pet-Bonusangriff."""
+    lines = [
+        f"**{pet.name}** greift **zusätzlich** zu deinem Nahkampf an.",
+        f"Cooldown danach: **{Config.ZOMBIE_PET_ACTION_COOLDOWN}** Angriffe.",
+        "",
+        "**Wähle einen Impuls:**",
+    ]
+    for impulse_id, emoji, label in PET_IMPULSES:
+        if impulse_id == "focus":
+            effect = "Bonus 8–14 · nächster Nahkampf **+50 %**"
+        elif impulse_id == "energy":
+            effect = "Bonus **15–30** Schaden"
+        else:
+            effect = "Bonus 5–12 · Endbelohnung **+5 %** (max. 25 %)"
+        lines.append(f"{emoji} **{label}** — {effect}")
+
+    embed = info_embed("🐾 Pet-Bonusangriff", "\n".join(lines))
+    if run.in_combat and run.current_zombie_key:
+        zombie = get_zombie(run.current_zombie_key)
+        if zombie:
+            embed.add_field(
+                name="Ziel",
+                value=f"{zombie.emoji} **{zombie.name}** · {format_hp_bar(run.current_zombie_hp, zombie.hp)}",
+                inline=False,
+            )
+    return embed
 
 
 def build_run_embed(
@@ -143,7 +170,7 @@ def build_defeat_embed(
     )
     embed.add_field(
         name="Tipp",
-        value="Nutze Pet-Aktion clever — Fokus, Power oder Glück je nach Impuls.",
+        value="Nutze **Pet-Angriff** für Bonus-Schaden — Fokus, Power oder Glück wählen.",
         inline=False,
     )
     return embed
@@ -269,7 +296,7 @@ def build_help_embed() -> discord.Embed:
         fields=[
             (
                 "Ablauf",
-                "1. `/zombies start` · 2. Nahkampf & Pet-Aktion · "
+                "1. `/zombies start` · 2. Nahkampf & **Pet-Angriff** · "
                 "3. Wellenpause & **`/shop`** · 4. Boss in Welle 3",
                 False,
             ),

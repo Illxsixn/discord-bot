@@ -20,6 +20,7 @@ from database.models import (
 )
 from utils.embeds import error_embed, info_embed, warning_embed
 from utils.game_locks import game_lock
+from utils.pet_play import PET_IMPULSES
 from utils.zombie_assets import attach_zombie_visual
 from utils.zombie_combat import (
     advance_to_next_wave,
@@ -35,6 +36,7 @@ from utils.zombie_embeds import (
     build_help_embed,
     build_idle_status_embed,
     build_interface_embed,
+    build_pet_impulse_embed,
     build_profile_embed,
     build_run_embed,
     build_victory_embed,
@@ -93,6 +95,39 @@ class ZombieInterfaceView(discord.ui.View):
         await self.cog._send_status(interaction)
 
 
+class ZombiePetImpulseView(discord.ui.View):
+    """Separates Fenster: Impuls-Auswahl für den Pet-Bonusangriff."""
+
+    def __init__(self, cog: "ZombiesCog", run_id: int, owner_id: int) -> None:
+        super().__init__(timeout=60.0)
+        self.cog = cog
+        self.run_id = run_id
+        self.owner_id = owner_id
+        for impulse_id, emoji, label in PET_IMPULSES:
+            button = discord.ui.Button(
+                label=label,
+                emoji=emoji,
+                style=discord.ButtonStyle.secondary,
+            )
+            button.callback = self._make_callback(impulse_id)
+            self.add_item(button)
+
+    def _make_callback(self, impulse_id: str):
+        async def callback(interaction: discord.Interaction) -> None:
+            await self.cog._handle_pet_impulse(interaction, self.run_id, impulse_id)
+
+        return callback
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                embed=error_embed("Nicht dein Run", "Das ist nicht dein Run."),
+                ephemeral=True,
+            )
+            return False
+        return True
+
+
 class ZombieRunView(discord.ui.View):
     """Persistente Run-Buttons — Zustand kommt aus der DB."""
 
@@ -121,7 +156,7 @@ class ZombieRunView(discord.ui.View):
         self.add_item(melee)
 
         pet_btn = discord.ui.Button(
-            label="Pet-Aktion",
+            label="Pet-Angriff",
             style=discord.ButtonStyle.primary,
             emoji="🐾",
             custom_id=f"zombies:pet:{run_id}",
@@ -171,7 +206,7 @@ class ZombieRunView(discord.ui.View):
         await self.cog._handle_run_action(interaction, self.run_id, "melee")
 
     async def _pet_callback(self, interaction: discord.Interaction) -> None:
-        await self.cog._handle_run_action(interaction, self.run_id, "pet")
+        await self.cog._open_pet_impulse_window(interaction, self.run_id)
 
     async def _next_wave_callback(self, interaction: discord.Interaction) -> None:
         await self.cog._handle_run_action(interaction, self.run_id, "next_wave")
@@ -426,8 +461,6 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                     )
                     return
                 result = advance_to_next_wave(run)
-            elif action == "pet":
-                result = perform_pet_action(run, pet)
             else:
                 result = perform_melee(
                     run,
@@ -486,6 +519,157 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             await self.db.save_zombie_run(run)
             await self._update_run_message(interaction, run, interaction.user)
 
+    async def _open_pet_impulse_window(
+        self,
+        interaction: discord.Interaction,
+        run_id: int,
+    ) -> None:
+        """Öffnet separates Impuls-Fenster für den Pet-Bonusangriff."""
+        assert interaction.guild is not None
+        if not isinstance(interaction.user, discord.Member):
+            return
+
+        async with game_lock(run_id):
+            run = await self.db.get_zombie_run(run_id)
+            if run is None or run.status != ZombieRunStatus.ACTIVE.value:
+                await interaction.response.send_message(
+                    embed=error_embed("Kein aktiver Run", "Starte mit `/zombies start`."),
+                    ephemeral=True,
+                )
+                return
+            if run.user_id != interaction.user.id:
+                await interaction.response.send_message(
+                    embed=error_embed("Nicht dein Run", "Das ist nicht dein Run."),
+                    ephemeral=True,
+                )
+                return
+
+            checked = await self._check_expired_run(interaction.user, run)
+            if checked is None:
+                await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
+                return
+            run = checked
+
+            pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
+            if pet is None:
+                await interaction.response.send_message(
+                    embed=error_embed("Kein Pet", "Du brauchst ein aktives Pet für Bonus-Angriffe."),
+                    ephemeral=True,
+                )
+                return
+            if run.pet_action_cooldown > 0:
+                await interaction.response.send_message(
+                    embed=warning_embed(
+                        "Cooldown",
+                        f"Pet-Angriff in **{run.pet_action_cooldown}** Angriff(en) wieder verfügbar.",
+                    ),
+                    ephemeral=True,
+                )
+                return
+            if not run.in_combat:
+                await interaction.response.send_message(
+                    embed=warning_embed("Kein Kampf", "Es ist kein Zombie aktiv."),
+                    ephemeral=True,
+                )
+                return
+
+            embed = build_pet_impulse_embed(run, pet)
+            view = ZombiePetImpulseView(self, run_id, interaction.user.id)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    async def _handle_pet_impulse(
+        self,
+        interaction: discord.Interaction,
+        run_id: int,
+        impulse_id: str,
+    ) -> None:
+        """Führt gewählten Pet-Impuls als Bonusangriff aus."""
+        assert interaction.guild is not None
+        if not isinstance(interaction.user, discord.Member):
+            return
+
+        async with game_lock(run_id):
+            run = await self.db.get_zombie_run(run_id)
+            if run is None or run.status != ZombieRunStatus.ACTIVE.value:
+                await interaction.response.send_message(
+                    embed=error_embed("Kein aktiver Run", "Starte mit `/zombies start`."),
+                    ephemeral=True,
+                )
+                return
+            if run.user_id != interaction.user.id:
+                await interaction.response.send_message(
+                    embed=error_embed("Nicht dein Run", "Das ist nicht dein Run."),
+                    ephemeral=True,
+                )
+                return
+
+            checked = await self._check_expired_run(interaction.user, run)
+            if checked is None:
+                await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
+                return
+            run = checked
+
+            pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
+            if pet is None:
+                await interaction.response.send_message(
+                    embed=error_embed("Kein Pet", "Kein aktives Pet vorhanden."),
+                    ephemeral=True,
+                )
+                return
+
+            await interaction.response.defer(ephemeral=True)
+
+            profile = await self.db.get_zombie_player(interaction.guild.id, interaction.user.id)
+            channel = self._channel(interaction)
+            result = perform_pet_action(run, pet, impulse_id)
+
+            run.last_action_text = "\n".join(result.lines)[:1024]
+            run.updated_at = datetime.now(timezone.utc)
+
+            if result.zombie_killed:
+                profile.total_kills += 1
+            if result.boss_killed:
+                profile.boss_kills += 1
+
+            await self.db.save_zombie_player(profile)
+
+            if result.run_completed:
+                rewards = await finalize_zombie_run(
+                    self.db,
+                    self.bot,
+                    interaction.user,
+                    run,
+                    profile,
+                    completed=True,
+                    boss_killed=True,
+                    channel=channel,
+                )
+                await interaction.edit_original_response(
+                    embed=info_embed("🐾 Pet-Bonusangriff", "\n".join(result.lines)),
+                    view=None,
+                )
+                await self._update_run_message(
+                    interaction,
+                    run,
+                    interaction.user,
+                    final_embed=build_victory_embed(run, rewards),
+                )
+                return
+
+            await self.db.save_zombie_run(run)
+
+            result_embed = info_embed(
+                "🐾 Pet-Bonusangriff",
+                "\n".join(result.lines),
+            )
+            result_embed.add_field(
+                name="Cooldown",
+                value=f"**{run.pet_action_cooldown}** Angriffe bis zum nächsten Pet-Angriff.",
+                inline=False,
+            )
+            await interaction.edit_original_response(embed=result_embed, view=None)
+            await self._update_run_message(interaction, run, interaction.user)
+
     async def _send_profile(self, interaction: discord.Interaction) -> None:
         assert interaction.guild is not None
         if not isinstance(interaction.user, discord.Member):
@@ -521,6 +705,11 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             if file:
                 kwargs["file"] = file
             await interaction.response.send_message(**kwargs)
+            msg = await interaction.original_response()
+            checked.message_id = msg.id
+            checked.channel_id = self._channel(interaction).id if self._channel(interaction) else None
+            await self.db.save_zombie_run(checked)
+            self.bot.add_view(view, message_id=msg.id)
             return
 
         cooldown = await self._get_cooldown(interaction.guild.id, interaction.user.id)

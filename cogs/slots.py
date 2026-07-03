@@ -44,7 +44,6 @@ class SlotsView(discord.ui.View):
             btn = discord.ui.Button(
                 label=f"{amount} 🪙",
                 style=style,
-                custom_id=f"slot_bet_{amount}",
             )
             btn.callback = self._make_bet_callback(amount)
             self.add_item(btn)
@@ -54,7 +53,6 @@ class SlotsView(discord.ui.View):
             style=discord.ButtonStyle.success,
             emoji="🎰",
             row=1,
-            custom_id="slot_spin",
         )
         spin_btn.callback = self._spin_callback
         self.add_item(spin_btn)
@@ -159,7 +157,7 @@ class SlotsCog(commands.Cog):
             bet=view.bet,
             reels=reels,
             result_line=result_line,
-            won=won if won is not None else False,
+            won=won,
         )
         if result.jackpot:
             embed.title = "🎰 MEGA-JACKPOT!"

@@ -39,15 +39,9 @@ def spin_reels() -> tuple[str, str, str]:
 
 
 def format_reels(reels: tuple[str, str, str]) -> str:
-    """ASCII-Slot-Anzeige für Embeds."""
+    """Walzen-Anzeige für Embeds (Emoji-getrennt, ohne ASCII-Rahmen)."""
     a, b, c = reels
-    return (
-        "```\n"
-        "╔══════════════════╗\n"
-        f"║   {a}  │  {b}  │  {c}   ║\n"
-        "╚══════════════════╝\n"
-        "```"
-    )
+    return f"**{a}** · **{b}** · **{c}**"
 
 
 def resolve_spin(reels: tuple[str, str, str], bet: int) -> SpinResult:
