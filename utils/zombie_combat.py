@@ -166,7 +166,6 @@ def perform_melee(
     run: ZombieRunRecord,
     *,
     player_level: int,
-    zombie_level: int,
     pet: PetRecord | None,
 ) -> CombatResult:
     """Spieler-Nahkampfangriff."""
@@ -175,7 +174,7 @@ def perform_melee(
         result.lines.append("Kein Zombie im Visier.")
         return result
 
-    base = melee_base_damage(player_level, zombie_level)
+    base = melee_base_damage(player_level)
     damage = random.randint(max(1, base - 2), base + 3)
     if run.focus_active:
         damage = int(damage * 1.5)

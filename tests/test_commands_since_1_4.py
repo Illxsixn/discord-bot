@@ -203,13 +203,13 @@ def test_zombies_melee_damages_or_kills() -> None:
     )
     spawn_wave(run)
     hp_before = run.current_zombie_hp
-    result = perform_melee(run, player_level=5, zombie_level=1, pet=None)
+    result = perform_melee(run, player_level=5, pet=None)
     assert run.current_zombie_hp <= hp_before or result.zombie_killed
 
 
 def test_zombies_player_hp_scales() -> None:
-    assert player_max_hp(1, 1) == Config.ZOMBIE_PLAYER_HP_BASE
-    assert player_max_hp(5, 3) > Config.ZOMBIE_PLAYER_HP_BASE
+    assert player_max_hp(1) == Config.ZOMBIE_PLAYER_HP_BASE
+    assert player_max_hp(5) > Config.ZOMBIE_PLAYER_HP_BASE
 
 
 def test_zombies_pet_action_bonus_attack_and_cooldown() -> None:

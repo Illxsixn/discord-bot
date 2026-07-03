@@ -95,7 +95,7 @@ def build_run_embed(
         ("HP", player_hp, True),
         ("Gold", f"**{economy.gold:,}** 🪙", True),
         ("Run-Punkte", f"**{run.run_gold}**", True),
-        ("Level", f"**{player_level}**", True),
+        ("Level", f"**{player_level}** (/levels)", True),
         (f"Pet · {pet_name}", pet_status, True),
         ("Upgrades", upgrade_lines(), True),
     ]
@@ -184,17 +184,23 @@ def build_profile_embed(
     economy: PlayerEconomyRecord,
     pet: PetRecord | None,
     member: discord.Member,
+    *,
+    player_level: int,
+    player_xp: int,
 ) -> discord.Embed:
-    """Permanentes Zombie-Profil."""
-    current, needed, percent = xp_progress(profile.xp, profile.level)
+    """Permanentes Zombie-Profil — Level/XP kommen aus /levels."""
+    current, needed, percent = xp_progress(player_xp, player_level)
     pet_line = f"**{pet.name}** ({pet.species})" if pet else "Kein aktives Pet"
 
     embed = info_embed(
         f"Zombie Survival — {member.display_name}",
-        member.mention,
+        spaced_lines(
+            member.mention,
+            "Level und XP gelten für **Spieler & Pet** — siehe **`/levels level`**.",
+        ),
         fields=[
-            ("Level", f"**{profile.level}** · `{progress_bar(percent, 10)}` **{percent} %**", True),
-            ("XP", f"**{profile.xp:,}** ({current:,}/{needed:,})", True),
+            ("Level", f"**{player_level}** · `{progress_bar(percent, 10)}` **{percent} %**", True),
+            ("XP", f"**{player_xp:,}** ({current:,}/{needed:,})", True),
             ("Gold", f"**{economy.gold:,}** 🪙", True),
             ("Höchste Welle", f"**{profile.highest_wave}/{Config.ZOMBIE_MAX_WAVES}**", True),
             ("Zombie-Kills", f"**{profile.total_kills:,}**", True),
@@ -205,7 +211,7 @@ def build_profile_embed(
         ],
         thumbnail=member.display_avatar.url,
     )
-    apply_brand_footer(embed, prefix="Spieler-Level weiterhin unter /levels level")
+    apply_brand_footer(embed, prefix="Level & XP über /levels")
     return embed
 
 
@@ -251,6 +257,7 @@ def build_idle_status_embed(
     economy: PlayerEconomyRecord,
     profile: ZombiePlayerRecord,
     *,
+    player_level: int,
     cooldown: int | None = None,
 ) -> discord.Embed:
     """Kurzstatus ohne aktiven Run."""
@@ -259,7 +266,7 @@ def build_idle_status_embed(
         member.mention,
         fields=[
             ("Gold", f"**{economy.gold:,}** 🪙", True),
-            ("Zombie-Level", f"**{profile.level}**", True),
+            ("Level", f"**{player_level}** (/levels)", True),
             ("Höchste Welle", f"**{profile.highest_wave}**", True),
             ("Kills", f"**{profile.total_kills}**", True),
             ("Boss-Kills", f"**{profile.boss_kills}**", True),

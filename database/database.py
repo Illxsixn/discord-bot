@@ -1018,14 +1018,14 @@ class Database:
         allowed = {
             "kills": "total_kills",
             "boss_kills": "boss_kills",
-            "level": "level",
+            "highest_wave": "highest_wave",
         }
         column = allowed.get(sort_by, "total_kills")
         cursor = await self.conn.execute(
             f"""
             SELECT * FROM zombie_players
             WHERE guild_id = ?
-            ORDER BY {column} DESC, xp DESC
+            ORDER BY {column} DESC, total_kills DESC
             LIMIT ?
             """,
             (guild_id, limit),

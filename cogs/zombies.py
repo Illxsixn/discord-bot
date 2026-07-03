@@ -448,7 +448,6 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
 
             profile = await self.db.get_zombie_player(interaction.guild.id, interaction.user.id)
             player_level = (await self.db.get_user_level(interaction.guild.id, interaction.user.id)).level
-            zombie_level = profile.level
             pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
             channel = self._channel(interaction)
 
@@ -486,7 +485,6 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 result = perform_melee(
                     run,
                     player_level=player_level,
-                    zombie_level=zombie_level,
                     pet=pet,
                 )
 
@@ -702,7 +700,15 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         profile = await self.db.get_zombie_player(interaction.guild.id, interaction.user.id)
         economy = await self.db.get_player_economy(interaction.guild.id, interaction.user.id)
         pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
-        embed = build_profile_embed(profile, economy, pet, interaction.user)
+        level_record = await self.db.get_user_level(interaction.guild.id, interaction.user.id)
+        embed = build_profile_embed(
+            profile,
+            economy,
+            pet,
+            interaction.user,
+            player_level=level_record.level,
+            player_xp=level_record.xp,
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _send_status(self, interaction: discord.Interaction) -> None:
@@ -750,9 +756,8 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             )
             return
 
-        profile = await self.db.get_zombie_player(interaction.guild.id, interaction.user.id)
         player_level = (await self.db.get_user_level(interaction.guild.id, interaction.user.id)).level
-        hp_max = player_max_hp(player_level, profile.level)
+        hp_max = player_max_hp(player_level)
         now = datetime.now(timezone.utc)
         channel = self._channel(interaction)
 
@@ -816,8 +821,15 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
 
         profile = await self.db.get_zombie_player(interaction.guild.id, interaction.user.id)
         economy = await self.db.get_player_economy(interaction.guild.id, interaction.user.id)
+        player_level = (await self.db.get_user_level(interaction.guild.id, interaction.user.id)).level
         cooldown = await self._get_cooldown(interaction.guild.id, interaction.user.id)
-        embed = build_idle_status_embed(interaction.user, economy, profile, cooldown=cooldown)
+        embed = build_idle_status_embed(
+            interaction.user,
+            economy,
+            profile,
+            player_level=player_level,
+            cooldown=cooldown,
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="profil", description="Zeigt dein Zombie-Survival-Profil")
@@ -848,7 +860,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         sortierung=[
             app_commands.Choice(name="Zombie-Kills", value="kills"),
             app_commands.Choice(name="Boss-Kills", value="boss_kills"),
-            app_commands.Choice(name="Zombie-Level", value="level"),
+            app_commands.Choice(name="Höchste Welle", value="highest_wave"),
             app_commands.Choice(name="Gold", value="gold"),
         ]
     )
@@ -900,7 +912,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         labels = {
             "kills": ("Zombie-Kills", lambda r: f"**{r.total_kills:,}** 💀"),
             "boss_kills": ("Boss-Kills", lambda r: f"**{r.boss_kills:,}** 👁️"),
-            "level": ("Zombie-Level", lambda r: f"Level **{r.level}** · **{r.xp:,}** XP"),
+            "highest_wave": ("Höchste Welle", lambda r: f"Welle **{r.highest_wave}/{Config.ZOMBIE_MAX_WAVES}**"),
         }
         title, formatter = labels.get(key, labels["kills"])
         lines = []

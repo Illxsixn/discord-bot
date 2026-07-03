@@ -128,18 +128,14 @@ def wave_intro_text(wave: int, zombie: ZombieDefinition | None) -> str:
     return f"In **{location}** schlurft ein **{zombie.name}** aus dem Nebel."
 
 
-def player_max_hp(player_level: int, zombie_level: int) -> int:
-    """Maximale Spieler-HP für einen Run."""
-    return (
-        Config.ZOMBIE_PLAYER_HP_BASE
-        + max(0, player_level - 1) * 2
-        + max(0, zombie_level - 1) * 3
-    )
+def player_max_hp(player_level: int) -> int:
+    """Maximale Spieler-HP für einen Run (skaliert mit /levels)."""
+    return Config.ZOMBIE_PLAYER_HP_BASE + max(0, player_level - 1) * 2
 
 
-def melee_base_damage(player_level: int, zombie_level: int) -> int:
-    """Basis-Nahkampfschaden."""
-    return 11 + max(0, player_level - 1) // 2 + max(0, zombie_level - 1) // 3
+def melee_base_damage(player_level: int) -> int:
+    """Basis-Nahkampfschaden (skaliert mit /levels)."""
+    return 11 + max(0, player_level - 1) // 2
 
 
 def upgrade_lines() -> str:
