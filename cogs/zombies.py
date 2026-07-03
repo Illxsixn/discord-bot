@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone
 
 import discord
-from discord import app_commands
+from discord import InteractionType, app_commands
 from discord.ext import commands
 
 from config import Config
@@ -21,7 +21,7 @@ from database.models import (
 )
 from utils.embeds import error_embed, info_embed, warning_embed
 from utils.game_locks import game_lock
-from utils.zombie_assets import attach_zombie_visual
+from utils.zombie_assets import attach_zombie_visual, set_zombie_visual_url
 from utils.zombie_combat import (
     perform_melee,
     perform_pet_action,
@@ -192,31 +192,34 @@ class ZombieRunView(discord.ui.View):
             self.run_id,
             action,
             view=self,
-            run_message=interaction.message,
         )
 
     async def _melee_callback(self, interaction: discord.Interaction) -> None:
         await self._dispatch_action(interaction, "melee")
 
     async def _pet_callback(self, interaction: discord.Interaction) -> None:
-        await self.cog._open_pet_action_picker(interaction, self.run_id, interaction.message)
+        if self._busy:
+            await interaction.response.send_message(
+                embed=warning_embed("Moment", "Die letzte Aktion läuft noch …"),
+                ephemeral=True,
+            )
+            return
+        await self.cog._open_pet_action_picker(interaction, self.run_id)
 
 
 class ZombiePetActionView(discord.ui.View):
-    """Separates Menü: Fokus, Glück oder Power wählen."""
+    """Pet-Aktion direkt auf der Run-Nachricht wählen (Fokus, Glück, Power)."""
 
     def __init__(
         self,
         cog: "ZombiesCog",
         run_id: int,
         owner_id: int,
-        run_message: discord.Message | None,
     ) -> None:
         super().__init__(timeout=60.0)
         self.cog = cog
         self.run_id = run_id
         self.owner_id = owner_id
-        self.run_message = run_message
 
         for action_id, emoji, label in (
             ("focus", "🎯", "Fokus"),
@@ -228,10 +231,19 @@ class ZombiePetActionView(discord.ui.View):
                 emoji=emoji,
                 style=discord.ButtonStyle.primary,
             )
-            button.callback = self._make_callback(action_id, label)
+            button.callback = self._make_callback(action_id)
             self.add_item(button)
 
-    def _make_callback(self, action_id: str, label: str):
+        back = discord.ui.Button(
+            label="Zurück",
+            style=discord.ButtonStyle.secondary,
+            emoji="↩️",
+            row=1,
+        )
+        back.callback = self._back_callback
+        self.add_item(back)
+
+    def _make_callback(self, action_id: str):
         async def callback(interaction: discord.Interaction) -> None:
             if interaction.user.id != self.owner_id:
                 await interaction.response.send_message(
@@ -239,18 +251,23 @@ class ZombiePetActionView(discord.ui.View):
                     ephemeral=True,
                 )
                 return
-            for item in self.children:
-                item.disabled = True  # type: ignore[union-attr]
             await self.cog._handle_run_action(
                 interaction,
                 self.run_id,
                 "pet",
                 pet_action=action_id,
-                run_message=self.run_message,
-                picker_label=label,
             )
 
         return callback
+
+    async def _back_callback(self, interaction: discord.Interaction) -> None:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                embed=error_embed("Nicht dein Run", "Das ist nicht dein Run."),
+                ephemeral=True,
+            )
+            return
+        await self.cog._restore_run_message(interaction, self.run_id)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -386,6 +403,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         run: ZombieRunRecord,
         *,
         refresh_visual: bool = False,
+        use_attachment: bool = False,
     ) -> tuple[discord.Embed, discord.File | None, ZombieRunView]:
         economy = await self.db.get_player_economy(member.guild.id, member.id)
         level = (await self.db.get_user_level(member.guild.id, member.id)).level
@@ -401,83 +419,86 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         if refresh_visual and run.in_combat and run.current_zombie_key:
             zombie = get_zombie(run.current_zombie_key)
             if zombie:
-                file = attach_zombie_visual(embed, run.current_zombie_key, is_boss=zombie.is_boss)
+                if use_attachment:
+                    file = attach_zombie_visual(embed, run.current_zombie_key, is_boss=zombie.is_boss)
+                else:
+                    set_zombie_visual_url(embed, run.current_zombie_key, is_boss=zombie.is_boss)
 
         view = await self._get_run_view(run, has_pet=pet is not None)
         return embed, file, view
 
-    async def _edit_run_ui(
-        self,
-        target: discord.Message,
-        *,
-        embed: discord.Embed,
-        view: discord.ui.View | None,
-        file: discord.File | None = None,
-        refresh_visual: bool = False,
-    ) -> None:
-        """Aktualisiert die Run-Nachricht — GIF-Anhang nur bei neuem Zombie."""
-        if refresh_visual:
-            attachments: list[discord.File] = [file] if file is not None else []
-            await target.edit(embed=embed, view=view, attachments=attachments)
-        else:
-            await target.edit(embed=embed, view=view)
-
-    async def _update_run_message(
+    async def _respond_run_update(
         self,
         interaction: discord.Interaction,
         run: ZombieRunRecord,
         member: discord.Member,
         *,
-        run_message: discord.Message | None = None,
         final_embed: discord.Embed | None = None,
         refresh_visual: bool = False,
+        view: ZombieRunView | None = None,
     ) -> None:
-        target = run_message or interaction.message
+        """Aktualisiert die Run-Nachricht über die Interaction (ephemeral-sicher)."""
         if final_embed is not None:
             self._drop_run_view(run.id)
-            try:
-                if target is not None:
-                    await target.edit(embed=final_embed, view=None, attachments=[])
-                else:
-                    await interaction.edit_original_response(embed=final_embed, view=None, attachments=[])
-            except (discord.NotFound, discord.HTTPException) as exc:
-                logger.warning("Run-Abschluss konnte nicht aktualisiert werden: %s", exc)
-            return
-
-        embed, file, view = await self._build_run_message(
-            member,
-            run,
-            refresh_visual=refresh_visual,
-        )
-
-        if target is None:
-            logger.warning("Run-Nachricht fehlt — kein Embed-Update (run_id=%s)", run.id)
-            return
+            payload: dict = {"embed": final_embed, "view": None, "attachments": []}
+        else:
+            embed, _file, run_view = await self._build_run_message(
+                member,
+                run,
+                refresh_visual=refresh_visual,
+                use_attachment=False,
+            )
+            view = view or run_view
+            payload = {"embed": embed, "view": view}
+            if refresh_visual:
+                payload["attachments"] = []
 
         try:
-            await self._edit_run_ui(
-                target,
-                embed=embed,
-                view=view,
-                file=file,
-                refresh_visual=refresh_visual,
-            )
-            if run.message_id != target.id:
-                run.message_id = target.id
-                await self.db.save_zombie_run(run)
-            self._register_run_view(run, view)
+            if interaction.response.is_done():
+                await interaction.edit_original_response(**payload)
+            elif interaction.type is InteractionType.component:
+                await interaction.response.edit_message(**payload)
+            else:
+                await interaction.response.send_message(**payload, ephemeral=True)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Run-Nachricht Update fehlgeschlagen: %s", exc)
-            try:
-                await self._edit_run_ui(target, embed=embed, view=view)
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                pass
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    embed=error_embed("Update fehlgeschlagen", "Nutze `/zombies status`."),
+                    ephemeral=True,
+                )
+            return
+
+        if final_embed is None and view is not None:
+            if interaction.message and run.message_id != interaction.message.id:
+                run.message_id = interaction.message.id
+                await self.db.save_zombie_run(run)
+            self._register_run_view(run, view)
+
+    async def _restore_run_message(
+        self,
+        interaction: discord.Interaction,
+        run_id: int,
+    ) -> None:
+        """Stellt die Run-Ansicht nach dem Pet-Menü wieder her."""
+        assert interaction.guild is not None
+        if not isinstance(interaction.user, discord.Member):
+            return
+
+        run = await self.db.get_zombie_run(run_id)
+        if run is None or run.user_id != interaction.user.id:
+            await interaction.response.send_message(
+                embed=error_embed("Kein aktiver Run", "Starte mit `/zombies start`."),
+                ephemeral=True,
+            )
+            return
+
+        await self._respond_run_update(interaction, run, interaction.user)
 
     async def _open_pet_action_picker(
         self,
         interaction: discord.Interaction,
         run_id: int,
-        run_message: discord.Message | None,
     ) -> None:
         assert interaction.guild is not None
         if not isinstance(interaction.user, discord.Member):
@@ -530,8 +551,8 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             return
 
         embed = build_pet_action_picker_embed(pet)
-        view = ZombiePetActionView(self, run_id, interaction.user.id, run_message)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        view = ZombiePetActionView(self, run_id, interaction.user.id)
+        await interaction.response.edit_message(embed=embed, view=view)
 
     async def _handle_run_action(
         self,
@@ -541,8 +562,6 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         *,
         view: ZombieRunView | None = None,
         pet_action: str | None = None,
-        run_message: discord.Message | None = None,
-        picker_label: str | None = None,
     ) -> None:
         assert interaction.guild is not None
         if not isinstance(interaction.user, discord.Member):
@@ -579,12 +598,6 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         refresh_visual = False
 
         try:
-            if not interaction.response.is_done():
-                await interaction.response.defer()
-
-            if view is not None:
-                view.mark_action()
-
             async with game_lock("zombie", run_id):
                 run = await self.db.get_zombie_run(run_id)
                 if run is None or run.status != ZombieRunStatus.ACTIVE.value or run.user_id != member.id:
@@ -605,7 +618,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                             if not pet_action:
                                 followup_embed = warning_embed(
                                     "Keine Aktion",
-                                    "Wähle Fokus, Glück oder Power im Menü.",
+                                    "Wähle Fokus, Glück oder Power.",
                                 )
                                 result = None
                             else:
@@ -657,34 +670,31 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                                         member.id,
                                     )
                                     view.sync_from_run(run, has_pet=pet is not None)
+                                    view.mark_action()
         finally:
             if view is not None:
                 view.set_busy(False)
 
-        if picker_label and followup_embed is None:
-            try:
-                await interaction.delete_original_response()
-            except discord.HTTPException:
-                pass
-
         if followup_embed is not None:
-            await interaction.followup.send(embed=followup_embed, ephemeral=True)
+            if not interaction.response.is_done():
+                await interaction.response.send_message(embed=followup_embed, ephemeral=True)
+            else:
+                await interaction.followup.send(embed=followup_embed, ephemeral=True)
             return
 
         if final_embed is not None:
-            await self._update_run_message(
+            await self._respond_run_update(
                 interaction,
                 run,
                 member,
-                run_message=run_message,
                 final_embed=final_embed,
             )
         elif saved_run is not None:
-            await self._update_run_message(
+            await self._respond_run_update(
                 interaction,
                 saved_run,
                 member,
-                run_message=run_message,
+                view=view,
                 refresh_visual=refresh_visual,
             )
 
@@ -719,7 +729,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
                 return
             embed, file, view = await self._build_run_message(
-                interaction.user, checked, refresh_visual=True
+                interaction.user, checked, refresh_visual=True, use_attachment=True
             )
             kwargs = {"embed": embed, "view": view, "ephemeral": True}
             if file:
@@ -763,7 +773,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         run = await self.db.save_zombie_run(run)
 
         embed, file, view = await self._build_run_message(
-            interaction.user, run, refresh_visual=True
+            interaction.user, run, refresh_visual=True, use_attachment=True
         )
         kwargs: dict = {"embed": embed, "view": view, "ephemeral": True}
         if file:
@@ -791,7 +801,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
                 return
             embed, file, view = await self._build_run_message(
-                interaction.user, checked, refresh_visual=True
+                interaction.user, checked, refresh_visual=True, use_attachment=True
             )
             kwargs = {"embed": embed, "view": view, "ephemeral": True}
             if file:
