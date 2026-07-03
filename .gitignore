@@ -19,7 +19,9 @@ bot.log
 
 # IDE & lokale Tools
 .idea/
-.cursor/
+.cursor/*
+!.cursor/agents/
+!.cursor/agents/**
 .vscode/
 *.swp
 *.swo
