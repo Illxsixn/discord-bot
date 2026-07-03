@@ -25,6 +25,7 @@ from utils.pet_ai_images import (
     agnes_configured,
     ensure_pet_portrait,
     load_pet_portrait_buffer,
+    pet_portrait_path,
     portrait_status_label,
 )
 from utils.pet_embeds import (
@@ -659,13 +660,33 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
         level = (await self.db.get_user_level(interaction.guild.id, interaction.user.id)).level
         economy = await get_profile_economy(self.db, interaction.guild.id, interaction.user.id, level)
         zombie_line = await format_zombie_stat_line(self.db, interaction.guild.id, interaction.user.id)
+
+        species = get_species_by_name(pet.species)
+        rarity = species.rarity if species else PetRarity.COMMON
+        portrait_path = pet_portrait_path(pet.id, pet.evolution_stage)
+        if not portrait_path.is_file() and agnes_configured():
+            try:
+                portrait_path = await ensure_pet_portrait(pet)
+            except PetPortraitError:
+                pass
+
+        thumbnail: str | None = None
+        files: list[discord.File] = []
+        if portrait_path.is_file():
+            filename = f"pet_{pet.id}_info.png"
+            files.append(
+                discord.File(load_pet_portrait_buffer(portrait_path, rarity), filename=filename)
+            )
+            thumbnail = f"attachment://{filename}"
+
         embed = build_pet_info_embed(
             pet,
             interaction.user,
             gold=economy.gold,
             survival_stat=zombie_line,
+            thumbnail=thumbnail,
         )
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, files=files or None)
         await self._track_pet_challenge(
             interaction.user,
             "track_pet_info",

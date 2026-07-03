@@ -62,6 +62,7 @@ def build_pet_info_embed(
     *,
     gold: int | None = None,
     survival_stat: str | None = None,
+    thumbnail: str | None = None,
 ) -> discord.Embed:
     """Übersichtliches Profil des aktiven Pets."""
     species = get_species_by_name(pet.species)
@@ -85,7 +86,7 @@ def build_pet_info_embed(
             f"**{evolution_display(pet.evolution_stage)}**",
             f"Besitzer: {member.mention}",
         ),
-        thumbnail=member.display_avatar.url,
+        thumbnail=thumbnail,
         fields=[
             (
                 "Fortschritt",
