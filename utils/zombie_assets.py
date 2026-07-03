@@ -72,6 +72,18 @@ def boss_zombie_gif() -> str | Path | None:
     return random.choice(FALLBACK_GIFS["boss"])
 
 
+def set_zombie_visual_url(
+    embed: discord.Embed,
+    zombie_type: str,
+    *,
+    is_boss: bool = False,
+) -> None:
+    """Setzt Zombie-GIF per URL (für Embed-Updates ohne Datei-Anhang)."""
+    folder = "boss" if is_boss else ZOMBIE_ASSET_MAP.get(zombie_type, "common")
+    urls = FALLBACK_GIFS.get(folder, FALLBACK_GIFS["common"])
+    embed.set_image(url=random.choice(urls))
+
+
 def attach_zombie_visual(
     embed: discord.Embed,
     zombie_type: str,
