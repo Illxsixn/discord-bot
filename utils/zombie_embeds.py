@@ -46,7 +46,7 @@ def build_pet_impulse_embed(
         if impulse_id == "focus":
             effect = "Bonus 8–14 · nächster Nahkampf **+50 %**"
         elif impulse_id == "energy":
-            effect = "Bonus **15–30** Schaden"
+            effect = "Heilt dich um **20** HP"
         else:
             effect = "Bonus 5–12 · Endbelohnung **+5 %** (max. 25 %)"
         lines.append(f"{emoji} **{label}** — {effect}")

@@ -230,8 +230,19 @@ def test_zombies_pet_action_bonus_attack_and_cooldown() -> None:
         created_at=now,
         updated_at=now,
     )
+    run = ZombieRunRecord(
+        id=1,
+        guild_id=1,
+        user_id=2,
+        status=ZombieRunStatus.ACTIVE.value,
+        wave=1,
+        max_waves=3,
+        player_hp=50,
+        player_max_hp=100,
+        created_at=now,
+        updated_at=now,
+    )
     spawn_wave(run)
-    hp_before = run.current_zombie_hp
     pet = PetRecord(
         id=1,
         owner_id=2,
@@ -240,9 +251,9 @@ def test_zombies_pet_action_bonus_attack_and_cooldown() -> None:
         name="Rex",
     )
     result = perform_pet_action(run, pet, "energy")
-    assert run.current_zombie_hp < hp_before or result.zombie_killed
+    assert run.player_hp == 70
     assert run.pet_action_cooldown == Config.ZOMBIE_PET_ACTION_COOLDOWN
-    assert any("Power" in line or "Bonus" in line for line in result.lines)
+    assert any("Power" in line and "+20" in line for line in result.lines)
 
 
 # Live-Verbindungstest: scripts/smoke_bot.py (Bot muss separat laufen)

@@ -232,6 +232,7 @@ def perform_pet_action(
         return result
 
     _, emoji, label = impulse
+    dmg = 0
 
     if impulse_id == "focus":
         dmg = random.randint(8, 14)
@@ -241,8 +242,13 @@ def perform_pet_action(
             "Nächster Nahkampf **+50 %**."
         )
     elif impulse_id == "energy":
-        dmg = random.randint(15, 30)
-        result.lines.append(f"**{pet.name}** — {emoji} **{label}**: Bonus **{dmg}** Schaden!")
+        heal = 20
+        before = run.player_hp
+        run.player_hp = min(run.player_max_hp, run.player_hp + heal)
+        gained = run.player_hp - before
+        result.lines.append(
+            f"**{pet.name}** — {emoji} **{label}**: **+{gained}** HP für dich!"
+        )
     elif impulse_id == "luck":
         dmg = random.randint(5, 12)
         max_uses = Config.ZOMBIE_LUCK_BONUS_MAX // Config.ZOMBIE_LUCK_BONUS_PERCENT
@@ -262,16 +268,17 @@ def perform_pet_action(
         dmg = random.randint(8, 14)
         result.lines.append(f"**{pet.name}** — Bonus **{dmg}** Schaden!")
 
-    run.current_zombie_hp = max(0, run.current_zombie_hp - dmg)
-    run.total_damage += dmg
+    if dmg > 0:
+        run.current_zombie_hp = max(0, run.current_zombie_hp - dmg)
+        run.total_damage += dmg
 
-    if run.current_zombie_hp <= 0 and run.current_zombie_key:
-        kill_result = _on_zombie_killed(run, run.current_zombie_key)
-        result.lines.extend(kill_result.lines)
-        result.zombie_killed = kill_result.zombie_killed
-        result.wave_cleared = kill_result.wave_cleared
-        result.run_completed = kill_result.run_completed
-        result.boss_killed = kill_result.boss_killed
+        if run.current_zombie_hp <= 0 and run.current_zombie_key:
+            kill_result = _on_zombie_killed(run, run.current_zombie_key)
+            result.lines.extend(kill_result.lines)
+            result.zombie_killed = kill_result.zombie_killed
+            result.wave_cleared = kill_result.wave_cleared
+            result.run_completed = kill_result.run_completed
+            result.boss_killed = kill_result.boss_killed
 
     run.pet_action_cooldown = Config.ZOMBIE_PET_ACTION_COOLDOWN
     return result
