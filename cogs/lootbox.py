@@ -14,6 +14,7 @@ from config import Config
 from database.database import Database
 from utils.embeds import error_embed, info_embed, success_embed
 from utils.lootboxes import apply_lootbox_roll, roll_lootbox
+from utils.shop_actions import buy_lootboxes
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
             embed = error_embed(
                 "Keine Lootboxen",
                 f"Du hast nur **{economy.lootbox_count}** Lootbox(en).\n"
-                f"Kaufe welche im **`/shop`** (**{Config.LOOTBOX_PRICE}** Gold pro Stück).",
+                f"Kaufe welche mit **`/lootbox buy`** (**{Config.LOOTBOX_PRICE}** Gold pro Stück).",
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
@@ -117,6 +118,24 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
             embed = info_embed("Lootbox geöffnet", body)
 
         await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="buy", description="Kauft Lootboxen mit Gold")
+    @app_commands.guild_only()
+    @app_commands.describe(anzahl="Anzahl Lootboxen (1–10)")
+    async def buy(
+        self,
+        interaction: discord.Interaction,
+        anzahl: app_commands.Range[int, 1, Config.LOOTBOX_BATCH_MAX],
+    ) -> None:
+        """Lootboxen mit Gold kaufen."""
+        assert interaction.guild is not None
+        _, embed, _ = await buy_lootboxes(
+            self.db,
+            interaction.guild.id,
+            interaction.user.id,
+            int(anzahl),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="leaderboard", description="Gold-Rangliste des Servers")
     @app_commands.guild_only()

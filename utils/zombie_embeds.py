@@ -1,5 +1,5 @@
 """
-Zombie Survival: Embeds für Run, Profil, Shop und Interface.
+Zombie Survival: Embeds für Run, Profil und Interface.
 """
 
 from __future__ import annotations
@@ -7,7 +7,7 @@ from __future__ import annotations
 import discord
 
 from config import Config
-from database.models import PetMood, PetRecord, PlayerEconomyRecord, ZombiePlayerRecord, ZombieRunRecord
+from database.models import PetRecord, PlayerEconomyRecord, ZombiePlayerRecord, ZombieRunRecord
 from utils.embeds import info_embed, success_embed, error_embed
 from utils.levels import progress_bar, xp_progress
 from utils.zombie_content import get_zombie, upgrade_lines, wave_intro_text, wave_location
@@ -24,16 +24,10 @@ def format_hp_bar(current: int, maximum: int) -> str:
 
 def _pet_action_label(run: ZombieRunRecord, pet: PetRecord | None) -> str:
     if pet is None:
-        return "Kein Pet — deaktiviert"
+        return "Kein Pet — Angriffe deaktiviert"
     if run.pet_action_cooldown > 0:
         return f"Cooldown: **{run.pet_action_cooldown}** Runde(n)"
-    mood = pet.mood or PetMood.FOCUS.value
-    labels = {
-        PetMood.FOCUS.value: "🎯 Fokus — bereit",
-        PetMood.ENERGY.value: "⚡ Power — bereit",
-        PetMood.LUCK.value: "🍀 Glück — bereit",
-    }
-    return labels.get(mood, "Spezialaktion bereit")
+    return "Wähle **🎯 Fokus**, **⚡ Power** oder **🍀 Glück**"
 
 
 def build_run_embed(
@@ -143,7 +137,7 @@ def build_defeat_embed(
     )
     embed.add_field(
         name="Tipp",
-        value="Nutze Pet-Aktion clever — Fokus, Power oder Glück je nach Impuls.",
+        value="Nutze **🎯 Fokus**, **⚡ Power** oder **🍀 Glück** — je nach Situation.",
         inline=False,
     )
     return embed
@@ -204,38 +198,16 @@ def build_profile_embed(
     embed.set_footer(text="Spieler-Level weiterhin unter /levels level")
     return embed
 
-
-def build_between_waves_embed(
-    run: ZombieRunRecord,
-    economy: PlayerEconomyRecord,
-) -> discord.Embed:
-    """Pause zwischen Wellen — nur Zombie-Perks, kein Shop-Inventar."""
-    return info_embed(
-        "⏸️ Wellenpause",
-        f"Welle **{run.wave}/{run.max_waves}** geschafft. Atme durch, bevor es weitergeht.",
-        fields=[
-            ("HP", format_hp_bar(run.player_hp, run.player_max_hp), True),
-            ("Gold", f"**{economy.gold:,}** 🪙", True),
-            ("Perks", upgrade_lines(), False),
-            (
-                "Shop",
-                "Lootboxen & kaufbare Produkte nur unter **`/shop`**.",
-                False,
-            ),
-        ],
-    )
-
-
 def build_interface_embed(economy: PlayerEconomyRecord) -> discord.Embed:
     """Steuerzentrale."""
     return info_embed(
         "🎮 Zombie Survival — Interface",
-        "Schnellzugriff auf Profil, Status und Shop.",
+        "Schnellzugriff auf Profil und Status.",
         fields=[
             ("Gold", f"**{economy.gold:,}** 🪙", True),
             (
                 "Befehle",
-                "`/zombies start` · `/zombies status` · `/zombies profil` · `/shop`",
+                "`/zombies start` · `/zombies status` · `/zombies profil` · `/lootbox buy`",
                 False,
             ),
         ],
@@ -269,8 +241,8 @@ def build_help_embed() -> discord.Embed:
         fields=[
             (
                 "Ablauf",
-                "1. `/zombies start` · 2. Nahkampf & Pet-Aktion · "
-                "3. Wellenpause & **`/shop`** · 4. Boss in Welle 3",
+                "1. `/zombies start` · 2. Nahkampf & Pet-Angriff wählen · "
+                "3. **Nächste Welle** · 4. Boss in Welle 3",
                 False,
             ),
             (
@@ -282,7 +254,7 @@ def build_help_embed() -> discord.Embed:
             ),
             (
                 "Befehle",
-                "`start` · `status` · `profil` · `interface` · `leaderboard` · Shop: **`/shop`**",
+                "`start` · `status` · `profil` · `interface` · `leaderboard` · Lootboxen: **`/lootbox buy`**",
                 False,
             ),
         ],

@@ -3,7 +3,7 @@ Tests für Slash-Commands und Logik seit Changelog 1.4.
 
 Ab 1.4: Dungeons (ersetzt durch /zombies in 1.6), Gold in Profilen
 Ab 1.5: /slots
-Ab 1.6: /zombies, /shop — /lootbox buy & shop entfernt
+Ab 1.6: /zombies — /lootbox buy wieder verfügbar, /shop entfernt
 """
 
 from __future__ import annotations
@@ -27,7 +27,6 @@ from database.models import ZombieRunRecord, ZombieRunStatus
 COMMANDS_ADDED_SINCE_1_4: frozenset[str] = frozenset(
     {
         "slots",
-        "shop",
         "zombies start",
         "zombies status",
         "zombies profil",
@@ -41,12 +40,13 @@ COMMANDS_REMOVED_SINCE_1_4: frozenset[str] = frozenset(
     {
         "dungeon start",
         "dungeon status",
-        "lootbox buy",
-        "lootbox shop",
+        "shop",
     }
 )
 
-LOOTBOX_COMMANDS_KEPT: frozenset[str] = frozenset({"lootbox open", "lootbox leaderboard"})
+LOOTBOX_COMMANDS_KEPT: frozenset[str] = frozenset(
+    {"lootbox buy", "lootbox open", "lootbox leaderboard"}
+)
 
 
 def _flatten_commands(tree: app_commands.CommandTree) -> set[str]:
@@ -123,7 +123,7 @@ def test_slot_bet_options_configured() -> None:
     assert Config.SLOT_BET_OPTIONS == (5, 10, 25, 50)
 
 
-# ── /shop Logik (1.6) ─────────────────────────────────────────────────
+# ── /lootbox buy Logik ────────────────────────────────────────────────
 
 
 @pytest_asyncio.fixture
@@ -137,7 +137,7 @@ async def db(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_shop_buy_lootboxes_success(db: Database) -> None:
+async def test_lootbox_buy_success(db: Database) -> None:
     await db.add_player_gold(1, 42, 500)
     ok, embed, economy = await buy_lootboxes(db, 1, 42, count=2)
     assert ok is True
@@ -148,7 +148,7 @@ async def test_shop_buy_lootboxes_success(db: Database) -> None:
 
 
 @pytest.mark.asyncio
-async def test_shop_buy_lootboxes_insufficient_gold(db: Database) -> None:
+async def test_lootbox_buy_insufficient_gold(db: Database) -> None:
     ok, embed, economy = await buy_lootboxes(db, 1, 99, count=1)
     assert ok is False
     assert economy is not None

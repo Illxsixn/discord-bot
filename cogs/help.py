@@ -39,7 +39,6 @@ class HelpCategory(enum.Enum):
     Spiele = "games"
     Challenges = "challenges"
     Lootbox = "lootbox"
-    Shop = "shop"
     Zombies = "zombies"
     ReactionRoles = "reactionrole"
     Polls = "poll"
@@ -205,29 +204,16 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
         "emoji": "📦",
         "access": "Alle",
         "commands": [
+            ("/lootbox buy", "Lootboxen mit Gold kaufen"),
             ("/lootbox open", "Lootboxen öffnen"),
             ("/lootbox leaderboard", "Gold-Rangliste des Servers"),
         ],
         "hints": [
-            f"Kaufen nur im **`/shop`** (**{Config.LOOTBOX_PRICE} Gold** pro Box)",
+            f"Preis: **{Config.LOOTBOX_PRICE} Gold** pro Box",
             f"Jackpot: **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** Chance auf "
             f"**{Config.LOOTBOX_XP_REWARD}** Spieler-XP **+** **{Config.LOOTBOX_XP_REWARD}** Pet-XP",
             f"Gold durch Spielsiege (**{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}**)",
             "Pet-XP nur mit aktivem Pet; Spieler-XP wenn Level-System aktiv ist",
-        ],
-    },
-    HelpCategory.Shop.value: {
-        "label": "Shop",
-        "emoji": "🏪",
-        "access": "Alle",
-        "commands": [
-            ("/shop", "Lootboxen & kaufbare Produkte anzeigen und kaufen"),
-        ],
-        "hints": [
-            f"Lootbox: **{Config.LOOTBOX_PRICE} Gold** · "
-            f"Jackpot **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %**",
-            "Öffnen weiterhin mit `/lootbox open`",
-            "Zombie-Perks — **Coming soon**",
         ],
     },
     HelpCategory.Zombies.value: {
@@ -243,12 +229,12 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             ("/zombies help", "Kurze Modus-Erklärung"),
         ],
         "hints": [
-            f"**{Config.ZOMBIE_MAX_WAVES} Wellen** — Nahkampf & Pet-Aktion",
+            f"**{Config.ZOMBIE_MAX_WAVES} Wellen** — Nahkampf & Pet-Angriffe wählen",
+            "Pet: **🎯 Fokus** · **⚡ Power** · **🍀 Glück** (3 Buttons im Run-Panel)",
             "Kein Abbrechen — Run endet durch Sieg, Niederlage oder 12h Inaktivität",
             f"Cooldown nach Run: **{Config.ZOMBIE_RUN_COOLDOWN // 60} Min.**",
             f"**+{Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT} %** HP nach jeder geschafften Welle",
-            "Lootboxen & Produkte nur unter **`/shop`**",
-            "Pet optional — ohne Pet ist Pet-Aktion deaktiviert",
+            "Pet optional — ohne Pet sind Pet-Angriffe deaktiviert",
         ],
     },
     HelpCategory.Challenges.value: {

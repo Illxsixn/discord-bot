@@ -45,7 +45,6 @@ COGS: list[str] = [
     "cogs.pets",
     "cogs.guess",
     "cogs.challenges",
-    "cogs.shop",
     "cogs.lootbox",
     "cogs.zombies",
     "cogs.slots",

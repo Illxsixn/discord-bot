@@ -9,8 +9,9 @@ from dataclasses import dataclass, field
 
 from config import Config
 from database.models import PetMood, PetRecord, PetRarity, ZombieRunRecord
+from utils.pet_play import PET_IMPULSES
 from utils.pets import get_species_rarity
-from utils.zombie_content import ZOMBIES, get_zombie, melee_base_damage, wave_zombie_list
+from utils.zombie_content import get_zombie, melee_base_damage, wave_zombie_list
 
 _PASSIVE_HELP_CHANCE: dict[PetRarity, float] = {
     PetRarity.COMMON: 0.05,
@@ -60,7 +61,7 @@ def _spawn_next_from_queue(run: ZombieRunRecord, queue: list[str]) -> list[str]:
         run.current_zombie_key = None
         run.current_zombie_hp = 0
         run.shop_available = 1
-        lines.append(f"**Welle {run.wave}** geschafft! Wellenpause — Käufe unter **`/shop`**.")
+        lines.append(f"**Welle {run.wave}** geschafft! Nutze **Nächste Welle**.")
         heal = max(1, int(run.player_max_hp * Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT / 100))
         run.player_hp = min(run.player_max_hp, run.player_hp + heal)
         lines.append(f"Kurz durchatmen — **+{heal}** HP.")
@@ -105,7 +106,7 @@ def _on_zombie_killed(run: ZombieRunRecord, zombie_key: str) -> CombatResult:
         run.player_hp = min(run.player_max_hp, run.player_hp + heal)
         gained = run.player_hp - before
         result.wave_cleared = True
-        result.lines.append(f"**Welle {run.wave}** geschafft! Wellenpause — Käufe unter **`/shop`**.")
+        result.lines.append(f"**Welle {run.wave}** geschafft! Nutze **Nächste Welle**.")
         if gained > 0:
             result.lines.append(f"Kurz durchatmen — **+{gained}** HP.")
     else:
@@ -206,11 +207,16 @@ def perform_melee(
     return result
 
 
-def perform_pet_action(run: ZombieRunRecord, pet: PetRecord | None) -> CombatResult:
-    """Pet-Spezialaktion basierend auf Impuls/Mood."""
+def perform_pet_action(
+    run: ZombieRunRecord,
+    pet: PetRecord | None,
+    *,
+    ability: str,
+) -> CombatResult:
+    """Pet-Spezialaktion — Spieler wählt Fokus, Power oder Glück."""
     result = CombatResult()
     if pet is None:
-        result.lines.append("Kein aktives Pet — Pet-Aktion deaktiviert.")
+        result.lines.append("Kein aktives Pet — Pet-Angriffe deaktiviert.")
         return result
     if run.pet_action_cooldown > 0:
         result.lines.append(f"Pet-Aktion auf Cooldown (**{run.pet_action_cooldown}** Runde(n)).")
@@ -219,11 +225,15 @@ def perform_pet_action(run: ZombieRunRecord, pet: PetRecord | None) -> CombatRes
         result.lines.append("Kein Zombie aktiv.")
         return result
 
-    mood = pet.mood or PetMood.FOCUS.value
-    if mood == PetMood.FOCUS.value:
+    valid = {impulse_id for impulse_id, _emoji, _label in PET_IMPULSES}
+    if ability not in valid:
+        result.lines.append("Ungültiger Pet-Angriff.")
+        return result
+
+    if ability == PetMood.FOCUS.value:
         run.focus_active = 1
         result.lines.append(f"**{pet.name}** — **Fokus**: Nächster Nahkampf +50 % Schaden.")
-    elif mood == PetMood.ENERGY.value:
+    elif ability == PetMood.ENERGY.value:
         dmg = random.randint(15, 30)
         run.current_zombie_hp = max(0, run.current_zombie_hp - dmg)
         run.total_damage += dmg
@@ -235,7 +245,7 @@ def perform_pet_action(run: ZombieRunRecord, pet: PetRecord | None) -> CombatRes
             result.wave_cleared = kill_result.wave_cleared
             result.run_completed = kill_result.run_completed
             result.boss_killed = kill_result.boss_killed
-    elif mood == PetMood.LUCK.value:
+    elif ability == PetMood.LUCK.value:
         max_uses = Config.ZOMBIE_LUCK_BONUS_MAX // Config.ZOMBIE_LUCK_BONUS_PERCENT
         if run.luck_bonus_uses < max_uses:
             run.luck_bonus_uses += 1
@@ -245,9 +255,6 @@ def perform_pet_action(run: ZombieRunRecord, pet: PetRecord | None) -> CombatRes
             )
         else:
             result.lines.append(f"**{pet.name}** — Glück-Bonus bereits maximal.")
-    else:
-        run.focus_active = 1
-        result.lines.append(f"**{pet.name}** konzentriert sich — nächster Angriff verstärkt.")
 
     run.pet_action_cooldown = Config.ZOMBIE_PET_ACTION_COOLDOWN
 

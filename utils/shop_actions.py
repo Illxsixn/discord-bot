@@ -1,5 +1,5 @@
 """
-Shop-Aktionen — gemeinsame Kauf-Logik für /shop.
+Lootbox-Kauf — gemeinsame Kauf-Logik für /lootbox buy.
 """
 
 from __future__ import annotations

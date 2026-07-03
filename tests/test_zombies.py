@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from config import Config
 from database.models import ZombieRunRecord, ZombieRunStatus
-from utils.zombie_combat import perform_melee, spawn_wave
+from utils.zombie_combat import perform_melee, perform_pet_action, spawn_wave
 from utils.zombie_content import player_max_hp, wave_zombie_list
 
 
@@ -61,5 +61,31 @@ def test_zombie_run_view_persistent_until_timeout():
 
     view = ZombieRunView(MagicMock(), 7, 99, has_pet=True, pet_on_cooldown=False)
     assert view.is_persistent()
+    assert len(view.children) == 5
     view.timeout = 900.0
     assert not view.is_persistent()
+
+
+def test_pet_focus_sets_buff():
+    run = _run()
+    spawn_wave(run)
+    result = perform_pet_action(run, None, ability="focus")
+    assert "Kein aktives Pet" in result.lines[0]
+
+
+def test_pet_power_deals_damage():
+    from database.models import PetRecord
+
+    run = _run()
+    spawn_wave(run)
+    pet = PetRecord(
+        id=1,
+        owner_id=2,
+        guild_id=1,
+        species="robo_hamster",
+        name="Testy",
+    )
+    hp_before = run.current_zombie_hp
+    result = perform_pet_action(run, pet, ability="energy")
+    assert run.current_zombie_hp <= hp_before or result.zombie_killed
+    assert any("Power" in line for line in result.lines)

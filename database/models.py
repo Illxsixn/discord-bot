@@ -298,7 +298,7 @@ class ZombieRunRecord:
 
     @property
     def between_waves(self) -> bool:
-        """True zwischen Wellen (Wellenpause erlaubt)."""
+        """True zwischen Wellen (Nächste Welle möglich)."""
         return not self.in_combat and self.shop_available == 1
 
 

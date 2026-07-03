@@ -1,5 +1,5 @@
 """
-Zombie Survival Cog: Wellen, Kampf, Shop und Profil.
+Zombie Survival Cog: Wellen, Kampf und Profil.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from database.models import (
 )
 from utils.embeds import error_embed, info_embed, warning_embed
 from utils.game_locks import game_lock
+from utils.pet_play import PET_IMPULSES
 from utils.zombie_assets import attach_zombie_visual
 from utils.zombie_combat import (
     advance_to_next_wave,
@@ -29,7 +30,6 @@ from utils.zombie_combat import (
 )
 from utils.zombie_content import get_zombie, player_max_hp
 from utils.zombie_embeds import (
-    build_between_waves_embed,
     build_defeat_embed,
     build_expired_embed,
     build_help_embed,
@@ -61,21 +61,6 @@ class ZombieInterfaceView(discord.ui.View):
             return False
         return True
 
-    @discord.ui.button(label="Shop", style=discord.ButtonStyle.secondary, emoji="🏪")
-    async def open_shop(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button[discord.ui.View],
-    ) -> None:
-        shop_cog = self.cog.bot.get_cog("ShopCog")
-        if shop_cog is None:
-            await interaction.response.send_message(
-                embed=info_embed("Shop", "Nutze **`/shop`** für Lootboxen und Produkte."),
-                ephemeral=True,
-            )
-            return
-        await shop_cog.send_shop(interaction)  # type: ignore[attr-defined]
-
     @discord.ui.button(label="Profil", style=discord.ButtonStyle.secondary, emoji="📊")
     async def open_profile(
         self,
@@ -104,7 +89,6 @@ class ZombieRunView(discord.ui.View):
         *,
         has_pet: bool = True,
         pet_on_cooldown: bool = False,
-        include_legacy_shop: bool = False,
     ) -> None:
         super().__init__(timeout=None)
         self.cog = cog
@@ -116,47 +100,39 @@ class ZombieRunView(discord.ui.View):
             style=discord.ButtonStyle.danger,
             emoji="🗡️",
             custom_id=f"zombies:melee:{run_id}",
+            row=0,
         )
         melee.callback = self._melee_callback
         self.add_item(melee)
-
-        pet_btn = discord.ui.Button(
-            label="Pet-Aktion",
-            style=discord.ButtonStyle.primary,
-            emoji="🐾",
-            custom_id=f"zombies:pet:{run_id}",
-            disabled=not has_pet or pet_on_cooldown,
-        )
-        pet_btn.callback = self._pet_callback
-        self.add_item(pet_btn)
 
         nxt = discord.ui.Button(
             label="Nächste Welle",
             style=discord.ButtonStyle.success,
             emoji="➡️",
             custom_id=f"zombies:next_wave:{run_id}",
+            row=0,
         )
         nxt.callback = self._next_wave_callback
         self.add_item(nxt)
 
-        pause = discord.ui.Button(
-            label="Wellenpause",
-            style=discord.ButtonStyle.secondary,
-            emoji="⏸️",
-            custom_id=f"zombies:pause:{run_id}",
-        )
-        pause.callback = self._pause_callback
-        self.add_item(pause)
-
-        if include_legacy_shop:
-            legacy = discord.ui.Button(
-                label="Wellenpause",
-                style=discord.ButtonStyle.secondary,
-                emoji="⏸️",
-                custom_id=f"zombies:shop:{run_id}",
+        pet_disabled = not has_pet or pet_on_cooldown
+        for ability_id, emoji, label in PET_IMPULSES:
+            btn = discord.ui.Button(
+                label=label,
+                style=discord.ButtonStyle.primary,
+                emoji=emoji,
+                custom_id=f"zombies:pet:{ability_id}:{run_id}",
+                disabled=pet_disabled,
+                row=0,
             )
-            legacy.callback = self._pause_callback
-            self.add_item(legacy)
+            btn.callback = self._make_pet_callback(ability_id)
+            self.add_item(btn)
+
+    def _make_pet_callback(self, ability_id: str):
+        async def callback(interaction: discord.Interaction) -> None:
+            await self.cog._handle_run_action(interaction, self.run_id, f"pet:{ability_id}")
+
+        return callback
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -170,14 +146,8 @@ class ZombieRunView(discord.ui.View):
     async def _melee_callback(self, interaction: discord.Interaction) -> None:
         await self.cog._handle_run_action(interaction, self.run_id, "melee")
 
-    async def _pet_callback(self, interaction: discord.Interaction) -> None:
-        await self.cog._handle_run_action(interaction, self.run_id, "pet")
-
     async def _next_wave_callback(self, interaction: discord.Interaction) -> None:
         await self.cog._handle_run_action(interaction, self.run_id, "next_wave")
-
-    async def _pause_callback(self, interaction: discord.Interaction) -> None:
-        await self.cog._handle_run_action(interaction, self.run_id, "pause")
 
 
 class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zombie Survival — Wellen, Gold & Pets"):
@@ -221,7 +191,6 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             run.user_id,
             has_pet=pet is not None,
             pet_on_cooldown=run.pet_action_cooldown > 0,
-            include_legacy_shop=True,
         )
 
     def _persist_run_view(self, view: ZombieRunView, message_id: int | None) -> None:
@@ -400,9 +369,6 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         if not isinstance(interaction.user, discord.Member):
             return
 
-        if action == "shop":
-            action = "pause"
-
         async with game_lock(run_id):
             run = await self.db.get_zombie_run(run_id)
             if run is None or run.status != ZombieRunStatus.ACTIVE.value:
@@ -433,28 +399,6 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
             channel = self._channel(interaction)
 
-            if action == "pause":
-                if run.in_combat:
-                    await interaction.followup.send(
-                        embed=warning_embed("Im Kampf", "Besiege zuerst den aktiven Zombie."),
-                        ephemeral=True,
-                    )
-                    return
-                if not run.between_waves:
-                    await interaction.followup.send(
-                        embed=info_embed(
-                            "Wellenpause",
-                            "Kaufbare Produkte findest du unter **`/shop`**.\n"
-                            "Zwischen Wellen: erst Welle abschließen.",
-                        ),
-                        ephemeral=True,
-                    )
-                    return
-                economy = await self.db.get_player_economy(interaction.guild.id, interaction.user.id)
-                embed = build_between_waves_embed(run, economy)
-                await interaction.followup.send(embed=embed, ephemeral=True)
-                return
-
             if action == "next_wave":
                 if run.in_combat:
                     await interaction.followup.send(
@@ -463,8 +407,9 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                     )
                     return
                 result = advance_to_next_wave(run)
-            elif action == "pet":
-                result = perform_pet_action(run, pet)
+            elif action.startswith("pet:"):
+                ability = action.split(":", 1)[1]
+                result = perform_pet_action(run, pet, ability=ability)
             else:
                 result = perform_melee(
                     run,
