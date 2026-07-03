@@ -348,6 +348,46 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         )
         return embed, file, view
 
+    async def _refresh_stored_run_message(
+        self,
+        run: ZombieRunRecord,
+        member: discord.Member,
+        *,
+        final_embed: discord.Embed | None = None,
+    ) -> None:
+        """Aktualisiert die gespeicherte Run-Nachricht (Haupt-Kampf-Embed)."""
+        if not run.message_id or not run.channel_id:
+            return
+        guild = self.bot.get_guild(run.guild_id)
+        if guild is None:
+            return
+        channel = guild.get_channel(run.channel_id)
+        if not isinstance(channel, (discord.TextChannel, discord.Thread)):
+            return
+
+        try:
+            message = await channel.fetch_message(run.message_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Run-Nachricht %s nicht ladbar: %s", run.message_id, exc)
+            return
+
+        if final_embed is not None:
+            try:
+                await message.edit(embed=final_embed, view=None, attachments=[])
+            except (discord.NotFound, discord.HTTPException) as exc:
+                logger.warning("Run-Abschluss-Update fehlgeschlagen: %s", exc)
+            return
+
+        embed, file, view = await self._build_run_message(member, run)
+        try:
+            if file:
+                await message.edit(embed=embed, view=view, attachments=[file])
+            else:
+                await message.edit(embed=embed, view=view, attachments=[])
+            self.bot.add_view(view, message_id=message.id)
+        except (discord.NotFound, discord.HTTPException) as exc:
+            logger.warning("Run-Nachricht Refresh fehlgeschlagen: %s", exc)
+
     async def _update_run_message(
         self,
         interaction: discord.Interaction,
@@ -667,31 +707,34 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                     boss_killed=True,
                     channel=channel,
                 )
-                await interaction.edit_original_response(
-                    embed=info_embed("🐾 Pet-Bonusangriff", "\n".join(result.lines)),
-                    view=None,
-                )
-                await self._update_run_message(
-                    interaction,
+                await self._refresh_stored_run_message(
                     run,
                     interaction.user,
                     final_embed=build_victory_embed(run, rewards),
                 )
-                return
+            elif result.run_failed:
+                rewards = await finalize_zombie_run(
+                    self.db,
+                    self.bot,
+                    interaction.user,
+                    run,
+                    profile,
+                    completed=False,
+                    channel=channel,
+                )
+                await self._refresh_stored_run_message(
+                    run,
+                    interaction.user,
+                    final_embed=build_defeat_embed(run, rewards),
+                )
+            else:
+                await self.db.save_zombie_run(run)
+                await self._refresh_stored_run_message(run, interaction.user)
 
-            await self.db.save_zombie_run(run)
-
-            result_embed = info_embed(
-                "🐾 Pet-Bonusangriff",
-                "\n".join(result.lines),
-            )
-            result_embed.add_field(
-                name="Cooldown",
-                value=f"**{run.pet_action_cooldown}** Angriffe bis zum nächsten Pet-Angriff.",
-                inline=False,
-            )
-            await interaction.edit_original_response(embed=result_embed, view=None)
-            await self._update_run_message(interaction, run, interaction.user)
+            try:
+                await interaction.delete_original_response()
+            except discord.HTTPException:
+                pass
 
     async def _send_profile(self, interaction: discord.Interaction) -> None:
         assert interaction.guild is not None
