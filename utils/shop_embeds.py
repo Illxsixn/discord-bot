@@ -14,28 +14,27 @@ from utils.embeds import info_embed
 def build_shop_embed(economy: PlayerEconomyRecord) -> discord.Embed:
     """Zentraler Shop — Lootboxen und weitere Produkte."""
     return info_embed(
-        "🏪 Shop",
+        "Shop",
         "Kaufe Lootboxen mit **Gold** — weitere Produkte folgen.",
         fields=[
             ("Dein Gold", f"**{economy.gold:,}** 🪙", True),
             ("Lootboxen", f"**{economy.lootbox_count}** 📦", True),
             ("Preis", f"**{Config.LOOTBOX_PRICE}** Gold pro Box", True),
             (
-                "📦 Lootbox",
-                f"Jackpot: **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** Chance\n"
-                f"Gewinn: **{Config.LOOTBOX_XP_REWARD}** Spieler-XP **+** **{Config.LOOTBOX_XP_REWARD}** Pet-XP",
-                False,
+                "Lootbox",
+                f"Jackpot **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** · "
+                f"**{Config.LOOTBOX_XP_REWARD}** XP (Spieler + Pet)",
+                True,
             ),
             (
-                "🧟 Zombie-Perks",
+                "Zombie-Perks",
                 "Glück · Fokus · Energie — **Coming soon**",
-                False,
+                True,
             ),
             (
                 "Gold verdienen",
-                f"Spielsiege: **{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}** · "
-                f"Zombie Survival · Slots",
-                False,
+                f"Spielsiege **{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}** · Zombie · Slots",
+                True,
             ),
         ],
     )

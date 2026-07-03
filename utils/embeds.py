@@ -251,7 +251,6 @@ def artwork_embed(
     fields: list[tuple[str, str, bool]] | None = None,
     thumbnail: str | None = None,
     image: str | None = None,
-    color: int | None = None,
 ) -> discord.Embed:
     """
     Einheitliches Embed nach Artwork-Vorlage: Cyan-Akzent, Thumbnail, 3-Spalten-Felder.
@@ -262,7 +261,6 @@ def artwork_embed(
         fields: Felder als (name, value, inline) — inline=True für 3er-Reihen.
         thumbnail: Optionale Thumbnail-URL (sonst Marken-Icon).
         image: Optionales Großbild.
-        color: Optionale Farbe (Standard: COLOR_ARTWORK).
 
     Returns:
         Fertiges discord.Embed-Objekt.
@@ -270,7 +268,7 @@ def artwork_embed(
     embed = discord.Embed(
         title=title,
         description=description,
-        color=color or Config.COLOR_ARTWORK,
+        color=Config.COLOR_ARTWORK,
         timestamp=datetime.now(timezone.utc),
     )
     apply_artwork_thumbnail(embed, thumbnail=thumbnail)
@@ -416,8 +414,6 @@ def moderation_embed(
     target: discord.abc.User,
     moderator: discord.abc.User,
     reason: str | None = None,
-    *,
-    color: int | None = None,
 ) -> discord.Embed:
     """
     Erstellt ein Moderations-Log-Embed für Aktionen wie Ban, Kick, etc.
@@ -427,7 +423,6 @@ def moderation_embed(
         target: Betroffener Benutzer.
         moderator: Ausführender Moderator.
         reason: Optionaler Grund.
-        color: Optionale Embed-Farbe.
 
     Returns:
         Fertiges discord.Embed-Objekt.
@@ -440,7 +435,6 @@ def moderation_embed(
             ("Grund", reason or "Kein Grund angegeben", True),
         ],
         thumbnail=target.display_avatar.url,
-        color=color,
     )
 
 
@@ -448,7 +442,6 @@ def log_event_embed(
     event_name: str,
     description: str,
     *,
-    color: int | None = None,
     fields: list[tuple[str, str, bool]] | None = None,
 ) -> discord.Embed:
     """
@@ -457,10 +450,9 @@ def log_event_embed(
     Args:
         event_name: Name des Ereignisses.
         description: Beschreibung des Ereignisses.
-        color: Optionale Farbe.
         fields: Optionale Zusatzfelder.
 
     Returns:
         Fertiges discord.Embed-Objekt.
     """
-    return artwork_embed(event_name, description, fields=fields, color=color)
+    return artwork_embed(event_name, description, fields=fields)

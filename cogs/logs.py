@@ -153,7 +153,6 @@ class LogsCog(commands.GroupCog, group_name="logs", group_description="Server-Lo
                 ("Account erstellt", discord.utils.format_dt(member.created_at, "R"), True),
                 ("Mitglieder", str(member.guild.member_count), True),
             ],
-            color=Config.COLOR_SUCCESS,
         )
         embed.set_thumbnail(url=member.display_avatar.url)
         await self.send_log(member.guild, embed)
@@ -165,7 +164,6 @@ class LogsCog(commands.GroupCog, group_name="logs", group_description="Server-Lo
             "Mitglied verlassen",
             f"**{member.display_name}** hat den Server verlassen.",
             fields=[("Benutzer-ID", str(member.id), True)],
-            color=Config.COLOR_WARNING,
         )
         embed.set_thumbnail(url=member.display_avatar.url)
         await self.send_log(member.guild, embed)
@@ -183,7 +181,6 @@ class LogsCog(commands.GroupCog, group_name="logs", group_description="Server-Lo
             "Mitglied gebannt",
             f"{user.mention} wurde gebannt.",
             fields=[("Grund", reason, False)],
-            color=Config.COLOR_ERROR,
         )
         await self.send_log(guild, embed)
 
@@ -193,7 +190,6 @@ class LogsCog(commands.GroupCog, group_name="logs", group_description="Server-Lo
         embed = log_event_embed(
             "Ban aufgehoben",
             f"{user.mention} wurde entbannt.",
-            color=Config.COLOR_SUCCESS,
         )
         await self.send_log(guild, embed)
 
@@ -263,7 +259,6 @@ class LogsCog(commands.GroupCog, group_name="logs", group_description="Server-Lo
         embed = log_event_embed(
             "Kanal erstellt",
             f"{channel.mention} (`{channel.id}`)",
-            color=Config.COLOR_SUCCESS,
         )
         await self.send_log(channel.guild, embed)
 
@@ -273,7 +268,6 @@ class LogsCog(commands.GroupCog, group_name="logs", group_description="Server-Lo
         embed = log_event_embed(
             "Kanal gelöscht",
             f"**{channel.name}** (`{channel.id}`)",
-            color=Config.COLOR_ERROR,
         )
         await self.send_log(channel.guild, embed)
 

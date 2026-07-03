@@ -8,7 +8,7 @@ import discord
 
 from config import Config
 from database.models import PetRecord, PlayerEconomyRecord, ZombiePlayerRecord, ZombieRunRecord
-from utils.embeds import info_embed, spaced_lines, success_embed, error_embed
+from utils.embeds import apply_brand_footer, info_embed, spaced_lines, success_embed, error_embed
 from utils.pet_play import PET_IMPULSES
 from utils.levels import progress_bar, xp_progress
 from utils.zombie_content import get_zombie, upgrade_lines, wave_intro_text, wave_location
@@ -117,7 +117,7 @@ def build_run_embed(
     if run.last_action_text:
         embed.add_field(name="Letzte Aktion", value=run.last_action_text[:1024], inline=False)
 
-    embed.set_footer(text="Kein Abbrechen — Run endet durch Sieg, Niederlage oder 12h Inaktivität")
+    apply_brand_footer(embed, prefix="Kein Abbrechen — Run endet durch Sieg, Niederlage oder 12h Inaktivität")
     return embed
 
 
@@ -127,7 +127,7 @@ def build_victory_embed(
 ) -> discord.Embed:
     """Run abgeschlossen — Sieg."""
     embed = success_embed(
-        "🏆 Run abgeschlossen",
+        "Run abgeschlossen",
         "Du hast alle Wellen überlebt und den Seuchenbrecher besiegt!",
         fields=[
             ("Wellen", f"**{run.max_waves}/{run.max_waves}**", True),
@@ -153,7 +153,7 @@ def build_defeat_embed(
 ) -> discord.Embed:
     """Niederlage."""
     embed = error_embed(
-        "💀 Überrannt",
+        "Überrannt",
         f"Du wurdest in **Welle {run.wave}** besiegt.",
         fields=[
             ("Gold", f"**+{rewards.gold:,}** 🪙 (Trost)", True),
@@ -163,8 +163,8 @@ def build_defeat_embed(
     )
     embed.add_field(
         name="Tipp",
-        value="Nutze **Pet-Angriff** für Bonus-Schaden — Fokus, Power oder Glück wählen.",
-        inline=False,
+        value="Nutze **Pet-Angriff** — Fokus, Power oder Glück wählen.",
+        inline=True,
     )
     return embed
 
@@ -193,35 +193,19 @@ def build_profile_embed(
         f"Zombie Survival — {member.display_name}",
         member.mention,
         fields=[
-            (
-                "Profil",
-                "\n".join(
-                    [
-                        f"**Level:** {profile.level} · `{progress_bar(percent, 10)}` **{percent} %**",
-                        f"**XP:** {profile.xp:,} ({current:,}/{needed:,} bis Level {profile.level + 1})",
-                        f"**Gold:** {economy.gold:,} 🪙",
-                        f"**Höchste Welle:** {profile.highest_wave}/{Config.ZOMBIE_MAX_WAVES}",
-                    ]
-                ),
-                False,
-            ),
-            (
-                "Statistik",
-                "\n".join(
-                    [
-                        f"**Zombie-Kills:** {profile.total_kills:,}",
-                        f"**Boss-Kills:** {profile.boss_kills:,}",
-                        f"**Runs:** {profile.runs_completed} Siege · {profile.runs_failed} Niederlagen",
-                    ]
-                ),
-                False,
-            ),
-            ("Aktives Pet", pet_line, False),
-            ("Perks", upgrade_lines(), False),
+            ("Level", f"**{profile.level}** · `{progress_bar(percent, 10)}` **{percent} %**", True),
+            ("XP", f"**{profile.xp:,}** ({current:,}/{needed:,})", True),
+            ("Gold", f"**{economy.gold:,}** 🪙", True),
+            ("Höchste Welle", f"**{profile.highest_wave}/{Config.ZOMBIE_MAX_WAVES}**", True),
+            ("Zombie-Kills", f"**{profile.total_kills:,}**", True),
+            ("Boss-Kills", f"**{profile.boss_kills:,}**", True),
+            ("Runs", f"**{profile.runs_completed}** Siege · **{profile.runs_failed}** Niederlagen", True),
+            ("Aktives Pet", pet_line, True),
+            ("Perks", upgrade_lines(), True),
         ],
+        thumbnail=member.display_avatar.url,
     )
-    embed.set_thumbnail(url=member.display_avatar.url)
-    embed.set_footer(text="Spieler-Level weiterhin unter /levels level")
+    apply_brand_footer(embed, prefix="Spieler-Level weiterhin unter /levels level")
     return embed
 
 
@@ -231,16 +215,16 @@ def build_between_waves_embed(
 ) -> discord.Embed:
     """Pause zwischen Wellen — nur Zombie-Perks, kein Shop-Inventar."""
     return info_embed(
-        "⏸️ Wellenpause",
+        "Wellenpause",
         f"Welle **{run.wave}/{run.max_waves}** geschafft. Atme durch, bevor es weitergeht.",
         fields=[
             ("HP", format_hp_bar(run.player_hp, run.player_max_hp), True),
             ("Gold", f"**{economy.gold:,}** 🪙", True),
-            ("Perks", upgrade_lines(), False),
+            ("Perks", upgrade_lines(), True),
             (
                 "Shop",
-                "Lootboxen & kaufbare Produkte nur unter **`/shop`**.",
-                False,
+                "Lootboxen & Produkte unter **`/shop`**.",
+                True,
             ),
         ],
     )
@@ -249,15 +233,15 @@ def build_between_waves_embed(
 def build_interface_embed(economy: PlayerEconomyRecord) -> discord.Embed:
     """Steuerzentrale."""
     return info_embed(
-        "🎮 Zombie Survival — Interface",
+        "Zombie Survival — Interface",
         "Schnellzugriff auf Profil, Status und Shop.",
         fields=[
             ("Gold", f"**{economy.gold:,}** 🪙", True),
-            (
-                "Befehle",
-                "`/zombies start` · `/zombies status` · `/zombies profil` · `/shop`",
-                False,
-            ),
+            ("Start", "`/zombies start`", True),
+            ("Status", "`/zombies status`", True),
+            ("Profil", "`/zombies profil`", True),
+            ("Shop", "`/shop`", True),
+            ("Leaderboard", "`/zombies leaderboard`", True),
         ],
     )
 
@@ -270,40 +254,50 @@ def build_idle_status_embed(
     cooldown: int | None = None,
 ) -> discord.Embed:
     """Kurzstatus ohne aktiven Run."""
-    lines = [
-        f"🪙 **Gold:** {economy.gold:,}",
-        f"🧟 **Zombie-Level:** {profile.level} · Höchste Welle: **{profile.highest_wave}**",
-        f"💀 **Kills:** {profile.total_kills} · **Boss:** {profile.boss_kills}",
-    ]
-    if cooldown:
-        lines.append(f"⏳ **Cooldown:** {cooldown // 60}:{cooldown % 60:02d}")
-    lines.append("\nStarte einen Run mit **`/zombies start`**.")
-    return info_embed(f"Zombie Survival — {member.display_name}", "\n".join(lines))
+    return info_embed(
+        f"Zombie Survival — {member.display_name}",
+        member.mention,
+        fields=[
+            ("Gold", f"**{economy.gold:,}** 🪙", True),
+            ("Zombie-Level", f"**{profile.level}**", True),
+            ("Höchste Welle", f"**{profile.highest_wave}**", True),
+            ("Kills", f"**{profile.total_kills}**", True),
+            ("Boss-Kills", f"**{profile.boss_kills}**", True),
+            (
+                "Cooldown" if cooldown else "Start",
+                (
+                    f"**{cooldown // 60}:{cooldown % 60:02d}**"
+                    if cooldown
+                    else "`/zombies start`"
+                ),
+                True,
+            ),
+        ],
+        thumbnail=member.display_avatar.url,
+    )
 
 
 def build_help_embed() -> discord.Embed:
     """Kurze Modus-Erklärung."""
     return info_embed(
-        "🧟 Zombie Survival",
+        "Zombie Survival",
         "Wellenbasiertes Survival-RPG mit Gold, Pets und Bosskampf.",
         fields=[
             (
                 "Ablauf",
-                "1. `/zombies start` · 2. Nahkampf & **Pet-Angriff** · "
-                "3. Wellenpause & **`/shop`** · 4. Boss in Welle 3",
-                False,
+                "`/zombies start` → Nahkampf & Pet-Angriff → Wellenpause → Boss Welle 3",
+                True,
             ),
             (
                 "Regeln",
-                f"**{Config.ZOMBIE_MAX_WAVES} Wellen** · **Kein Abbrechen** · "
-                f"**{Config.ZOMBIE_RUN_INACTIVITY // 3600}h** Inaktivität beendet Run · "
-                f"**+{Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT} %** HP nach jeder Welle",
-                False,
+                f"**{Config.ZOMBIE_MAX_WAVES} Wellen** · kein Abbrechen · "
+                f"**{Config.ZOMBIE_RUN_INACTIVITY // 3600}h** Inaktivität",
+                True,
             ),
             (
                 "Befehle",
-                "`start` · `status` · `profil` · `interface` · `leaderboard` · Shop: **`/shop`**",
-                False,
+                "`start` · `status` · `profil` · `interface` · `leaderboard`",
+                True,
             ),
         ],
     )

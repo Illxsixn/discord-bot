@@ -105,7 +105,7 @@ class ModerationCog(commands.Cog):
             reason_text = reason or "Kein Grund angegeben"
             await user.ban(reason=f"{reason_text} | Von: {interaction.user}", delete_message_days=0)
 
-            embed = moderation_embed("Ban", user, interaction.user, reason_text, color=Config.COLOR_ERROR)
+            embed = moderation_embed("Ban", user, interaction.user, reason_text)
             await interaction.followup.send(embed=success_embed("Mitglied gebannt", f"{user.mention} wurde gebannt."), ephemeral=True)
 
             logs = self._get_logs_cog()
@@ -143,7 +143,7 @@ class ModerationCog(commands.Cog):
             reason_text = reason or "Kein Grund angegeben"
             await user.kick(reason=f"{reason_text} | Von: {interaction.user}")
 
-            embed = moderation_embed("Kick", user, interaction.user, reason_text, color=Config.COLOR_WARNING)
+            embed = moderation_embed("Kick", user, interaction.user, reason_text)
             await interaction.followup.send(embed=success_embed("Mitglied gekickt", f"{user.mention} wurde gekickt."), ephemeral=True)
 
             logs = self._get_logs_cog()
@@ -188,7 +188,6 @@ class ModerationCog(commands.Cog):
                 user,
                 interaction.user,
                 f"{reason_text}\nDauer: {minutes} Min.",
-                color=Config.COLOR_WARNING,
             )
             await interaction.followup.send(
                 embed=success_embed("Timeout gesetzt", f"{user.mention} für **{minutes}** Min. in Timeout."),
@@ -289,7 +288,6 @@ class ModerationCog(commands.Cog):
                     user,
                     interaction.user,
                     reason_text,
-                    color=Config.COLOR_WARNING,
                 )
                 log_embed.add_field(name="Warn-ID", value=str(record.id), inline=True)
                 log_embed.add_field(name="Gesamt", value=f"{count} Warnung(en)", inline=True)
@@ -550,7 +548,7 @@ class ModerationCog(commands.Cog):
             role = await self._get_or_create_mute_role(interaction.guild)
             await user.add_roles(role, reason=reason or f"Mute von {interaction.user}")
 
-            embed = moderation_embed("Mute", user, interaction.user, reason, color=Config.COLOR_WARNING)
+            embed = moderation_embed("Mute", user, interaction.user, reason)
             await interaction.followup.send(embed=success_embed("Gemutet", f"{user.mention} wurde gemutet."), ephemeral=True)
 
             logs = self._get_logs_cog()

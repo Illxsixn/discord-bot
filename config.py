@@ -45,7 +45,7 @@ class Config:
     COLOR_ERROR: int = 0xE74C3C  # Rot
     COLOR_WARNING: int = 0xF1C40F  # Gelb
     COLOR_INFO: int = 0x3498DB  # Blau
-    COLOR_ARTWORK: int = 0x00B4D8  # Cyan — einheitliches Embed-Artwork
+    COLOR_ARTWORK: int = 0x581C87  # Dunkel-Lila — einheitliches Embed-Artwork
 
     # Cooldown in Sekunden für wiederholte Slash-Commands
     DEFAULT_COOLDOWN: float = 3.0

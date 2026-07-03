@@ -160,7 +160,7 @@ class SlotsCog(commands.Cog):
             won=won,
         )
         if result.jackpot:
-            embed.title = "🎰 MEGA-JACKPOT!"
+            embed.title = "MEGA-JACKPOT!"
 
         view._spinning = False
         await interaction.edit_original_response(embed=embed, view=view)

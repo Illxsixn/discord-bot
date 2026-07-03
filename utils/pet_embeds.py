@@ -45,16 +45,14 @@ def _pet_embed(
     thumbnail: str | None = None,
     image: str | None = None,
     evolution_stage: str = PetEvolutionStage.BABY.value,
-    color: int | None = None,
 ) -> discord.Embed:
-    del evolution_stage  # Artwork nutzt einheitliche Cyan-Farbe
+    del evolution_stage
     return artwork_embed(
         title,
         description,
         fields=fields,
         thumbnail=thumbnail,
         image=image,
-        color=color,
     )
 
 
@@ -147,7 +145,6 @@ def build_pet_duplicate_embed(
             f"📈 **+{player_xp} Spieler-XP**",
         ),
         evolution_stage=PetEvolutionStage.BABY.value,
-        color=Config.COLOR_WARNING,
     )
 
 
@@ -179,7 +176,6 @@ def build_pet_hatch_embed(
             ("Evolution", evolution_display(pet.evolution_stage), True),
             ("Impuls", mood_display(mood), True),
         ],
-        color=Config.COLOR_SUCCESS,
     )
 
 
