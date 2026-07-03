@@ -97,9 +97,6 @@ class Config:
     CHALLENGE_PET_XP_MIN: int = 20
     CHALLENGE_PET_XP_MAX: int = 50
     CHALLENGE_GENERATION_VERSION: int = 4
-    GUESS_MIN: int = 1
-    GUESS_MAX: int = 100
-    GUESS_COOLDOWN: int = 300
     BOARD_GAME_TIMEOUT: float = 300.0
     DAILY_CHALLENGE_COUNT: int = 4
     DAILY_PET_CHALLENGE_COUNT: int = 2

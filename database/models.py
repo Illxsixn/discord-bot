@@ -559,61 +559,6 @@ class TicketRecord:
 
 
 @dataclass
-class GuessGameRecord:
-    """Aktives Zahlenraten-Spiel pro Kanal."""
-
-    guild_id: int
-    channel_id: int
-    target_number: int
-    started_at: datetime
-
-    @classmethod
-    def from_row(cls, row: dict[str, Any]) -> "GuessGameRecord":
-        started = row.get("started_at")
-        started_at = datetime.fromisoformat(started) if isinstance(started, str) else datetime.utcnow()
-        return cls(
-            guild_id=row["guild_id"],
-            channel_id=row["channel_id"],
-            target_number=int(row["target_number"]),
-            started_at=started_at,
-        )
-
-
-@dataclass
-class GuessStatsRecord:
-    """Statistiken für Zahlenraten pro Nutzer."""
-
-    guild_id: int
-    user_id: int
-    games_played: int = 0
-    games_won: int = 0
-    total_guesses: int = 0
-    win_attempts_sum: int = 0
-    best_win_attempts: int | None = None
-    fastest_win_seconds: int | None = None
-
-    @classmethod
-    def from_row(cls, row: dict[str, Any]) -> "GuessStatsRecord":
-        return cls(
-            guild_id=row["guild_id"],
-            user_id=row["user_id"],
-            games_played=int(row.get("games_played") or 0),
-            games_won=int(row.get("games_won") or 0),
-            total_guesses=int(row.get("total_guesses") or 0),
-            win_attempts_sum=int(row.get("win_attempts_sum") or 0),
-            best_win_attempts=row.get("best_win_attempts"),
-            fastest_win_seconds=row.get("fastest_win_seconds"),
-        )
-
-    @property
-    def average_win_attempts(self) -> float | None:
-        """Durchschnittliche Versuche bei Siegen."""
-        if self.games_won <= 0:
-            return None
-        return self.win_attempts_sum / self.games_won
-
-
-@dataclass
 class ChallengeTask:
     """Einzelne tägliche Aufgabe."""
 
