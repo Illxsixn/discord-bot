@@ -15,7 +15,8 @@ import discord
 from utils.embeds import apply_brand_footer, info_embed
 
 CHANGELOG_PATH = Path(__file__).resolve().parent.parent / "data" / "changelog.json"
-MAX_RELEASES_IN_EMBED = 5
+MAX_RELEASES_IN_EMBED = 3
+MAX_CHANGES_PER_RELEASE = 5
 
 
 @dataclass(frozen=True)
@@ -47,16 +48,28 @@ def load_changelog() -> ChangelogData:
     return ChangelogData(version=str(raw["version"]), releases=releases)
 
 
+def _important_changes(changes: tuple[str, ...], *, limit: int = MAX_CHANGES_PER_RELEASE) -> tuple[str, ...]:
+    """Wählt die wichtigsten Einträge (Neu/Ersetzt zuerst, dann Rest)."""
+    priority_prefixes = ("Neu:", "Ersetzt", "Balance:")
+    prioritized = [change for change in changes if change.startswith(priority_prefixes)]
+    remaining = [change for change in changes if change not in prioritized]
+    ordered = prioritized + remaining
+    return tuple(ordered[:limit])
+
+
 def build_changelog_embed(*, max_releases: int = MAX_RELEASES_IN_EMBED) -> discord.Embed:
-    """Erstellt ein übersichtliches Changelog-Embed."""
+    """Erstellt ein übersichtliches Changelog-Embed (letzte wichtige Updates)."""
     data = load_changelog()
     sections: list[str] = []
 
     for release in data.releases[:max_releases]:
-        bullets = "\n".join(f"• {change}" for change in release.changes)
+        bullets = "\n".join(f"• {change}" for change in _important_changes(release.changes))
         sections.append(f"**v{release.version}**\n{bullets}")
 
     description = "\n\n".join(sections) if sections else "Noch keine Einträge."
-    embed = info_embed("📋 Changelog", description)
-    apply_brand_footer(embed, prefix=f"Version {data.version}")
+    embed = info_embed(
+        "Changelog",
+        description,
+    )
+    apply_brand_footer(embed, prefix=f"Version {data.version} · letzte {max_releases} Updates")
     return embed
