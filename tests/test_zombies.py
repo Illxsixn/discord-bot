@@ -66,6 +66,19 @@ def test_zombie_run_view_persistent_until_timeout():
     assert not view.is_persistent()
 
 
+def test_zombie_run_view_has_pet_attack_buttons():
+    from unittest.mock import MagicMock
+
+    from cogs.zombies import ZombieRunView
+
+    view = ZombieRunView(MagicMock(), 7, 99, has_pet=True, pet_on_cooldown=False)
+    custom_ids = [child.custom_id for child in view.children if hasattr(child, "custom_id")]
+    assert f"zombies:melee:7" in custom_ids
+    assert f"zombies:pet:focus:7" in custom_ids
+    assert f"zombies:pet:energy:7" in custom_ids
+    assert f"zombies:pet:luck:7" in custom_ids
+
+
 def test_pet_focus_sets_buff():
     run = _run()
     spawn_wave(run)

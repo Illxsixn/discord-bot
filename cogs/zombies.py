@@ -296,6 +296,69 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         )
         return embed, file, view
 
+    async def _resolve_run_message(
+        self,
+        interaction: discord.Interaction,
+        run: ZombieRunRecord,
+    ) -> discord.Message | None:
+        """Run-Panel-Nachricht aus Interaktion oder gespeicherter message_id."""
+        if interaction.message is not None:
+            return interaction.message
+        if interaction.guild is None or not run.channel_id or not run.message_id:
+            return None
+        channel = interaction.guild.get_channel(run.channel_id)
+        if not isinstance(channel, (discord.TextChannel, discord.Thread)):
+            return None
+        try:
+            return await channel.fetch_message(run.message_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return None
+
+    async def _edit_run_panel(
+        self,
+        interaction: discord.Interaction,
+        run: ZombieRunRecord,
+        *,
+        embed: discord.Embed,
+        view: ZombieRunView | None = None,
+        file: discord.File | None = None,
+    ) -> None:
+        """Aktualisiert das Run-Panel und registriert persistente Views neu."""
+        attachments: list[discord.File] = [file] if file is not None else []
+
+        panel = await self._resolve_run_message(interaction, run)
+        if panel is not None:
+            await panel.edit(embed=embed, view=view, attachments=attachments)
+            if view is not None:
+                self._persist_run_view(view, panel.id)
+            return
+
+        if interaction.response.is_done():
+            await interaction.edit_original_response(
+                embed=embed,
+                view=view,
+                attachments=attachments,
+            )
+            if view is not None:
+                try:
+                    msg = await interaction.original_response()
+                    self._persist_run_view(view, msg.id)
+                except (discord.NotFound, discord.HTTPException):
+                    pass
+            return
+
+        if interaction.message is not None:
+            await interaction.response.edit_message(
+                embed=embed,
+                view=view,
+                attachments=attachments,
+            )
+            if view is not None and interaction.message.id:
+                self._persist_run_view(view, interaction.message.id)
+            return
+
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
     async def _update_run_message(
         self,
         interaction: discord.Interaction,
@@ -307,52 +370,27 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         channel = self._channel(interaction)
         if final_embed is not None:
             try:
-                if interaction.response.is_done():
-                    await interaction.edit_original_response(embed=final_embed, view=None, attachments=[])
-                elif interaction.message:
-                    await interaction.response.edit_message(embed=final_embed, view=None, attachments=[])
-                else:
-                    await interaction.response.send_message(embed=final_embed, ephemeral=True)
+                await self._edit_run_panel(
+                    interaction,
+                    run,
+                    embed=final_embed,
+                    view=None,
+                    file=None,
+                )
             except (discord.NotFound, discord.HTTPException):
                 if channel:
                     await channel.send(embed=final_embed)
             return
 
         embed, file, view = await self._build_run_message(member, run)
-        kwargs: dict = {"embed": embed, "view": view}
-        if file:
-            kwargs["file"] = file
-
         try:
-            if interaction.response.is_done():
-                if file:
-                    await interaction.edit_original_response(embed=embed, view=view, attachments=[file])
-                else:
-                    await interaction.edit_original_response(embed=embed, view=view, attachments=[])
-            elif interaction.message:
-                if file:
-                    await interaction.response.edit_message(embed=embed, view=view, attachments=[file])
-                else:
-                    await interaction.response.edit_message(embed=embed, view=view, attachments=[])
-            else:
-                if channel is None:
-                    await interaction.response.send_message(
-                        embed=error_embed("Kein Kanal", "Run-Panel kann hier nicht gesendet werden."),
-                        ephemeral=True,
-                    )
-                    return
-                sent = await channel.send(**kwargs)
-                run.channel_id = channel.id
-                run.message_id = sent.id
-                await self.db.save_zombie_run(run)
-                self._persist_run_view(view, sent.id)
-                await interaction.response.send_message(
-                    embed=info_embed("Run gestartet", f"Dein Run-Panel: {sent.jump_url}"),
-                    ephemeral=True,
-                )
+            await self._edit_run_panel(interaction, run, embed=embed, view=view, file=file)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Run-Nachricht Update fehlgeschlagen: %s", exc)
             if channel:
+                kwargs: dict = {"embed": embed, "view": view}
+                if file:
+                    kwargs["file"] = file
                 sent = await channel.send(**kwargs)
                 run.channel_id = channel.id
                 run.message_id = sent.id
@@ -476,7 +514,10 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         economy = await self.db.get_player_economy(interaction.guild.id, interaction.user.id)
         pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
         embed = build_profile_embed(profile, economy, pet, interaction.user)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _send_status(self, interaction: discord.Interaction) -> None:
         await self.status(interaction)
