@@ -52,3 +52,14 @@ def test_melee_reduces_zombie_hp():
 def test_player_max_hp_scales():
     assert player_max_hp(1, 1) == Config.ZOMBIE_PLAYER_HP_BASE
     assert player_max_hp(5, 3) > Config.ZOMBIE_PLAYER_HP_BASE
+
+
+def test_zombie_run_view_persistent_until_timeout():
+    from unittest.mock import MagicMock
+
+    from cogs.zombies import ZombieRunView
+
+    view = ZombieRunView(MagicMock(), 7, 99, has_pet=True, pet_on_cooldown=False)
+    assert view.is_persistent()
+    view.timeout = 900.0
+    assert not view.is_persistent()
