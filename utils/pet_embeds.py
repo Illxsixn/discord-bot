@@ -9,6 +9,7 @@ import discord
 from config import Config
 from database.models import PetEvolutionStage, PetRarity, PetRecord
 from utils.embeds import artwork_embed, split_embed_fields, spaced_lines
+from utils.pet_skills import pet_skill_fields
 from utils.pets import (
     PET_SPECIES,
     PetSpeciesDefinition,
@@ -63,6 +64,7 @@ def build_pet_info_embed(
     gold: int | None = None,
     survival_stat: str | None = None,
     thumbnail: str | None = None,
+    player_level: int = 1,
 ) -> discord.Embed:
     """Übersichtliches Profil des aktiven Pets."""
     species = get_species_by_name(pet.species)
@@ -107,18 +109,11 @@ def build_pet_info_embed(
                 mood_display(pet.mood),
                 True,
             ),
-            (
-                "Charakter",
-                spaced_lines(
-                    f"**Persönlichkeit:** {pet.personality}",
-                    f"**Lieblingsaktivität:** {pet.favorite_activity}",
-                ),
-                True,
-            ),
-            ("Catchphrase", f"*{pet.catchphrase}*", True),
+            *pet_skill_fields(player_level),
             (
                 "Meta",
                 spaced_lines(
+                    f"**Lieblingsaktivität:** {pet.favorite_activity or '—'}",
                     f"**Geburtstag:** {pet_birthday(pet.adoption_date)}",
                     f"**Interaktionen:** {pet.total_interactions:,}",
                 ),

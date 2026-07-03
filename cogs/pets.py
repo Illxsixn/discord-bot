@@ -685,6 +685,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             gold=economy.gold,
             survival_stat=zombie_line,
             thumbnail=thumbnail,
+            player_level=level,
         )
         await interaction.followup.send(embed=embed, files=files or None)
         await self._track_pet_challenge(
