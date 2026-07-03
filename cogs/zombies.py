@@ -5,6 +5,7 @@ Zombie Survival Cog: Wellen, Kampf, Shop und Profil.
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
 
 import discord
@@ -94,7 +95,7 @@ class ZombieInterfaceView(discord.ui.View):
 
 
 class ZombieRunView(discord.ui.View):
-    """Persistente Run-Buttons — Zustand kommt aus der DB."""
+    """Persistente Run-Buttons — dieselbe View-Instanz wird wiederverwendet."""
 
     def __init__(
         self,
@@ -110,12 +111,23 @@ class ZombieRunView(discord.ui.View):
         self.cog = cog
         self.run_id = run_id
         self.owner_id = owner_id
+        self._busy = False
+        self._last_action = 0.0
+        self._has_pet = has_pet
+        self._pet_on_cooldown = pet_on_cooldown
+        self._between_waves = False
+        self._in_combat = False
+        self._include_legacy_shop = include_legacy_shop
+        self._build_buttons()
+
+    def _build_buttons(self) -> None:
+        self.clear_items()
 
         melee = discord.ui.Button(
             label="Nahkampf",
             style=discord.ButtonStyle.danger,
             emoji="🗡️",
-            custom_id=f"zombies:melee:{run_id}",
+            custom_id=f"zombies:melee:{self.run_id}",
         )
         melee.callback = self._melee_callback
         self.add_item(melee)
@@ -124,8 +136,8 @@ class ZombieRunView(discord.ui.View):
             label="Pet-Aktion",
             style=discord.ButtonStyle.primary,
             emoji="🐾",
-            custom_id=f"zombies:pet:{run_id}",
-            disabled=not has_pet or pet_on_cooldown,
+            custom_id=f"zombies:pet:{self.run_id}",
+            disabled=not self._has_pet or self._pet_on_cooldown,
         )
         pet_btn.callback = self._pet_callback
         self.add_item(pet_btn)
@@ -134,7 +146,8 @@ class ZombieRunView(discord.ui.View):
             label="Nächste Welle",
             style=discord.ButtonStyle.success,
             emoji="➡️",
-            custom_id=f"zombies:next_wave:{run_id}",
+            custom_id=f"zombies:next_wave:{self.run_id}",
+            disabled=self._in_combat or not self._between_waves,
         )
         nxt.callback = self._next_wave_callback
         self.add_item(nxt)
@@ -143,20 +156,43 @@ class ZombieRunView(discord.ui.View):
             label="Wellenpause",
             style=discord.ButtonStyle.secondary,
             emoji="⏸️",
-            custom_id=f"zombies:pause:{run_id}",
+            custom_id=f"zombies:pause:{self.run_id}",
         )
         pause.callback = self._pause_callback
         self.add_item(pause)
 
-        if include_legacy_shop:
+        if self._include_legacy_shop:
             legacy = discord.ui.Button(
                 label="Wellenpause",
                 style=discord.ButtonStyle.secondary,
                 emoji="⏸️",
-                custom_id=f"zombies:shop:{run_id}",
+                custom_id=f"zombies:shop:{self.run_id}",
             )
             legacy.callback = self._pause_callback
             self.add_item(legacy)
+
+    def sync_from_run(
+        self,
+        run: ZombieRunRecord,
+        *,
+        has_pet: bool,
+    ) -> None:
+        """Aktualisiert Button-Zustand ohne neue View-Instanz (Buttons bleiben klickbar)."""
+        self._has_pet = has_pet
+        self._pet_on_cooldown = run.pet_action_cooldown > 0
+        self._between_waves = run.between_waves
+        self._in_combat = run.in_combat
+        self._build_buttons()
+
+    def set_busy(self, busy: bool) -> None:
+        self._busy = busy
+
+    def action_cooldown_remaining(self) -> float:
+        elapsed = time.monotonic() - self._last_action
+        return max(0.0, Config.ZOMBIE_ACTION_COOLDOWN - elapsed)
+
+    def mark_action(self) -> None:
+        self._last_action = time.monotonic()
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -167,17 +203,38 @@ class ZombieRunView(discord.ui.View):
             return False
         return True
 
+    async def _dispatch_action(self, interaction: discord.Interaction, action: str) -> None:
+        if self._busy:
+            await interaction.response.send_message(
+                embed=warning_embed("Moment", "Die letzte Aktion läuft noch …"),
+                ephemeral=True,
+            )
+            return
+
+        remaining = self.action_cooldown_remaining()
+        if remaining > 0:
+            await interaction.response.send_message(
+                embed=warning_embed(
+                    "Cooldown",
+                    f"Kurz warten (**{remaining:.1f}** s), dann erneut.",
+                ),
+                ephemeral=True,
+            )
+            return
+
+        await self.cog._handle_run_action(interaction, self.run_id, action, view=self)
+
     async def _melee_callback(self, interaction: discord.Interaction) -> None:
-        await self.cog._handle_run_action(interaction, self.run_id, "melee")
+        await self._dispatch_action(interaction, "melee")
 
     async def _pet_callback(self, interaction: discord.Interaction) -> None:
-        await self.cog._handle_run_action(interaction, self.run_id, "pet")
+        await self._dispatch_action(interaction, "pet")
 
     async def _next_wave_callback(self, interaction: discord.Interaction) -> None:
-        await self.cog._handle_run_action(interaction, self.run_id, "next_wave")
+        await self._dispatch_action(interaction, "next_wave")
 
     async def _pause_callback(self, interaction: discord.Interaction) -> None:
-        await self.cog._handle_run_action(interaction, self.run_id, "pause")
+        await self._dispatch_action(interaction, "pause")
 
 
 class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zombie Survival — Wellen, Gold & Pets"):
@@ -186,6 +243,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
     def __init__(self, bot: commands.Bot, db: Database) -> None:
         self.bot = bot
         self.db = db
+        self._run_views: dict[int, ZombieRunView] = {}
 
     async def cog_load(self) -> None:
         stale = await self.db.get_stale_active_zombie_runs(Config.ZOMBIE_RUN_INACTIVITY)
@@ -196,7 +254,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         for run in await self.db.get_all_active_zombie_runs():
             if run.message_id:
                 view = await self._build_persistent_run_view(run)
-                self.bot.add_view(view, message_id=run.message_id)
+                self._register_run_view(run, view)
 
     async def _finalize_stale_run(self, run: ZombieRunRecord) -> None:
         """Schließt inaktive Runs beim Start ab — inkl. Trostbelohnung."""
@@ -212,15 +270,42 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                     member = None
         await finalize_expired_run(self.db, self.bot, run, profile, member=member)
 
+    def _register_run_view(self, run: ZombieRunRecord, view: ZombieRunView) -> None:
+        """Registriert persistente Buttons für Nachricht und Bot-Neustart."""
+        if run.message_id:
+            self.bot.add_view(view, message_id=run.message_id)
+
+    def _drop_run_view(self, run_id: int) -> None:
+        self._run_views.pop(run_id, None)
+
+    async def _get_run_view(
+        self,
+        run: ZombieRunRecord,
+        *,
+        has_pet: bool,
+        include_legacy_shop: bool = False,
+    ) -> ZombieRunView:
+        """Gibt dieselbe View-Instanz pro Run zurück (Buttons bleiben nach Edits aktiv)."""
+        view = self._run_views.get(run.id)
+        if view is None:
+            view = ZombieRunView(
+                self,
+                run.id,
+                run.user_id,
+                has_pet=has_pet,
+                pet_on_cooldown=run.pet_action_cooldown > 0,
+                include_legacy_shop=include_legacy_shop,
+            )
+            self._run_views[run.id] = view
+        view.sync_from_run(run, has_pet=has_pet)
+        return view
+
     async def _build_persistent_run_view(self, run: ZombieRunRecord) -> ZombieRunView:
         """View für persistente Nachrichten nach Bot-Neustart."""
         pet = await self.db.get_active_pet(run.guild_id, run.user_id)
-        return ZombieRunView(
-            self,
-            run.id,
-            run.user_id,
+        return await self._get_run_view(
+            run,
             has_pet=pet is not None,
-            pet_on_cooldown=run.pet_action_cooldown > 0,
             include_legacy_shop=True,
         )
 
@@ -285,13 +370,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             if zombie:
                 file = attach_zombie_visual(embed, run.current_zombie_key, is_boss=zombie.is_boss)
 
-        view = ZombieRunView(
-            self,
-            run.id,
-            member.id,
-            has_pet=pet is not None,
-            pet_on_cooldown=run.pet_action_cooldown > 0,
-        )
+        view = await self._get_run_view(run, has_pet=pet is not None)
         return embed, file, view
 
     async def _update_run_message(
@@ -304,6 +383,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
     ) -> None:
         channel = self._channel(interaction)
         if final_embed is not None:
+            self._drop_run_view(run.id)
             try:
                 if interaction.response.is_done():
                     await interaction.edit_original_response(embed=final_embed, view=None, attachments=[])
@@ -342,8 +422,11 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                             pass
                         elif hasattr(msg, "id"):
                             saved.message_id = msg.id
+                            run.message_id = msg.id
                         await self.db.save_zombie_run(saved)
-                        self.bot.add_view(view, message_id=saved.message_id)
+            if not run.message_id and interaction.message:
+                run.message_id = interaction.message.id
+            self._register_run_view(run, view)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Run-Nachricht Update fehlgeschlagen: %s", exc)
             if channel:
@@ -351,13 +434,15 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 run.channel_id = channel.id
                 run.message_id = sent.id
                 await self.db.save_zombie_run(run)
-                self.bot.add_view(view, message_id=sent.id)
+                self._register_run_view(run, view)
 
     async def _handle_run_action(
         self,
         interaction: discord.Interaction,
         run_id: int,
         action: str,
+        *,
+        view: ZombieRunView | None = None,
     ) -> None:
         assert interaction.guild is not None
         if not isinstance(interaction.user, discord.Member):
@@ -366,6 +451,23 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         if action == "shop":
             action = "pause"
 
+        if view is not None:
+            view.set_busy(True)
+
+        try:
+            await self._process_run_action(interaction, run_id, action, view=view)
+        finally:
+            if view is not None:
+                view.set_busy(False)
+
+    async def _process_run_action(
+        self,
+        interaction: discord.Interaction,
+        run_id: int,
+        action: str,
+        *,
+        view: ZombieRunView | None = None,
+    ) -> None:
         async with game_lock(run_id):
             run = await self.db.get_zombie_run(run_id)
             if run is None or run.status != ZombieRunStatus.ACTIVE.value:
@@ -389,6 +491,9 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
 
             if not interaction.response.is_done():
                 await interaction.response.defer()
+
+            if view is not None:
+                view.mark_action()
 
             profile = await self.db.get_zombie_player(interaction.guild.id, interaction.user.id)
             player_level = (await self.db.get_user_level(interaction.guild.id, interaction.user.id)).level
@@ -484,6 +589,9 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 return
 
             await self.db.save_zombie_run(run)
+            if view is not None:
+                pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
+                view.sync_from_run(run, has_pet=pet is not None)
             await self._update_run_message(interaction, run, interaction.user)
 
     async def _send_profile(self, interaction: discord.Interaction) -> None:
@@ -566,7 +674,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         msg = await interaction.original_response()
         run.message_id = msg.id
         await self.db.save_zombie_run(run)
-        self.bot.add_view(view, message_id=msg.id)
+        self._register_run_view(run, view)
 
     @app_commands.command(name="status", description="Zeigt den aktiven Run oder Kurzprofil")
     @app_commands.guild_only()
@@ -593,7 +701,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             checked.message_id = msg.id
             checked.channel_id = self._channel(interaction).id if self._channel(interaction) else None
             await self.db.save_zombie_run(checked)
-            self.bot.add_view(view, message_id=msg.id)
+            self._register_run_view(checked, view)
             return
 
         profile = await self.db.get_zombie_player(interaction.guild.id, interaction.user.id)
