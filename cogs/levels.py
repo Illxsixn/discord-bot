@@ -67,33 +67,22 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
             f"Level — {member.display_name}",
             member.mention,
             fields=[
-                (
-                    "📊 Übersicht",
-                    spaced_lines(
-                        f"**Level:** {record.level}",
-                        f"**Rang:** #{rank}",
-                        f"**XP gesamt:** {record.xp:,}",
-                        f"**Gold:** {economy.gold:,} 🪙",
-                        f"**Zombie Survival:** {zombie_line}",
-                    ),
-                    False,
-                ),
+                ("Level", f"**{record.level}**", True),
+                ("Rang", f"**#{rank}**", True),
+                ("XP", f"**{record.xp:,}**", True),
+                ("Gold", f"**{economy.gold:,}** 🪙", True),
+                ("Zombie Survival", zombie_line, True),
                 (
                     "Fortschritt",
                     spaced_lines(
-                        f"`{progress_bar(percent)}` **{percent}%**",
+                        f"`{progress_bar(percent)}` **{percent} %**",
                         f"**{current:,}** / **{needed:,}** XP bis Level **{next_level}**",
                     ),
-                    False,
-                ),
-                (
-                    "XP pro Nachricht",
-                    f"**{Config.XP_PER_MESSAGE} XP** (Cooldown: **{Config.LEVEL_XP_COOLDOWN}s**)",
-                    False,
+                    True,
                 ),
             ],
+            thumbnail=member.display_avatar.url,
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
         return embed
 
     async def _announce_level_up(
@@ -306,8 +295,11 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         await interaction.followup.send(
             embed=success_embed(
                 "Level-System aktiv",
-                f"Mitglieder erhalten jetzt **{Config.XP_PER_MESSAGE} XP** pro Nachricht "
-                f"(Cooldown: **{Config.LEVEL_XP_COOLDOWN} Sekunden**).",
+                spaced_lines(
+                    f"Mitglieder erhalten jetzt **{Config.XP_PER_MESSAGE} XP** pro Nachricht "
+                    f"(Cooldown: **{Config.LEVEL_XP_COOLDOWN} Sekunden**).",
+                    "**Zombie Survival** (`/zombies`) ist jetzt ebenfalls verfügbar.",
+                ),
             ),
             ephemeral=True,
         )
@@ -319,7 +311,10 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         await interaction.response.defer(ephemeral=True)
         await self.db.update_guild_settings(interaction.guild.id, levels_enabled=False)  # type: ignore[union-attr]
         await interaction.followup.send(
-            embed=success_embed("Level-System aus", "Keine XP-Vergabe mehr."),
+            embed=success_embed(
+                "Level-System aus",
+                "Keine XP-Vergabe mehr. **Zombie Survival** ist damit ebenfalls deaktiviert.",
+            ),
             ephemeral=True,
         )
 

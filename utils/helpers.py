@@ -215,25 +215,25 @@ def guild_settings_to_fields(settings: "GuildSettings") -> list[tuple[str, str, 
 
     return [
         (
-            "👋 Welcome & Leave",
+            "Welcome & Leave",
             spaced_lines(
                 f"**Welcome:** {onoff(settings.welcome_enabled)}",
                 f"**Welcome-Kanal:** {ch(settings.welcome_channel_id)}",
                 f"**Leave:** {onoff(settings.leave_enabled)}",
                 f"**Leave-Kanal:** {ch(settings.leave_channel_id)}",
             ),
-            False,
+            True,
         ),
         (
-            "📋 Logs",
+            "Logs",
             spaced_lines(
                 f"**Logs:** {onoff(settings.logs_enabled)}",
                 f"**Log-Kanal:** {ch(settings.logs_channel_id)}",
             ),
-            False,
+            True,
         ),
         (
-            "🤖 AutoMod",
+            "AutoMod",
             spaced_lines(
                 f"**AutoMod:** {onoff(settings.automod_enabled)}",
                 f"**Spam-Schutz:** {'✅' if settings.spam_protection else '❌'}",
@@ -243,12 +243,13 @@ def guild_settings_to_fields(settings: "GuildSettings") -> list[tuple[str, str, 
                 f"**Strafe:** {settings.automod_punishment.value.title()}",
                 f"**Mute-Rolle:** {f'<@&{settings.mute_role_id}>' if settings.mute_role_id else '— Nicht gesetzt'}",
             ),
-            False,
+            True,
         ),
         (
-            "📈 Level-System",
+            "Level-System",
             spaced_lines(
                 f"**Level-System:** {onoff(settings.levels_enabled)}",
+                f"**Zombie Survival:** {onoff(settings.levels_enabled)} (gekoppelt)",
                 f"**XP pro Nachricht:** {Config.XP_PER_MESSAGE}",
                 (
                     f"**Level-Up Kanal:** <#{settings.levels_announce_channel_id}>"
@@ -256,7 +257,7 @@ def guild_settings_to_fields(settings: "GuildSettings") -> list[tuple[str, str, 
                     else "**Level-Up Kanal:** Nachrichtenkanal"
                 ),
             ),
-            False,
+            True,
         ),
     ]
 

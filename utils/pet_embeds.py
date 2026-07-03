@@ -4,13 +4,11 @@ Einheitliche, übersichtliche Embeds für das Pet-System.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import discord
 
 from config import Config
 from database.models import PetEvolutionStage, PetRarity, PetRecord
-from utils.embeds import apply_brand_footer, split_embed_fields, spaced_lines
+from utils.embeds import artwork_embed, split_embed_fields, spaced_lines
 from utils.pets import (
     PET_SPECIES,
     PetSpeciesDefinition,
@@ -34,35 +32,30 @@ RARITY_ORDER: tuple[PetRarity, ...] = (
 
 
 def pet_embed_color(evolution_stage: str) -> int:
-    """Embed-Farbe passend zur Evolutionsstufe."""
-    colors = {
-        PetEvolutionStage.BABY.value: Config.COLOR_INFO,
-        PetEvolutionStage.TEEN.value: 0x57F287,
-        PetEvolutionStage.ADULT.value: 0xFEE75C,
-        PetEvolutionStage.LEGENDARY.value: 0xEB459E,
-    }
-    return colors.get(evolution_stage, Config.COLOR_INFO)
+    """Einheitliche Artwork-Farbe (Evolution nur noch im Text)."""
+    del evolution_stage
+    return Config.COLOR_ARTWORK
 
 
 def _pet_embed(
     title: str,
     *,
     description: str | None = None,
-    evolution_stage: str = PetEvolutionStage.BABY.value,
     fields: list[tuple[str, str, bool]] | None = None,
+    thumbnail: str | None = None,
+    image: str | None = None,
+    evolution_stage: str = PetEvolutionStage.BABY.value,
     color: int | None = None,
 ) -> discord.Embed:
-    embed = discord.Embed(
-        title=title,
-        description=description,
-        color=color or pet_embed_color(evolution_stage),
-        timestamp=datetime.now(timezone.utc),
+    del evolution_stage  # Artwork nutzt einheitliche Cyan-Farbe
+    return artwork_embed(
+        title,
+        description,
+        fields=fields,
+        thumbnail=thumbnail,
+        image=image,
+        color=color,
     )
-    if fields:
-        for name, value, inline in fields:
-            embed.add_field(name=name, value=value, inline=inline)
-    apply_brand_footer(embed)
-    return embed
 
 
 def build_pet_info_embed(
@@ -94,43 +87,43 @@ def build_pet_info_embed(
             f"**{evolution_display(pet.evolution_stage)}**",
             f"Besitzer: {member.mention}",
         ),
-        evolution_stage=pet.evolution_stage,
+        thumbnail=member.display_avatar.url,
         fields=[
             (
-                "📊 Fortschritt",
+                "Fortschritt",
                 spaced_lines(*overview_lines),
-                False,
+                True,
             ),
             (
-                "🧬 Profil",
+                "Profil",
                 spaced_lines(
                     f"**Art:** {pet.species}",
                     f"**Seltenheit:** {rarity}",
                     f"**XP-Bonus:** {xp_bonus}",
                 ),
-                False,
+                True,
             ),
             (
-                "⚡ Impuls",
+                "Impuls",
                 mood_display(pet.mood),
-                False,
+                True,
             ),
             (
-                "🎭 Charakter",
+                "Charakter",
                 spaced_lines(
                     f"**Persönlichkeit:** {pet.personality}",
                     f"**Lieblingsaktivität:** {pet.favorite_activity}",
                 ),
-                False,
+                True,
             ),
-            ("💬 Catchphrase", f"*{pet.catchphrase}*", False),
+            ("Catchphrase", f"*{pet.catchphrase}*", True),
             (
-                "📅 Meta",
+                "Meta",
                 spaced_lines(
                     f"**Geburtstag:** {pet_birthday(pet.adoption_date)}",
                     f"**Interaktionen:** {pet.total_interactions:,}",
                 ),
-                False,
+                True,
             ),
         ],
     )
@@ -182,8 +175,9 @@ def build_pet_hatch_embed(
         ),
         evolution_stage=pet.evolution_stage,
         fields=[
-            ("Status", status, False),
-            ("Evolution", evolution_display(pet.evolution_stage), False),
+            ("Status", status, True),
+            ("Evolution", evolution_display(pet.evolution_stage), True),
+            ("Impuls", mood_display(mood), True),
         ],
         color=Config.COLOR_SUCCESS,
     )
@@ -301,7 +295,11 @@ def build_pet_play_embed(
     return _pet_embed(
         f"{emoji} Impuls-Rush · {pet.name}",
         description=spaced_lines(*description_parts),
-        evolution_stage=pet.evolution_stage,
+        fields=[
+            ("Runde", f"**{round_num}/{total_rounds}**", True),
+            ("Treffer", f"**{score}/{total_rounds}**", True),
+            ("Score", bar, True),
+        ],
     )
 
 

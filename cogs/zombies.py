@@ -18,8 +18,9 @@ from database.models import (
     ZombieRunRecord,
     ZombieRunStatus,
 )
-from utils.embeds import error_embed, info_embed, warning_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, warning_embed
 from utils.game_locks import game_lock
+from utils.game_gates import is_zombie_mode_active
 from utils.pet_play import PET_IMPULSES
 from utils.zombie_assets import attach_zombie_visual
 from utils.zombie_combat import (
@@ -222,6 +223,24 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         self.bot = bot
         self.db = db
 
+    async def _ensure_zombie_mode(self, interaction: discord.Interaction) -> bool:
+        """Prüft, ob Zombie Survival über das Level-System freigeschaltet ist."""
+        assert interaction.guild is not None
+        if await is_zombie_mode_active(self.db, interaction.guild.id):
+            return True
+        embed = error_embed(
+            "Zombie-Modus inaktiv",
+            spaced_lines(
+                "Zombie Survival ist an das **Level-System** gekoppelt.",
+                "Ein Admin aktiviert beides mit **`/levels enable`**.",
+            ),
+        )
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        return False
+
     async def cog_load(self) -> None:
         stale = await self.db.get_stale_active_zombie_runs(Config.ZOMBIE_RUN_INACTIVITY)
         if stale:
@@ -397,6 +416,8 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         assert interaction.guild is not None
         if not isinstance(interaction.user, discord.Member):
             return
+        if not await self._ensure_zombie_mode(interaction):
+            return
 
         if action == "shop":
             action = "pause"
@@ -528,6 +549,8 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         assert interaction.guild is not None
         if not isinstance(interaction.user, discord.Member):
             return
+        if not await self._ensure_zombie_mode(interaction):
+            return
 
         async with game_lock(run_id):
             run = await self.db.get_zombie_run(run_id)
@@ -586,6 +609,8 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         """Führt gewählten Pet-Impuls als Bonusangriff aus."""
         assert interaction.guild is not None
         if not isinstance(interaction.user, discord.Member):
+            return
+        if not await self._ensure_zombie_mode(interaction):
             return
 
         async with game_lock(run_id):
@@ -693,6 +718,8 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 ephemeral=True,
             )
             return
+        if not await self._ensure_zombie_mode(interaction):
+            return
 
         active = await self.db.get_active_zombie_run(interaction.guild.id, interaction.user.id)
         if active is not None:
@@ -763,6 +790,8 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         assert interaction.guild is not None
         if not isinstance(interaction.user, discord.Member):
             return
+        if not await self._ensure_zombie_mode(interaction):
+            return
 
         run = await self.db.get_active_zombie_run(interaction.guild.id, interaction.user.id)
         if run:
@@ -794,12 +823,16 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
     @app_commands.command(name="profil", description="Zeigt dein Zombie-Survival-Profil")
     @app_commands.guild_only()
     async def profil(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is not None and not await self._ensure_zombie_mode(interaction):
+            return
         await self._send_profile(interaction)
 
     @app_commands.command(name="interface", description="Steuerzentrale mit Schnellbuttons")
     @app_commands.guild_only()
     async def interface(self, interaction: discord.Interaction) -> None:
         assert interaction.guild is not None
+        if not await self._ensure_zombie_mode(interaction):
+            return
         economy = await self.db.get_player_economy(interaction.guild.id, interaction.user.id)
         embed = build_interface_embed(economy)
         await interaction.response.send_message(
@@ -825,6 +858,8 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         sortierung: app_commands.Choice[str],
     ) -> None:
         assert interaction.guild is not None
+        if not await self._ensure_zombie_mode(interaction):
+            return
         key = sortierung.value
 
         if key == "gold":
@@ -883,6 +918,8 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
     @app_commands.command(name="help", description="Kurze Erklärung von Zombie Survival")
     @app_commands.guild_only()
     async def help_cmd(self, interaction: discord.Interaction) -> None:
+        if not await self._ensure_zombie_mode(interaction):
+            return
         await interaction.response.send_message(embed=build_help_embed(), ephemeral=True)
 
 

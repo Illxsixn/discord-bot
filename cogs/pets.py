@@ -37,7 +37,6 @@ from utils.pet_embeds import (
     build_pet_info_embed,
     build_pet_leaderboard_embed,
     build_pet_play_embed,
-    pet_embed_color,
 )
 from utils.pet_play import (
     PET_IMPULSES,
@@ -481,8 +480,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             titles.get(milestone, "Pet-Evolution!"),
             descriptions.get(milestone, f"**{pet.name}** ist gewachsen!"),
         )
-        embed.color = pet_embed_color(pet.evolution_stage)
-        embed.set_footer(text=f"Besitzer: {member.display_name}")
+        embed.set_thumbnail(url=member.display_avatar.url)
         try:
             await channel.send(content=member.mention, embed=embed)
         except discord.Forbidden:

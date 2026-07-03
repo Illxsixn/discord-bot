@@ -8,7 +8,7 @@ import discord
 
 from config import Config
 from database.models import PetRecord, PlayerEconomyRecord, ZombiePlayerRecord, ZombieRunRecord
-from utils.embeds import info_embed, success_embed, error_embed
+from utils.embeds import info_embed, spaced_lines, success_embed, error_embed
 from utils.pet_play import PET_IMPULSES
 from utils.levels import progress_bar, xp_progress
 from utils.zombie_content import get_zombie, upgrade_lines, wave_intro_text, wave_location
@@ -36,12 +36,7 @@ def build_pet_impulse_embed(
     pet: PetRecord,
 ) -> discord.Embed:
     """Separates Fenster zur Impuls-Auswahl für den Pet-Bonusangriff."""
-    lines = [
-        f"**{pet.name}** greift **zusätzlich** zu deinem Nahkampf an.",
-        f"Cooldown danach: **{Config.ZOMBIE_PET_ACTION_COOLDOWN}** Angriffe.",
-        "",
-        "**Wähle einen Impuls:**",
-    ]
+    impulse_fields: list[tuple[str, str, bool]] = []
     for impulse_id, emoji, label in PET_IMPULSES:
         if impulse_id == "focus":
             effect = "Bonus 8–14 · nächster Nahkampf **+50 %**"
@@ -49,9 +44,17 @@ def build_pet_impulse_embed(
             effect = "Heilt dich um **20** HP"
         else:
             effect = "Bonus 5–12 · Endbelohnung **+5 %** (max. 25 %)"
-        lines.append(f"{emoji} **{label}** — {effect}")
+        impulse_fields.append((f"{emoji} {label}", effect, True))
 
-    embed = info_embed("🐾 Pet-Bonusangriff", "\n".join(lines))
+    embed = info_embed(
+        "Pet-Bonusangriff",
+        spaced_lines(
+            f"**{pet.name}** greift **zusätzlich** zu deinem Nahkampf an.",
+            f"Cooldown danach: **{Config.ZOMBIE_PET_ACTION_COOLDOWN}** Angriffe.",
+            "**Wähle einen Impuls unten:**",
+        ),
+        fields=impulse_fields,
+    )
     if run.in_combat and run.current_zombie_key:
         zombie = get_zombie(run.current_zombie_key)
         if zombie:
@@ -75,51 +78,41 @@ def build_run_embed(
     zombie = get_zombie(run.current_zombie_key)
 
     if run.in_combat and zombie:
-        title = f"🧟 Welle {run.wave}/{run.max_waves} · {location}"
+        title = f"Welle {run.wave}/{run.max_waves} · {location}"
         description = wave_intro_text(run.wave, zombie)
     elif run.between_waves:
-        title = f"✅ Welle {run.wave}/{run.max_waves} · {location}"
+        title = f"Welle {run.wave}/{run.max_waves} · {location}"
         description = wave_intro_text(run.wave, None)
     else:
-        title = f"🧟 Welle {run.wave}/{run.max_waves} · {location}"
+        title = f"Welle {run.wave}/{run.max_waves} · {location}"
         description = "Bereit für den nächsten Einsatz."
 
-    embed = info_embed(title, description)
+    player_hp = format_hp_bar(run.player_hp, run.player_max_hp)
+    pet_name = pet.name if pet else "—"
+    pet_status = _pet_action_label(run, pet)
 
-    embed.add_field(
-        name="Spieler",
-        value="\n".join(
-            [
-                f"❤️ HP: {format_hp_bar(run.player_hp, run.player_max_hp)}",
-                f"🪙 Gold: **{economy.gold:,}** · Run-Punkte: **{run.run_gold}**",
-                f"📊 Level: **{player_level}** · Upgrades: {upgrade_lines()}",
-            ]
-        ),
-        inline=False,
-    )
+    fields: list[tuple[str, str, bool]] = [
+        ("HP", player_hp, True),
+        ("Gold", f"**{economy.gold:,}** 🪙", True),
+        ("Run-Punkte", f"**{run.run_gold}**", True),
+        ("Level", f"**{player_level}**", True),
+        (f"Pet · {pet_name}", pet_status, True),
+        ("Upgrades", upgrade_lines(), True),
+    ]
 
     if run.in_combat and zombie:
         special = "Spezialangriff möglich" if zombie.is_boss else (
             "Doppelangriff möglich" if zombie.double_attack_chance else "Standardangriff"
         )
-        embed.add_field(
-            name="Gegner",
-            value="\n".join(
-                [
-                    f"{zombie.emoji} **{zombie.name}**",
-                    f"❤️ HP: {format_hp_bar(run.current_zombie_hp, zombie.hp)}",
-                    f"⚔️ Angriff: **{zombie.attack}** · {special}",
-                ]
-            ),
-            inline=False,
+        fields.extend(
+            [
+                ("Gegner", f"{zombie.emoji} **{zombie.name}**", True),
+                ("Zombie-HP", format_hp_bar(run.current_zombie_hp, zombie.hp), True),
+                ("Angriff", f"**{zombie.attack}** · {special}", True),
+            ]
         )
 
-    pet_name = pet.name if pet else "—"
-    embed.add_field(
-        name=f"🐾 {pet_name}",
-        value=_pet_action_label(run, pet),
-        inline=False,
-    )
+    embed = info_embed(title, description, fields=fields)
 
     if run.last_action_text:
         embed.add_field(name="Letzte Aktion", value=run.last_action_text[:1024], inline=False)

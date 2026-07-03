@@ -15,6 +15,7 @@ import discord
 from config import Config
 
 BRAND_ICON_ATTACHMENT = "anarchy_icon.png"
+ARTWORK_THUMBNAIL = f"attachment://{BRAND_ICON_ATTACHMENT}"
 DISCORD_FIELD_VALUE_LIMIT = 1024
 
 
@@ -222,6 +223,64 @@ def install_brand_send_hooks() -> None:
     discord.Message.edit = _wrap_edit(discord.Message.edit)
 
 
+def apply_artwork_thumbnail(embed: discord.Embed, *, thumbnail: str | None = None) -> discord.Embed:
+    """Setzt Thumbnail — Standard ist das Marken-Icon (Artwork-Vorlage)."""
+    if thumbnail:
+        embed.set_thumbnail(url=thumbnail)
+    elif not embed.thumbnail.url and brand_icon_file() is not None:
+        embed.set_thumbnail(url=ARTWORK_THUMBNAIL)
+    return embed
+
+
+def add_embed_fields(
+    embed: discord.Embed,
+    fields: list[tuple[str, str, bool]] | None,
+) -> discord.Embed:
+    """Fügt Felder hinzu — inline-Felder werden in Reihen à 3 gruppiert."""
+    if not fields:
+        return embed
+    for name, value, inline in fields:
+        embed.add_field(name=name, value=value, inline=inline)
+    return embed
+
+
+def artwork_embed(
+    title: str,
+    description: str | None = None,
+    *,
+    fields: list[tuple[str, str, bool]] | None = None,
+    thumbnail: str | None = None,
+    image: str | None = None,
+    color: int | None = None,
+) -> discord.Embed:
+    """
+    Einheitliches Embed nach Artwork-Vorlage: Cyan-Akzent, Thumbnail, 3-Spalten-Felder.
+
+    Args:
+        title: Überschrift ohne Emoji-Präfix.
+        description: Optionaler Beschreibungstext.
+        fields: Felder als (name, value, inline) — inline=True für 3er-Reihen.
+        thumbnail: Optionale Thumbnail-URL (sonst Marken-Icon).
+        image: Optionales Großbild.
+        color: Optionale Farbe (Standard: COLOR_ARTWORK).
+
+    Returns:
+        Fertiges discord.Embed-Objekt.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=color or Config.COLOR_ARTWORK,
+        timestamp=datetime.now(timezone.utc),
+    )
+    apply_artwork_thumbnail(embed, thumbnail=thumbnail)
+    if image:
+        embed.set_image(url=image)
+    add_embed_fields(embed, fields)
+    apply_brand_footer(embed)
+    return embed
+
+
 def success_embed(
     title: str,
     description: str | None = None,
@@ -239,17 +298,7 @@ def success_embed(
     Returns:
         Fertiges discord.Embed-Objekt.
     """
-    embed = discord.Embed(
-        title=f"✅ {title}",
-        description=description,
-        color=Config.COLOR_SUCCESS,
-        timestamp=datetime.now(timezone.utc),
-    )
-    if fields:
-        for name, value, inline in fields:
-            embed.add_field(name=name, value=value, inline=inline)
-    apply_brand_footer(embed)
-    return embed
+    return artwork_embed(title, description, fields=fields)
 
 
 def error_embed(
@@ -259,7 +308,7 @@ def error_embed(
     fields: list[tuple[str, str, bool]] | None = None,
 ) -> discord.Embed:
     """
-    Erstellt ein rotes Fehler-Embed.
+    Erstellt ein Fehler-Embed im Artwork-Stil.
 
     Args:
         title: Überschrift des Embeds.
@@ -269,17 +318,7 @@ def error_embed(
     Returns:
         Fertiges discord.Embed-Objekt.
     """
-    embed = discord.Embed(
-        title=f"❌ {title}",
-        description=description,
-        color=Config.COLOR_ERROR,
-        timestamp=datetime.now(timezone.utc),
-    )
-    if fields:
-        for name, value, inline in fields:
-            embed.add_field(name=name, value=value, inline=inline)
-    apply_brand_footer(embed)
-    return embed
+    return artwork_embed(title, description, fields=fields)
 
 
 def warning_embed(
@@ -289,7 +328,7 @@ def warning_embed(
     fields: list[tuple[str, str, bool]] | None = None,
 ) -> discord.Embed:
     """
-    Erstellt ein gelbes Warnungs-Embed.
+    Erstellt ein Warnungs-Embed im Artwork-Stil.
 
     Args:
         title: Überschrift des Embeds.
@@ -299,17 +338,7 @@ def warning_embed(
     Returns:
         Fertiges discord.Embed-Objekt.
     """
-    embed = discord.Embed(
-        title=f"⚠️ {title}",
-        description=description,
-        color=Config.COLOR_WARNING,
-        timestamp=datetime.now(timezone.utc),
-    )
-    if fields:
-        for name, value, inline in fields:
-            embed.add_field(name=name, value=value, inline=inline)
-    apply_brand_footer(embed)
-    return embed
+    return artwork_embed(title, description, fields=fields)
 
 
 def info_embed(
@@ -321,7 +350,7 @@ def info_embed(
     image: str | None = None,
 ) -> discord.Embed:
     """
-    Erstellt ein blaues Informations-Embed.
+    Erstellt ein Informations-Embed im Artwork-Stil.
 
     Args:
         title: Überschrift des Embeds.
@@ -333,21 +362,13 @@ def info_embed(
     Returns:
         Fertiges discord.Embed-Objekt.
     """
-    embed = discord.Embed(
-        title=f"ℹ️ {title}",
-        description=description,
-        color=Config.COLOR_INFO,
-        timestamp=datetime.now(timezone.utc),
+    return artwork_embed(
+        title,
+        description,
+        fields=fields,
+        thumbnail=thumbnail,
+        image=image,
     )
-    if fields:
-        for name, value, inline in fields:
-            embed.add_field(name=name, value=value, inline=inline)
-    if thumbnail:
-        embed.set_thumbnail(url=thumbnail)
-    if image:
-        embed.set_image(url=image)
-    apply_brand_footer(embed)
-    return embed
 
 
 def warn_embed(
@@ -373,25 +394,21 @@ def warn_embed(
     Returns:
         Fertiges discord.Embed-Objekt.
     """
-    embed = discord.Embed(
-        title="⚠️ Verwarnung",
-        description=f"{target.mention} wurde auf **{guild.name}** verwarnt.",
-        color=Config.COLOR_WARNING,
-        timestamp=datetime.now(timezone.utc),
-    )
-    embed.add_field(name="Grund", value=reason, inline=False)
-    embed.add_field(
-        name="Moderator",
-        value=f"{moderator.mention}\n`{moderator.id}`",
-        inline=True,
-    )
+    fields: list[tuple[str, str, bool]] = [
+        ("Grund", reason, False),
+        ("Moderator", f"{moderator.mention}\n`{moderator.id}`", True),
+    ]
     if warning_id is not None:
-        embed.add_field(name="Warn-ID", value=f"**#{warning_id}**", inline=True)
+        fields.append(("Warn-ID", f"**#{warning_id}**", True))
     if total_warnings is not None:
-        embed.add_field(name="Gesamt", value=f"**{total_warnings}** Warnung(en)", inline=True)
-    embed.set_thumbnail(url=target.display_avatar.url)
-    apply_brand_footer(embed)
-    return embed
+        fields.append(("Gesamt", f"**{total_warnings}** Warnung(en)", True))
+
+    return artwork_embed(
+        "Verwarnung",
+        f"{target.mention} wurde auf **{guild.name}** verwarnt.",
+        fields=fields,
+        thumbnail=target.display_avatar.url,
+    )
 
 
 def moderation_embed(
@@ -415,25 +432,16 @@ def moderation_embed(
     Returns:
         Fertiges discord.Embed-Objekt.
     """
-    embed = discord.Embed(
-        title=f"🔨 {action}",
-        color=color or Config.COLOR_INFO,
-        timestamp=datetime.now(timezone.utc),
+    return artwork_embed(
+        action,
+        fields=[
+            ("Benutzer", f"{target.mention}\n`{target.id}`", True),
+            ("Moderator", f"{moderator.mention}\n`{moderator.id}`", True),
+            ("Grund", reason or "Kein Grund angegeben", True),
+        ],
+        thumbnail=target.display_avatar.url,
+        color=color,
     )
-    embed.add_field(
-        name="Benutzer",
-        value=f"{target.mention}\n`{target.id}`",
-        inline=True,
-    )
-    embed.add_field(
-        name="Moderator",
-        value=f"{moderator.mention}\n`{moderator.id}`",
-        inline=True,
-    )
-    embed.add_field(name="Grund", value=reason or "Kein Grund angegeben", inline=False)
-    embed.set_thumbnail(url=target.display_avatar.url)
-    apply_brand_footer(embed)
-    return embed
 
 
 def log_event_embed(
@@ -455,14 +463,4 @@ def log_event_embed(
     Returns:
         Fertiges discord.Embed-Objekt.
     """
-    embed = discord.Embed(
-        title=f"📋 {event_name}",
-        description=description,
-        color=color or Config.COLOR_INFO,
-        timestamp=datetime.now(timezone.utc),
-    )
-    if fields:
-        for name, value, inline in fields:
-            embed.add_field(name=name, value=value, inline=inline)
-    apply_brand_footer(embed)
-    return embed
+    return artwork_embed(event_name, description, fields=fields, color=color)

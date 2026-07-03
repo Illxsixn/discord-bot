@@ -256,4 +256,19 @@ def test_zombies_pet_action_bonus_attack_and_cooldown() -> None:
     assert any("Power" in line and "+20" in line for line in result.lines)
 
 
+@pytest.mark.asyncio
+async def test_zombie_mode_requires_levels_enabled(tmp_path, monkeypatch) -> None:
+    from database.database import Database
+    from utils.game_gates import is_zombie_mode_active
+
+    monkeypatch.setattr(Config, "DATABASE_PATH", tmp_path / "gate_test.db")
+    db = Database()
+    await db.connect()
+    await db.initialize()
+    assert await is_zombie_mode_active(db, 1) is False
+    await db.update_guild_settings(1, levels_enabled=True)
+    assert await is_zombie_mode_active(db, 1) is True
+    await db.close()
+
+
 # Live-Verbindungstest: scripts/smoke_bot.py (Bot muss separat laufen)
