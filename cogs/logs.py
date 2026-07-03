@@ -14,7 +14,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config import Config
 from database.database import Database
 from utils.embeds import error_embed, log_event_embed, success_embed
 from utils.helpers import truncate_text
