@@ -28,7 +28,7 @@ def build_shop_embed(economy: PlayerEconomyRecord) -> discord.Embed:
             ),
             (
                 "Zombie-Perks",
-                "Glück · Fokus · Energie — **Coming soon**",
+                "**Coming soon**",
                 True,
             ),
             (
