@@ -5,11 +5,13 @@ Server-Emoji-Verwaltung: Emojis kopieren oder per Bild hochladen.
 from __future__ import annotations
 
 import logging
+import time
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
+from config import Config
 from utils.embeds import error_embed, spaced_lines, success_embed
 from utils.emojis import (
     fetch_emoji_bytes,
@@ -19,13 +21,16 @@ from utils.emojis import (
     validate_emoji_name,
     emoji_slot_error,
 )
-from utils.permissions import has_guild_permissions
 
 logger = logging.getLogger(__name__)
 
 
 class EmojiCog(commands.Cog):
     """Slash-Command zum Hinzufügen von Server-Emojis."""
+
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
+        self._last_use: dict[tuple[int, int], float] = {}
 
     @app_commands.command(
         name="emoji",
@@ -34,11 +39,9 @@ class EmojiCog(commands.Cog):
     @app_commands.describe(
         name="Name für das neue Emoji (2–32 Zeichen)",
         emoji="Emoji von einem anderen Server (<:name:id> oder Emoji-Picker)",
-        bild="Eigenes Bild hochladen (PNG, JPG, GIF, WebP · max. 256 KB)",
+        bild="Eigenes Bild hochladen (PNG, JPG, GIF · max. 256 KB)",
     )
     @app_commands.guild_only()
-    @app_commands.default_permissions(manage_emojis_and_stickers=True)
-    @has_guild_permissions(manage_emojis_and_stickers=True)
     async def emoji(
         self,
         interaction: discord.Interaction,
@@ -49,6 +52,20 @@ class EmojiCog(commands.Cog):
         """Kopiert ein Custom-Emoji oder lädt ein Bild als Server-Emoji hoch."""
         await interaction.response.defer(ephemeral=True)
         if interaction.guild is None:
+            return
+
+        key = (interaction.guild.id, interaction.user.id)
+        now = time.monotonic()
+        elapsed = now - self._last_use.get(key, 0.0)
+        if elapsed < Config.EMOJI_USER_COOLDOWN:
+            wait = int(Config.EMOJI_USER_COOLDOWN - elapsed) + 1
+            await interaction.followup.send(
+                embed=error_embed(
+                    "Cooldown",
+                    f"Bitte **{wait} s** warten, bevor du erneut ein Emoji hinzufügst.",
+                ),
+                ephemeral=True,
+            )
             return
 
         name_error = validate_emoji_name(name)
@@ -72,7 +89,7 @@ class EmojiCog(commands.Cog):
                     "Eingabe fehlt",
                     spaced_lines(
                         "**Option 1 — Kopieren:** `emoji` mit einem Custom-Emoji von einem anderen Server",
-                        "**Option 2 — Hochladen:** `bild` mit PNG, JPG, GIF oder WebP (max. 256 KB)",
+                        "**Option 2 — Hochladen:** `bild` mit PNG, JPG oder GIF (max. 256 KB)",
                     ),
                 ),
                 ephemeral=True,
@@ -150,6 +167,7 @@ class EmojiCog(commands.Cog):
             await interaction.followup.send(embed=error_embed("Erstellung fehlgeschlagen", message), ephemeral=True)
             return
 
+        self._last_use[key] = time.monotonic()
         emoji_type = "Animiert" if created.animated else "Statisch"
         await interaction.followup.send(
             embed=success_embed(
@@ -167,4 +185,4 @@ class EmojiCog(commands.Cog):
 
 async def setup(bot: commands.Bot) -> None:
     """Lädt den Emoji-Cog."""
-    await bot.add_cog(EmojiCog())
+    await bot.add_cog(EmojiCog(bot))

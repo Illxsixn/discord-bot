@@ -14,9 +14,8 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from database.models import ZombieCooldownType, ZombiePlayerRecord, ZombieRunRecord, ZombieRunStatus
-from utils.levels import level_from_xp
-from utils.pet_rewards import award_pet_xp
 from utils.economy_rewards import award_gold
+from utils.pet_rewards import award_pet_xp
 
 
 @dataclass
@@ -66,14 +65,6 @@ def calculate_defeat_rewards(run: ZombieRunRecord) -> RunRewards:
     )
 
 
-def add_zombie_xp(profile: ZombiePlayerRecord, amount: int) -> None:
-    """Vergibt Zombie-Profil-XP und aktualisiert Level."""
-    if amount <= 0:
-        return
-    profile.xp += amount
-    profile.level = level_from_xp(profile.xp)
-
-
 def zombie_cooldown_remaining(expires_at: datetime | None) -> int | None:
     """Verbleibende Cooldown-Sekunden."""
     if expires_at is None:
@@ -110,8 +101,6 @@ async def finalize_zombie_run(
         profile.runs_failed += 1
         profile.highest_wave = max(profile.highest_wave, max(0, run.wave - 1))
 
-    zombie_xp = rewards.player_xp // 2
-    add_zombie_xp(profile, zombie_xp)
     profile.updated_at = now
 
     await db.save_zombie_run(run)
@@ -125,6 +114,7 @@ async def finalize_zombie_run(
             rewards.player_xp,
             channel=channel,
             apply_pet_boost=False,
+            announce_level_up=False,
         )
 
     await award_pet_xp(
@@ -133,7 +123,7 @@ async def finalize_zombie_run(
         rewards.pet_xp,
         channel=channel,
         count_interaction=False,
-        announce_evolution=True,
+        announce_evolution=channel is not None,
     )
 
     expires = now + timedelta(seconds=Config.ZOMBIE_RUN_COOLDOWN)
@@ -159,7 +149,6 @@ async def finalize_expired_run(
     profile.runs_failed += 1
     profile.updated_at = datetime.now(timezone.utc)
     rewards = calculate_defeat_rewards(run)
-    add_zombie_xp(profile, rewards.player_xp // 2)
     await db.save_zombie_run(run)
     await db.save_zombie_player(profile)
     await db.add_player_gold(run.guild_id, run.user_id, rewards.gold)
@@ -172,6 +161,7 @@ async def finalize_expired_run(
                 rewards.player_xp,
                 channel=None,
                 apply_pet_boost=False,
+                announce_level_up=False,
             )
         await award_pet_xp(
             bot,

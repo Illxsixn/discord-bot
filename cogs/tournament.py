@@ -25,6 +25,18 @@ from utils.tournament_bracket import (
     create_round_one_pairings,
     distribute_maps,
 )
+from utils.tournament_admin import (
+    build_tournament_interface_embed,
+    build_wizard_embed,
+    build_wizard_view,
+    refresh_wizard_panel,
+)
+from utils.tournament_team_ui import (
+    CreateTeamNameModal,
+    TeamInterfaceView,
+    TournamentPickView,
+    build_team_embed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +68,52 @@ class TournamentCog(commands.Cog):
     def __init__(self, bot: commands.Bot, db: Database) -> None:
         self.bot = bot
         self.db = db
+        self._wizard_panels: dict[int, tuple[int, int]] = {}
+        self._tournament_interfaces: dict[int, tuple[int, int]] = {}
+
+    def register_wizard_panel(self, guild_id: int, channel_id: int, message_id: int) -> None:
+        """Merkt die Wizard-Panel-Nachricht pro Server."""
+        self._wizard_panels[guild_id] = (channel_id, message_id)
+
+    async def fetch_wizard_panel_message(
+        self,
+        guild: discord.Guild,
+        channel: discord.abc.Messageable | None = None,
+    ) -> discord.Message | None:
+        """Lädt die gespeicherte Wizard-Panel-Nachricht."""
+        ref = self._wizard_panels.get(guild.id)
+        if ref is None:
+            return None
+        channel_id, message_id = ref
+        if channel is not None and getattr(channel, "id", None) not in (None, channel_id):
+            pass
+        ch = guild.get_channel(channel_id) or self.bot.get_channel(channel_id)
+        if ch is None:
+            try:
+                ch = await self.bot.fetch_channel(channel_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                return None
+        if not hasattr(ch, "fetch_message"):
+            return None
+        try:
+            return await ch.fetch_message(message_id)  # type: ignore[union-attr]
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return None
 
     async def cog_load(self) -> None:
-        """Registriert persistente Match-Views nach Bot-Neustart."""
+        """Registriert persistente Match- und Team-Views nach Bot-Neustart."""
         matches = await self.db.get_active_tournament_matches()
         for match in matches:
             self.bot.add_view(MatchView(self, match.id))
+        teams = await self.db.get_teams_with_persistent_message()
+        for team in teams:
+            self.bot.add_view(TeamInterfaceView(self, team.id))
+        for tournament in await self.db.get_tournaments_with_interface():
+            if tournament.interface_channel_id and tournament.interface_message_id:
+                self._tournament_interfaces[tournament.id] = (
+                    tournament.interface_channel_id,
+                    tournament.interface_message_id,
+                )
 
     def _is_admin(self, member: discord.Member) -> bool:
         return member.guild_permissions.administrator
@@ -70,11 +122,96 @@ class TournamentCog(commands.Cog):
         self,
         guild: discord.Guild,
     ) -> discord.TextChannel | None:
+        """Lädt den Turnier-Kanal (Cache + API-Fallback)."""
         settings = await self.db.get_guild_settings(guild.id)
         if not settings.tournament_channel_id:
             return None
-        channel = guild.get_channel(settings.tournament_channel_id)
-        return channel if isinstance(channel, discord.TextChannel) else None
+        channel_id = settings.tournament_channel_id
+        channel = guild.get_channel(channel_id) or self.bot.get_channel(channel_id)
+        if isinstance(channel, discord.TextChannel):
+            return channel
+        try:
+            fetched = await self.bot.fetch_channel(channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return None
+        return fetched if isinstance(fetched, discord.TextChannel) else None
+
+    async def _save_tournament_channel(
+        self,
+        guild: discord.Guild,
+        channel: discord.TextChannel,
+    ) -> str | None:
+        """Speichert den Turnier-Kanal nach Berechtigungsprüfung. Gibt Fehlertext zurück."""
+        allowed, msg = bot_can_use_channel(
+            channel,
+            send=True,
+            embed_links=True,
+        )
+        if not allowed:
+            return msg or "Keine Berechtigung im Zielkanal."
+        await self.db.update_guild_settings(guild.id, tournament_channel_id=channel.id)
+        saved = await self.db.get_guild_settings(guild.id)
+        if saved.tournament_channel_id != channel.id:
+            return "Speichern fehlgeschlagen — bitte erneut versuchen."
+        return None
+
+    async def _upsert_tournament_interface(
+        self,
+        guild: discord.Guild,
+        tournament_id: int,
+        channel: discord.TextChannel,
+        *,
+        bracket_started: bool = False,
+    ) -> None:
+        """Postet oder aktualisiert das öffentliche Turnier-Interface im Turnier-Kanal."""
+        embed = await build_tournament_interface_embed(
+            self,
+            guild,
+            tournament_id,
+            bracket_started=bracket_started,
+        )
+        ref = self._tournament_interfaces.get(tournament_id)
+        if ref is not None and ref[0] == channel.id:
+            try:
+                message = await channel.fetch_message(ref[1])
+                await message.edit(embed=embed)
+                return
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass
+        message = await channel.send(embed=embed, embed_persistent=True)
+        self._tournament_interfaces[tournament_id] = (channel.id, message.id)
+        await self.db.update_tournament_interface(tournament_id, channel.id, message.id)
+
+    async def _refresh_team_interface(self, guild: discord.Guild, team_id: int) -> None:
+        """Aktualisiert die persistente Team-Interface-Nachricht."""
+        team = await self.db.get_tournament_team(team_id)
+        if team is None or not team.message_id:
+            return
+        channel_id = team.interface_channel_id
+        channel = guild.get_channel(channel_id) if channel_id else None
+        if channel is None and channel_id:
+            try:
+                fetched = await self.bot.fetch_channel(channel_id)
+                channel = fetched if isinstance(fetched, discord.TextChannel) else None
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                channel = None
+        if channel is None:
+            for ch in guild.text_channels:
+                try:
+                    await ch.fetch_message(team.message_id)
+                    channel = ch
+                    break
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    continue
+        if channel is None:
+            return
+        embed = await build_team_embed(self, guild, team_id)
+        view = TeamInterfaceView(self, team_id)
+        try:
+            message = await channel.fetch_message(team.message_id)
+            await message.edit(embed=embed, view=view)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
 
     async def _require_tournament_channel(
         self,
@@ -89,19 +226,18 @@ class TournamentCog(commands.Cog):
                     "Kein Turnier-Kanal",
                     "Ein Admin muss zuerst `/turnier_kanal_setzen` ausführen.",
                 ),
-                ephemeral=True,
+
             )
             return None
         allowed, msg = bot_can_use_channel(
             channel,
-            send_messages=True,
+            send=True,
             embed_links=True,
-            view_channel=True,
         )
         if not allowed:
             await interaction.response.send_message(
                 embed=error_embed("Kanal nicht nutzbar", msg or "Keine Berechtigung."),
-                ephemeral=True,
+
             )
             return None
         return channel
@@ -115,7 +251,7 @@ class TournamentCog(commands.Cog):
         if tournament is None or interaction.guild is None:
             await interaction.response.send_message(
                 embed=error_embed("Nicht gefunden", f"Turnier #{tournament_id} existiert nicht."),
-                ephemeral=True,
+
             )
             return None
         if tournament.guild_id != interaction.guild.id:
@@ -124,7 +260,7 @@ class TournamentCog(commands.Cog):
                     "Nicht gefunden",
                     f"Turnier #{tournament_id} gehört nicht zu diesem Server.",
                 ),
-                ephemeral=True,
+
             )
             return None
         return tournament
@@ -220,7 +356,7 @@ class TournamentCog(commands.Cog):
             extra_note=extra_note,
         )
         view = None if match.status == TournamentMatchStatus.FINISHED else MatchView(self, match.id)
-        message = await channel.send(embed=embed, view=view)
+        message = await channel.send(embed=embed, view=view, embed_persistent=True)
         updated = await self.db.update_tournament_match(match.id, message_id=message.id)
         return updated or match
 
@@ -247,7 +383,7 @@ class TournamentCog(commands.Cog):
                         f"Glückwunsch an **{team.name}**!",
                     )
                     apply_brand_footer(embed, prefix=f"Turnier #{tournament_id}")
-                    await channel.send(embed=embed)
+                    await channel.send(embed=embed, embed_persistent=True)
             return
 
         maps = await self.db.get_tournament_maps(tournament_id)
@@ -277,7 +413,7 @@ class TournamentCog(commands.Cog):
                     team2_name="Freilos",
                     extra_note="Freilos – automatisch weiter.",
                 )
-                message = await channel.send(embed=embed)
+                message = await channel.send(embed=embed, embed_persistent=True)
                 await self.db.update_tournament_match(match.id, message_id=message.id)
             else:
                 match = await self.db.create_tournament_match(
@@ -557,7 +693,199 @@ class TournamentCog(commands.Cog):
             ephemeral=True,
         )
 
+    async def _refresh_admin_panel(
+        self,
+        interaction: discord.Interaction,
+        tournament_id: int,
+        *,
+        message: discord.Message | None = None,
+    ) -> None:
+        """Aktualisiert das Admin-Wizard-Panel."""
+        await refresh_wizard_panel(
+            interaction,
+            self,
+            tournament_id=tournament_id,
+            message=message,
+        )
+
+    async def _admin_create_team(
+        self,
+        guild: discord.Guild,
+        tournament_id: int,
+        name: str,
+        captain_id: int,
+    ) -> str | None:
+        """Erstellt ein Team als Admin. Gibt Fehlertext zurück."""
+        tournament = await self.db.get_tournament(tournament_id)
+        if tournament is None or tournament.guild_id != guild.id:
+            return "Turnier nicht gefunden."
+        if tournament.status != TournamentStatus.OPEN:
+            return "Turnier ist nicht offen."
+        if await self.db.user_in_tournament_team(tournament_id, captain_id):
+            return "Dieser User ist bereits in einem Team."
+        if await self.db.get_tournament_team_by_name(tournament_id, name):
+            return f"Team **{name}** existiert bereits."
+        await self.db.create_tournament_team(tournament_id, name, captain_id)
+        return None
+
+    async def _admin_assign_member(
+        self,
+        guild: discord.Guild,
+        tournament_id: int,
+        team_id: int,
+        user_id: int,
+    ) -> str | None:
+        """Weist einen User einem Team zu."""
+        tournament = await self.db.get_tournament(tournament_id)
+        if tournament is None or tournament.guild_id != guild.id:
+            return "Turnier nicht gefunden."
+        if tournament.status != TournamentStatus.OPEN:
+            return "Turnier ist nicht offen."
+        team = await self.db.get_tournament_team(team_id)
+        if team is None or team.tournament_id != tournament_id:
+            return "Team nicht gefunden."
+        if await self.db.user_in_tournament_team(tournament_id, user_id):
+            return "User ist bereits in einem Team dieses Turniers."
+        if not await self.db.add_team_member(team_id, user_id):
+            return "Zuweisung fehlgeschlagen."
+        return None
+
+    async def _admin_register_team(
+        self,
+        guild: discord.Guild | None,
+        tournament_id: int,
+        team_id: int,
+    ) -> str | None:
+        """Meldet ein Team adminseitig an."""
+        if guild is None:
+            return "Nur auf dem Server möglich."
+        tournament = await self.db.get_tournament(tournament_id)
+        if tournament is None or tournament.guild_id != guild.id:
+            return "Turnier nicht gefunden."
+        if tournament.status != TournamentStatus.OPEN:
+            return "Anmeldung nur bei offenem Turnier."
+        team = await self.db.get_tournament_team(team_id)
+        if team is None or team.tournament_id != tournament_id:
+            return "Team nicht gefunden."
+        if team.registered:
+            return "Team ist bereits angemeldet."
+        count = await self.db.count_registered_teams(tournament_id)
+        if count >= tournament.max_teams:
+            return f"Maximale Team-Anzahl ({tournament.max_teams}) erreicht."
+        await self.db.register_tournament_team(team_id)
+        return None
+
+    async def _admin_start_bracket(
+        self,
+        interaction: discord.Interaction,
+        tournament_id: int,
+    ) -> tuple[str | None, int]:
+        """Erstellt Runde 1. Gibt (Fehlertext, Match-Anzahl) zurück."""
+        if interaction.guild is None:
+            return "Nur auf dem Server möglich.", 0
+        tournament = await self.db.get_tournament(tournament_id)
+        if tournament is None or tournament.guild_id != interaction.guild.id:
+            return "Turnier nicht gefunden.", 0
+        if tournament.status != TournamentStatus.CLOSED:
+            return "Setze den Status zuerst auf **geschlossen**.", 0
+        if await self.db.tournament_has_matches(tournament_id):
+            return "Bracket existiert bereits.", 0
+        teams = await self.db.get_registered_teams(tournament_id)
+        if len(teams) < 2:
+            return "Mindestens 2 angemeldete Teams nötig.", 0
+        channel = await self._get_tournament_channel(interaction.guild)
+        if channel is None:
+            return "Kein Turnier-Kanal gesetzt. Nutze `/turnier_kanal_setzen`.", 0
+
+        team_ids = [team.id for team in teams]
+        pairings = await create_round_one_pairings(team_ids)
+        maps = await self.db.get_tournament_maps(tournament_id)
+        map_list = distribute_maps(maps, len(pairings))
+        posted = 0
+
+        for index, (team1_id, team2_id) in enumerate(pairings):
+            map_name = map_list[index] if index < len(map_list) else ""
+            if team2_id is None:
+                match = await self.db.create_tournament_match(
+                    tournament_id,
+                    1,
+                    team1_id,
+                    None,
+                    map_name=map_name,
+                    status=TournamentMatchStatus.FINISHED,
+                    winner_id=team1_id,
+                )
+                t1 = await self._team_name(interaction.guild, team1_id)
+                embed = self._build_match_embed(
+                    match,
+                    interaction.guild,
+                    team1_name=t1,
+                    team2_name="Freilos",
+                    extra_note="Freilos – automatisch weiter.",
+                )
+                message = await channel.send(embed=embed, embed_persistent=True)
+                await self.db.update_tournament_match(match.id, message_id=message.id)
+            else:
+                match = await self.db.create_tournament_match(
+                    tournament_id,
+                    1,
+                    team1_id,
+                    team2_id,
+                    map_name=map_name,
+                )
+                await self._post_match(match, interaction.guild, channel)
+                posted += 1
+
+        await self._check_round_complete(tournament_id, interaction.guild)
+        channel = await self._get_tournament_channel(interaction.guild)
+        if channel is not None:
+            await self._upsert_tournament_interface(
+                interaction.guild,
+                tournament_id,
+                channel,
+                bracket_started=True,
+            )
+        return None, posted
+
+    async def _admin_announce_tournament(
+        self,
+        interaction: discord.Interaction,
+        tournament_id: int,
+    ) -> str | None:
+        """Postet eine Turnier-Ankündigung im Turnier-Kanal."""
+        if interaction.guild is None:
+            return "Nur auf dem Server möglich."
+        tournament = await self.db.get_tournament(tournament_id)
+        if tournament is None or tournament.guild_id != interaction.guild.id:
+            return "Turnier nicht gefunden."
+        channel = await self._get_tournament_channel(interaction.guild)
+        if channel is None:
+            return "Kein Turnier-Kanal gesetzt."
+        await self._upsert_tournament_interface(
+            interaction.guild,
+            tournament_id,
+            channel,
+        )
+        return None
+
     # ── Slash-Commands ──────────────────────────────────────────────
+
+    @app_commands.command(
+        name="turnier_panel",
+        description="Admin-Wizard: Kanal, Turnier, Maps, Teams & Bracket (Buttons)",
+    )
+    @app_commands.default_permissions(administrator=True)
+    @is_admin()
+    @app_commands.guild_only()
+    async def turnier_panel(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is None:
+            return
+        embed = await build_wizard_embed(self, interaction.guild)
+        view = await build_wizard_view(self, interaction.guild)
+        await interaction.response.send_message(embed=embed, view=view)
+        if isinstance(interaction.channel, discord.abc.GuildChannel):
+            panel = await interaction.original_response()
+            self.register_wizard_panel(interaction.guild.id, interaction.channel.id, panel.id)
 
     @app_commands.command(name="turnier_erstellen", description="Erstellt ein neues Turnier (Admin)")
     @app_commands.describe(
@@ -584,7 +912,7 @@ class TournamentCog(commands.Cog):
         if not name or not spiel:
             await interaction.response.send_message(
                 embed=error_embed("Ungültig", "Name und Spiel dürfen nicht leer sein."),
-                ephemeral=True,
+
             )
             return
 
@@ -602,7 +930,7 @@ class TournamentCog(commands.Cog):
             f"Status: **{TOURNAMENT_STATUS_LABELS[tournament.status]}**",
         )
         apply_brand_footer(embed, prefix=f"Turnier #{tournament.id}")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
     turnier_status_group = app_commands.Group(
         name="turnier_status",
@@ -640,7 +968,7 @@ class TournamentCog(commands.Cog):
                 "Status geändert",
                 f"Turnier #{turnier_id} ist jetzt **{TOURNAMENT_STATUS_LABELS[new_status]}**.",
             ),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_loeschen", description="Löscht ein Turnier (Admin, nur ohne Bracket)")
@@ -662,13 +990,13 @@ class TournamentCog(commands.Cog):
                     "Nicht möglich",
                     "Turnier hat bereits Matches. Nutze `/turnier_abbrechen` oder warte bis zum Ende.",
                 ),
-                ephemeral=True,
+
             )
             return
         await self.db.delete_tournament(turnier_id)
         await interaction.response.send_message(
             embed=success_embed("Gelöscht", f"Turnier #{turnier_id} wurde entfernt."),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_liste", description="Listet alle Turniere auf dem Server")
@@ -680,7 +1008,7 @@ class TournamentCog(commands.Cog):
         if not tournaments:
             await interaction.response.send_message(
                 embed=info_embed("Turniere", "Keine Turniere vorhanden."),
-                ephemeral=True,
+
             )
             return
         lines = [
@@ -692,7 +1020,7 @@ class TournamentCog(commands.Cog):
         ]
         await interaction.response.send_message(
             embed=info_embed("Turniere", spaced_list(lines)),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_info", description="Zeigt Details zu einem Turnier")
@@ -723,18 +1051,21 @@ class TournamentCog(commands.Cog):
         ]
         if tournament.description:
             fields.append(("Beschreibung", truncate_text(tournament.description, 900), False))
-        team_lines = [
-            spaced_lines(
-                f"{'✅' if t.registered else '⏳'} **{t.name}**",
-                f"Captain: <@{t.captain_id}>",
+        team_lines = []
+        for t in teams[:20]:
+            members = await self.db.get_team_members(t.id)
+            member_text = ", ".join(f"<@{uid}>" for uid in members[:8]) or "—"
+            team_lines.append(
+                spaced_lines(
+                    f"{'✅' if t.registered else '⏳'} **{t.name}** · Captain <@{t.captain_id}>",
+                    member_text,
+                )
             )
-            for t in teams[:20]
-        ]
         if team_lines:
             fields.extend(split_embed_fields("Teams", team_lines))
         embed = info_embed(f"Turnier #{tournament.id}: {tournament.name}", fields=fields)
         apply_brand_footer(embed, prefix=f"Turnier #{tournament.id}")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="turnier_maps_hinzufuegen", description="Fügt Maps zum Pool hinzu (Admin)")
     @app_commands.describe(turnier_id="ID des Turniers", map1="Erste Map", map2="Zweite Map (optional)")
@@ -773,13 +1104,13 @@ class TournamentCog(commands.Cog):
                     "Keine Maps",
                     "Keine neuen Maps hinzugefügt (leer oder bereits vorhanden).",
                 ),
-                ephemeral=True,
+
             )
             return
         msg = f"Hinzugefügt: **{', '.join(added)}**"
         if skipped:
             msg += f"\nBereits vorhanden: {', '.join(skipped)}"
-        await interaction.response.send_message(embed=success_embed("Maps", msg), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Maps", msg))
 
     @app_commands.command(name="turnier_maps_entfernen", description="Entfernt eine Map aus dem Pool (Admin)")
     @app_commands.describe(turnier_id="ID des Turniers", mapname="Name der Map")
@@ -799,12 +1130,12 @@ class TournamentCog(commands.Cog):
         if not await self.db.remove_tournament_map(turnier_id, name):
             await interaction.response.send_message(
                 embed=error_embed("Nicht gefunden", f"Map **{name}** ist nicht im Pool."),
-                ephemeral=True,
+
             )
             return
         await interaction.response.send_message(
             embed=success_embed("Entfernt", f"Map **{name}** wurde entfernt."),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_maps_anzeigen", description="Zeigt den Map-Pool eines Turniers")
@@ -822,7 +1153,7 @@ class TournamentCog(commands.Cog):
         text = "\n".join(f"• {m}" for m in maps) if maps else "Keine Maps im Pool."
         await interaction.response.send_message(
             embed=info_embed(f"Map-Pool – Turnier #{turnier_id}", text),
-            ephemeral=True,
+
         )
 
     @app_commands.command(
@@ -845,14 +1176,14 @@ class TournamentCog(commands.Cog):
         if not maps:
             await interaction.response.send_message(
                 embed=error_embed("Keine Maps", "Zuerst Maps zum Pool hinzufügen."),
-                ephemeral=True,
+
             )
             return
         count = await self.db.redistribute_match_maps(turnier_id, maps)
         if count == 0:
             await interaction.response.send_message(
                 embed=error_embed("Keine Matches", "Keine offenen Matches zum Aktualisieren."),
-                ephemeral=True,
+
             )
             return
         matches = await self.db.get_tournament_matches(turnier_id)
@@ -861,8 +1192,111 @@ class TournamentCog(commands.Cog):
                 await self._refresh_match_message(match, interaction.guild)
         await interaction.response.send_message(
             embed=success_embed("Verteilt", f"Maps auf **{count}** Match(es) neu verteilt."),
-            ephemeral=True,
+
         )
+
+    @app_commands.command(name="turnier_team", description="Gründet ein Team per Interface (Captain)")
+    @app_commands.guild_only()
+    async def turnier_team(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is None or interaction.user is None:
+            return
+        tournaments = await self.db.get_open_tournaments_for_user(
+            interaction.guild.id,
+            interaction.user.id,
+        )
+        if not tournaments:
+            await interaction.response.send_message(
+                embed=error_embed(
+                    "Kein offenes Turnier",
+                    "Es gibt kein offenes Turnier, für das du noch kein Team hast.",
+                ),
+            )
+            return
+        if len(tournaments) == 1:
+            await interaction.response.send_modal(CreateTeamNameModal(self, tournaments[0].id))
+            return
+        embed = info_embed("Team gründen", "Wähle das Turnier, für das du ein Team erstellen willst.")
+        await interaction.response.send_message(
+            embed=embed,
+            view=TournamentPickView(self, tournaments),
+        )
+
+    @app_commands.command(
+        name="turnier_einladen",
+        description="Lädt einen Spieler in dein Team ein (Captain)",
+    )
+    @app_commands.describe(user="Spieler, der dem Team beitreten soll")
+    @app_commands.guild_only()
+    async def turnier_einladen(
+        self,
+        interaction: discord.Interaction,
+        user: discord.Member,
+    ) -> None:
+        if interaction.guild is None or interaction.user is None:
+            return
+        if user.bot:
+            await interaction.response.send_message(
+                embed=error_embed("Ungültig", "Bots können nicht eingeladen werden."),
+            )
+            return
+        if user.id == interaction.user.id:
+            await interaction.response.send_message(
+                embed=error_embed("Ungültig", "Du kannst dich nicht selbst einladen."),
+            )
+            return
+        captain_teams = await self.db.get_captain_teams_for_guild(
+            interaction.guild.id,
+            interaction.user.id,
+        )
+        open_teams = []
+        for team in captain_teams:
+            tournament = await self.db.get_tournament(team.tournament_id)
+            if tournament is not None and tournament.status == TournamentStatus.OPEN:
+                open_teams.append(team)
+        if not open_teams:
+            await interaction.response.send_message(
+                embed=error_embed(
+                    "Kein Team",
+                    "Du bist Captain in keinem offenen Turnier-Team.",
+                ),
+            )
+            return
+        if len(open_teams) > 1:
+            await interaction.response.send_message(
+                embed=error_embed(
+                    "Mehrere Teams",
+                    "Du bist Captain in mehreren Teams — nutze zuerst `/turnier_info` "
+                    "und `/turnier_team_beitreten` für das jeweilige Turnier.",
+                ),
+            )
+            return
+        team = open_teams[0]
+        tournament = await self.db.get_tournament(team.tournament_id)
+        if tournament is None:
+            await interaction.response.send_message(
+                embed=error_embed("Fehler", "Turnier nicht gefunden."),
+            )
+            return
+        if await self.db.user_in_tournament_team(team.tournament_id, user.id):
+            await interaction.response.send_message(
+                embed=error_embed(
+                    "Bereits im Team",
+                    f"{user.mention} ist bereits in einem Team dieses Turniers.",
+                ),
+            )
+            return
+        if not await self.db.add_team_member(team.id, user.id):
+            await interaction.response.send_message(
+                embed=error_embed("Fehler", "Einladung fehlgeschlagen."),
+            )
+            return
+        await interaction.response.send_message(
+            embed=success_embed(
+                "Eingeladen",
+                f"{user.mention} ist jetzt Mitglied von **{team.name}** (Turnier #{tournament.id}).",
+            ),
+        )
+        await self._refresh_team_interface(interaction.guild, team.id)
 
     @app_commands.command(name="turnier_team_erstellen", description="Gründet ein Team (Captain)")
     @app_commands.describe(turnier_id="ID des Turniers", teamname="Name des Teams")
@@ -879,27 +1313,27 @@ class TournamentCog(commands.Cog):
         if tournament.status != TournamentStatus.OPEN:
             await interaction.response.send_message(
                 embed=error_embed("Geschlossen", "Das Turnier ist nicht mehr offen für neue Teams."),
-                ephemeral=True,
+
             )
             return
         name = _normalize_team_name(teamname)
         if not name:
             await interaction.response.send_message(
                 embed=error_embed("Ungültig", "Teamname darf nicht leer sein."),
-                ephemeral=True,
+
             )
             return
         if await self.db.user_in_tournament_team(turnier_id, interaction.user.id):
             await interaction.response.send_message(
                 embed=error_embed("Bereits im Team", "Du bist bereits in einem Team dieses Turniers."),
-                ephemeral=True,
+
             )
             return
         existing = await self.db.get_tournament_team_by_name(turnier_id, name)
         if existing:
             await interaction.response.send_message(
                 embed=error_embed("Name vergeben", f"Team **{name}** existiert bereits."),
-                ephemeral=True,
+
             )
             return
         team = await self.db.create_tournament_team(turnier_id, name, interaction.user.id)
@@ -909,7 +1343,7 @@ class TournamentCog(commands.Cog):
                 f"**{team.name}** (#{team.id}) – du bist Captain.\n"
                 "Melde das Team mit `/turnier_anmelden` an.",
             ),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_team_beitreten", description="Tritt einem Team bei")
@@ -927,31 +1361,31 @@ class TournamentCog(commands.Cog):
         if tournament.status != TournamentStatus.OPEN:
             await interaction.response.send_message(
                 embed=error_embed("Geschlossen", "Das Turnier ist nicht mehr offen."),
-                ephemeral=True,
+
             )
             return
         team = await self.db.get_tournament_team_by_name(turnier_id, _normalize_team_name(teamname))
         if team is None:
             await interaction.response.send_message(
                 embed=error_embed("Nicht gefunden", f"Team **{teamname}** existiert nicht."),
-                ephemeral=True,
+
             )
             return
         if await self.db.user_in_tournament_team(turnier_id, interaction.user.id):
             await interaction.response.send_message(
                 embed=error_embed("Bereits im Team", "Du bist bereits in einem Team dieses Turniers."),
-                ephemeral=True,
+
             )
             return
         if not await self.db.add_team_member(team.id, interaction.user.id):
             await interaction.response.send_message(
                 embed=error_embed("Fehler", "Beitritt nicht möglich."),
-                ephemeral=True,
+
             )
             return
         await interaction.response.send_message(
             embed=success_embed("Beigetreten", f"Du bist jetzt Mitglied von **{team.name}**."),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_anmelden", description="Meldet dein Team offiziell an (Captain)")
@@ -969,39 +1403,39 @@ class TournamentCog(commands.Cog):
         if tournament.status != TournamentStatus.OPEN:
             await interaction.response.send_message(
                 embed=error_embed("Geschlossen", "Anmeldungen sind nur bei offenem Turnier möglich."),
-                ephemeral=True,
+
             )
             return
         team = await self.db.get_tournament_team_by_name(turnier_id, _normalize_team_name(teamname))
         if team is None:
             await interaction.response.send_message(
                 embed=error_embed("Nicht gefunden", f"Team **{teamname}** existiert nicht."),
-                ephemeral=True,
+
             )
             return
         if team.captain_id != interaction.user.id:
             await interaction.response.send_message(
                 embed=error_embed("Kein Captain", "Nur der Captain kann das Team anmelden."),
-                ephemeral=True,
+
             )
             return
         if team.registered:
             await interaction.response.send_message(
                 embed=error_embed("Bereits angemeldet", f"**{team.name}** ist bereits angemeldet."),
-                ephemeral=True,
+
             )
             return
         count = await self.db.count_registered_teams(turnier_id)
         if count >= tournament.max_teams:
             await interaction.response.send_message(
                 embed=error_embed("Voll", f"Maximale Team-Anzahl ({tournament.max_teams}) erreicht."),
-                ephemeral=True,
+
             )
             return
         await self.db.register_tournament_team(team.id)
         await interaction.response.send_message(
             embed=success_embed("Angemeldet", f"**{team.name}** ist offiziell angemeldet."),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_team_zuweisen", description="Fügt einen User zu einem Team hinzu (Admin)")
@@ -1022,26 +1456,26 @@ class TournamentCog(commands.Cog):
         if tournament.status != TournamentStatus.OPEN:
             await interaction.response.send_message(
                 embed=error_embed("Geschlossen", "Team-Änderungen nur bei offenem Turnier."),
-                ephemeral=True,
+
             )
             return
         team = await self.db.get_tournament_team_by_name(turnier_id, _normalize_team_name(teamname))
         if team is None:
             await interaction.response.send_message(
                 embed=error_embed("Nicht gefunden", f"Team **{teamname}** existiert nicht."),
-                ephemeral=True,
+
             )
             return
         if await self.db.user_in_tournament_team(turnier_id, user.id):
             await interaction.response.send_message(
                 embed=error_embed("Bereits im Team", f"{user.mention} ist bereits in einem Team."),
-                ephemeral=True,
+
             )
             return
         await self.db.add_team_member(team.id, user.id)
         await interaction.response.send_message(
             embed=success_embed("Zugewiesen", f"{user.mention} → **{team.name}**"),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_team_entfernen", description="Entfernt einen User aus einem Team (Admin)")
@@ -1063,7 +1497,7 @@ class TournamentCog(commands.Cog):
         if team is None:
             await interaction.response.send_message(
                 embed=error_embed("Nicht gefunden", f"Team **{teamname}** existiert nicht."),
-                ephemeral=True,
+
             )
             return
         if team.captain_id == user.id:
@@ -1072,18 +1506,18 @@ class TournamentCog(commands.Cog):
                     "Captain",
                     "Captain kann nicht entfernt werden – Team löschen oder Captain wechseln.",
                 ),
-                ephemeral=True,
+
             )
             return
         if not await self.db.remove_team_member(team.id, user.id):
             await interaction.response.send_message(
                 embed=error_embed("Nicht im Team", f"{user.mention} ist nicht in **{team.name}**."),
-                ephemeral=True,
+
             )
             return
         await interaction.response.send_message(
             embed=success_embed("Entfernt", f"{user.mention} aus **{team.name}** entfernt."),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_baum_erstellen", description="Generiert Runde 1 und postet Matches (Admin)")
@@ -1105,73 +1539,37 @@ class TournamentCog(commands.Cog):
                     "Status",
                     "Turnier muss **geschlossen** sein. Nutze `/turnier_status setzen`.",
                 ),
-                ephemeral=True,
+
             )
             return
         if await self.db.tournament_has_matches(turnier_id):
             await interaction.response.send_message(
                 embed=error_embed("Bereits gestartet", "Bracket existiert bereits."),
-                ephemeral=True,
+
             )
             return
         teams = await self.db.get_registered_teams(turnier_id)
         if len(teams) < 2:
             await interaction.response.send_message(
                 embed=error_embed("Zu wenig Teams", "Mindestens 2 angemeldete Teams nötig."),
-                ephemeral=True,
+
             )
             return
         channel = await self._require_tournament_channel(interaction)
         if channel is None:
             return
 
-        await interaction.response.defer(ephemeral=True)
-        team_ids = [t.id for t in teams]
-        pairings = await create_round_one_pairings(team_ids)
-        maps = await self.db.get_tournament_maps(turnier_id)
-        map_list = distribute_maps(maps, len(pairings))
-
-        posted = 0
-        for index, (team1_id, team2_id) in enumerate(pairings):
-            map_name = map_list[index] if index < len(map_list) else ""
-            if team2_id is None:
-                match = await self.db.create_tournament_match(
-                    turnier_id,
-                    1,
-                    team1_id,
-                    None,
-                    map_name=map_name,
-                    status=TournamentMatchStatus.FINISHED,
-                    winner_id=team1_id,
-                )
-                t1 = await self._team_name(interaction.guild, team1_id)
-                embed = self._build_match_embed(
-                    match,
-                    interaction.guild,
-                    team1_name=t1,
-                    team2_name="Freilos",
-                    extra_note="Freilos – automatisch weiter.",
-                )
-                message = await channel.send(embed=embed)
-                await self.db.update_tournament_match(match.id, message_id=message.id)
-            else:
-                match = await self.db.create_tournament_match(
-                    turnier_id,
-                    1,
-                    team1_id,
-                    team2_id,
-                    map_name=map_name,
-                )
-                await self._post_match(match, interaction.guild, channel)
-                posted += 1
-
-        await self._check_round_complete(turnier_id, interaction.guild)
+        await interaction.response.defer()
+        error, posted = await self._admin_start_bracket(interaction, turnier_id)
+        if error:
+            await interaction.followup.send(embed=error_embed("Nicht möglich", error))
+            return
         await interaction.followup.send(
             embed=success_embed(
                 "Bracket erstellt",
                 f"Runde 1: **{posted}** Match(es) gepostet in {channel.mention}.",
             ),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_baum_anzeigen", description="Zeigt alle Matches eines Turniers")
@@ -1189,7 +1587,7 @@ class TournamentCog(commands.Cog):
         if not matches:
             await interaction.response.send_message(
                 embed=info_embed("Bracket", "Noch keine Matches vorhanden."),
-                ephemeral=True,
+
             )
             return
         entries: list[str] = []
@@ -1213,7 +1611,7 @@ class TournamentCog(commands.Cog):
                 f"Bracket – Turnier #{turnier_id}",
                 fields=fields,
             ),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_abbrechen", description="Setzt Turnier zurück und löscht Matches (Admin)")
@@ -1244,7 +1642,7 @@ class TournamentCog(commands.Cog):
                 "Abgebrochen",
                 f"Turnier #{turnier_id} zurückgesetzt (Status: offen, Matches gelöscht).",
             ),
-            ephemeral=True,
+
         )
 
     @app_commands.command(name="turnier_kanal_setzen", description="Legt den Turnier-Kanal fest (Admin)")
@@ -1261,23 +1659,73 @@ class TournamentCog(commands.Cog):
             return
         allowed, msg = bot_can_use_channel(
             channel,
-            send_messages=True,
+            send=True,
             embed_links=True,
-            view_channel=True,
         )
         if not allowed:
             await interaction.response.send_message(
                 embed=error_embed("Kanal nicht nutzbar", msg or "Keine Berechtigung."),
-                ephemeral=True,
             )
             return
-        await self.db.update_guild_settings(
-            interaction.guild.id,
-            tournament_channel_id=channel.id,
-        )
+        error = await self._save_tournament_channel(interaction.guild, channel)
+        if error:
+            await interaction.response.send_message(
+                embed=error_embed("Kanal nicht nutzbar", error),
+            )
+            return
+        saved = await self.db.get_guild_settings(interaction.guild.id)
+        if saved.tournament_channel_id != channel.id:
+            await interaction.response.send_message(
+                embed=error_embed(
+                    "Speichern fehlgeschlagen",
+                    "Der Kanal konnte nicht gespeichert werden. Bitte erneut versuchen.",
+                ),
+            )
+            return
         await interaction.response.send_message(
-            embed=success_embed("Turnier-Kanal", f"Turnier-Nachrichten → {channel.mention}"),
-            ephemeral=True,
+            embed=success_embed(
+                "Turnier-Kanal",
+                spaced_lines(
+                    f"Turnier-Nachrichten → {channel.mention}",
+                    "Nutze `/turnier_panel` für den nächsten Wizard-Schritt.",
+                ),
+            ),
+        )
+
+    @app_commands.command(
+        name="turnier_interface",
+        description="Postet/aktualisiert das Turnier-Hub im Turnier-Kanal (Admin)",
+    )
+    @app_commands.describe(turnier_id="ID des Turniers")
+    @app_commands.default_permissions(administrator=True)
+    @is_admin()
+    @app_commands.guild_only()
+    async def turnier_interface(
+        self,
+        interaction: discord.Interaction,
+        turnier_id: int,
+    ) -> None:
+        if interaction.guild is None:
+            return
+        tournament = await self._get_tournament_for_guild(interaction, turnier_id)
+        if tournament is None:
+            return
+        channel = await self._require_tournament_channel(interaction)
+        if channel is None:
+            return
+        has_matches = await self.db.tournament_has_matches(turnier_id)
+        await interaction.response.defer()
+        await self._upsert_tournament_interface(
+            interaction.guild,
+            turnier_id,
+            channel,
+            bracket_started=has_matches,
+        )
+        await interaction.followup.send(
+            embed=success_embed(
+                "Turnier-Interface",
+                f"Hub im Turnier-Kanal {channel.mention} gepostet/aktualisiert.",
+            ),
         )
 
     @app_commands.command(name="turnier_match_info", description="Zeigt Details zu einem Match")
@@ -1292,7 +1740,7 @@ class TournamentCog(commands.Cog):
         if match is None or interaction.guild is None:
             await interaction.response.send_message(
                 embed=error_embed("Nicht gefunden", f"Match #{match_id} existiert nicht."),
-                ephemeral=True,
+
             )
             return
         tournament = await self.db.get_tournament(match.tournament_id)
@@ -1302,7 +1750,7 @@ class TournamentCog(commands.Cog):
                     "Nicht gefunden",
                     f"Match #{match_id} gehört nicht zu diesem Server.",
                 ),
-                ephemeral=True,
+
             )
             return
         t1 = await self._team_name(interaction.guild, match.team1_id)
@@ -1321,7 +1769,7 @@ class TournamentCog(commands.Cog):
             ],
         )
         apply_brand_footer(embed, prefix=f"Match #{match.id}")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 
 class MatchView(discord.ui.View):

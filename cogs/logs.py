@@ -55,7 +55,7 @@ class LogsCog(commands.GroupCog, group_name="logs", group_description="Server-Lo
             if not isinstance(channel, discord.TextChannel):
                 return
 
-            await channel.send(embed=embed)
+            await channel.send(embed=embed, embed_persistent=True)
         except Exception as exc:
             logger.exception("Log senden fehlgeschlagen: %s", exc)
 

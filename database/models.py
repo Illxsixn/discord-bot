@@ -204,8 +204,6 @@ class ZombiePlayerRecord:
 
     guild_id: int
     user_id: int
-    level: int = 1
-    xp: int = 0
     highest_wave: int = 0
     total_kills: int = 0
     boss_kills: int = 0
@@ -222,8 +220,6 @@ class ZombiePlayerRecord:
         return cls(
             guild_id=row["guild_id"],
             user_id=row["user_id"],
-            level=int(row.get("level") or 1),
-            xp=int(row.get("xp") or 0),
             highest_wave=int(row.get("highest_wave") or 0),
             total_kills=int(row.get("total_kills") or 0),
             boss_kills=int(row.get("boss_kills") or 0),
@@ -849,6 +845,8 @@ class TournamentRecord:
     max_teams: int
     status: TournamentStatus
     created_at: datetime
+    interface_channel_id: int | None = None
+    interface_message_id: int | None = None
 
     @classmethod
     def from_row(cls, row: dict[str, Any]) -> "TournamentRecord":
@@ -867,6 +865,8 @@ class TournamentRecord:
             max_teams=int(row.get("max_teams") or 2),
             status=status,
             created_at=datetime.fromisoformat(created) if isinstance(created, str) else datetime.utcnow(),
+            interface_channel_id=row.get("interface_channel_id"),
+            interface_message_id=row.get("interface_message_id"),
         )
 
 
@@ -879,6 +879,8 @@ class TournamentTeamRecord:
     name: str
     captain_id: int
     registered: bool
+    message_id: int | None = None
+    interface_channel_id: int | None = None
 
     @classmethod
     def from_row(cls, row: dict[str, Any]) -> "TournamentTeamRecord":
@@ -888,6 +890,8 @@ class TournamentTeamRecord:
             name=row["name"],
             captain_id=row["captain_id"],
             registered=bool(row.get("registered", 0)),
+            message_id=row.get("message_id"),
+            interface_channel_id=row.get("interface_channel_id"),
         )
 
 

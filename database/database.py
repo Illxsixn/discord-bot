@@ -379,6 +379,8 @@ _GUILD_SETTINGS_MIGRATIONS = [
     "ALTER TABLE guild_settings ADD COLUMN levels_announce_enabled INTEGER DEFAULT 1",
     "ALTER TABLE guess_stats ADD COLUMN win_attempts_sum INTEGER DEFAULT 0",
     "ALTER TABLE guild_settings ADD COLUMN tournament_channel_id INTEGER",
+    "ALTER TABLE turnier_teams ADD COLUMN message_id INTEGER",
+    "ALTER TABLE turnier_teams ADD COLUMN interface_channel_id INTEGER",
 ]
 
 _TICKET_SETTINGS_MIGRATIONS = [
@@ -396,6 +398,11 @@ _PLAYER_ECONOMY_MIGRATIONS = [
     "ALTER TABLE player_economy ADD COLUMN dungeons_completed INTEGER DEFAULT 0",
     "ALTER TABLE player_economy ADD COLUMN pet_recovery_until TEXT",
     "ALTER TABLE player_economy ADD COLUMN pet_recovery_pet_id INTEGER",
+]
+
+_TOURNAMENT_MIGRATIONS = [
+    "ALTER TABLE turniere ADD COLUMN interface_channel_id INTEGER",
+    "ALTER TABLE turniere ADD COLUMN interface_message_id INTEGER",
 ]
 
 class Database:
@@ -420,6 +427,7 @@ class Database:
         self._connection = await aiosqlite.connect(self.path)
         self._connection.row_factory = aiosqlite.Row
         await self._connection.execute("PRAGMA foreign_keys = ON")
+        await self._connection.execute("PRAGMA journal_mode = WAL")
         await self._connection.commit()
         logger.info("Datenbank verbunden: %s", self.path)
 
@@ -438,6 +446,7 @@ class Database:
         await self._migrate_guild_settings()
         await self._migrate_ticket_settings()
         await self._migrate_player_economy()
+        await self._migrate_tournaments()
         await self._connection.commit()
         logger.info("Datenbankschema initialisiert.")
 
@@ -460,6 +469,14 @@ class Database:
     async def _migrate_player_economy(self) -> None:
         """Fügt Legacy-Spalten zu player_economy hinzu (idempotent, ungenutzt)."""
         for sql in _PLAYER_ECONOMY_MIGRATIONS:
+            try:
+                await self._connection.execute(sql)
+            except aiosqlite.OperationalError:
+                pass
+
+    async def _migrate_tournaments(self) -> None:
+        """Fügt Interface-Spalten zu turniere hinzu (idempotent)."""
+        for sql in _TOURNAMENT_MIGRATIONS:
             try:
                 await self._connection.execute(sql)
             except aiosqlite.OperationalError:
@@ -796,9 +813,9 @@ class Database:
         await self.conn.execute(
             """
             INSERT INTO zombie_players (
-                guild_id, user_id, level, xp, highest_wave, total_kills, boss_kills,
+                guild_id, user_id, highest_wave, total_kills, boss_kills,
                 runs_completed, runs_failed, perks_json, created_at, updated_at
-            ) VALUES (?, ?, 1, 0, 0, 0, 0, 0, 0, '{}', ?, ?)
+            ) VALUES (?, ?, 0, 0, 0, 0, 0, '{}', ?, ?)
             """,
             (guild_id, user_id, now, now),
         )
@@ -816,12 +833,10 @@ class Database:
         await self.conn.execute(
             """
             INSERT INTO zombie_players (
-                guild_id, user_id, level, xp, highest_wave, total_kills, boss_kills,
+                guild_id, user_id, highest_wave, total_kills, boss_kills,
                 runs_completed, runs_failed, perks_json, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(guild_id, user_id) DO UPDATE SET
-                level = excluded.level,
-                xp = excluded.xp,
                 highest_wave = excluded.highest_wave,
                 total_kills = excluded.total_kills,
                 boss_kills = excluded.boss_kills,
@@ -833,8 +848,6 @@ class Database:
             (
                 record.guild_id,
                 record.user_id,
-                record.level,
-                record.xp,
                 record.highest_wave,
                 record.total_kills,
                 record.boss_kills,
@@ -1018,14 +1031,13 @@ class Database:
         allowed = {
             "kills": "total_kills",
             "boss_kills": "boss_kills",
-            "level": "level",
         }
         column = allowed.get(sort_by, "total_kills")
         cursor = await self.conn.execute(
             f"""
             SELECT * FROM zombie_players
             WHERE guild_id = ?
-            ORDER BY {column} DESC, xp DESC
+            ORDER BY {column} DESC, highest_wave DESC
             LIMIT ?
             """,
             (guild_id, limit),
@@ -1913,6 +1925,35 @@ class Database:
         await self.conn.commit()
         return await self.get_tournament(tournament_id)
 
+    async def update_tournament_interface(
+        self,
+        tournament_id: int,
+        channel_id: int,
+        message_id: int,
+    ) -> None:
+        """Speichert die öffentliche Turnier-Interface-Nachricht."""
+        await self.conn.execute(
+            """
+            UPDATE turniere
+            SET interface_channel_id = ?, interface_message_id = ?
+            WHERE id = ?
+            """,
+            (channel_id, message_id, tournament_id),
+        )
+        await self.conn.commit()
+
+    async def get_tournaments_with_interface(self) -> list[TournamentRecord]:
+        """Lädt Turniere mit gespeichertem Interface-Embed."""
+        cursor = await self.conn.execute(
+            """
+            SELECT * FROM turniere
+            WHERE interface_message_id IS NOT NULL
+            ORDER BY id DESC
+            """
+        )
+        rows = await cursor.fetchall()
+        return [TournamentRecord.from_row(dict(row)) for row in rows]
+
     async def delete_tournament(self, tournament_id: int) -> bool:
         """Löscht ein Turnier inkl. Teams, Maps und Matches."""
         cursor = await self.conn.execute("DELETE FROM turniere WHERE id = ?", (tournament_id,))
@@ -2077,6 +2118,83 @@ class Database:
             (tournament_id, user_id),
         )
         return await cursor.fetchone() is not None
+
+    async def update_team_message_id(self, team_id: int, message_id: int | None) -> None:
+        """Speichert die Nachrichten-ID des Team-Interfaces."""
+        await self.conn.execute(
+            "UPDATE turnier_teams SET message_id = ? WHERE id = ?",
+            (message_id, team_id),
+        )
+        await self.conn.commit()
+
+    async def update_team_interface(
+        self,
+        team_id: int,
+        *,
+        message_id: int | None = None,
+        interface_channel_id: int | None = None,
+    ) -> None:
+        """Speichert Kanal und Nachricht des Team-Interfaces."""
+        fields: list[str] = []
+        values: list[Any] = []
+        if message_id is not None:
+            fields.append("message_id = ?")
+            values.append(message_id)
+        if interface_channel_id is not None:
+            fields.append("interface_channel_id = ?")
+            values.append(interface_channel_id)
+        if not fields:
+            return
+        values.append(team_id)
+        await self.conn.execute(
+            f"UPDATE turnier_teams SET {', '.join(fields)} WHERE id = ?",
+            values,
+        )
+        await self.conn.commit()
+
+    async def get_teams_with_persistent_message(self) -> list[TournamentTeamRecord]:
+        """Lädt Teams mit gespeichertem Interface (für persistente Views)."""
+        cursor = await self.conn.execute(
+            "SELECT * FROM turnier_teams WHERE message_id IS NOT NULL",
+        )
+        rows = await cursor.fetchall()
+        return [TournamentTeamRecord.from_row(dict(row)) for row in rows]
+
+    async def get_captain_teams_for_guild(
+        self,
+        guild_id: int,
+        captain_id: int,
+    ) -> list[TournamentTeamRecord]:
+        """Teams eines Captains auf dem Server."""
+        cursor = await self.conn.execute(
+            """
+            SELECT t.* FROM turnier_teams t
+            JOIN turniere tr ON tr.id = t.tournament_id
+            WHERE tr.guild_id = ? AND t.captain_id = ?
+            ORDER BY t.id DESC
+            """,
+            (guild_id, captain_id),
+        )
+        rows = await cursor.fetchall()
+        return [TournamentTeamRecord.from_row(dict(row)) for row in rows]
+
+    async def get_open_tournaments_for_user(
+        self,
+        guild_id: int,
+        user_id: int,
+    ) -> list[TournamentRecord]:
+        """Offene Turniere, in denen der User noch keinem Team angehört."""
+        from database.models import TournamentStatus
+
+        tournaments = await self.get_tournaments_for_guild(guild_id)
+        result: list[TournamentRecord] = []
+        for tournament in tournaments:
+            if tournament.status != TournamentStatus.OPEN:
+                continue
+            if await self.user_in_tournament_team(tournament.id, user_id):
+                continue
+            result.append(tournament)
+        return result
 
     async def create_tournament_match(
         self,

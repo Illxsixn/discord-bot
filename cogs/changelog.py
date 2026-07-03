@@ -22,7 +22,7 @@ class ChangelogCog(commands.Cog):
     @app_commands.guild_only()
     async def changelog(self, interaction: discord.Interaction) -> None:
         """Sendet den Changelog als Embed."""
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         try:
             embed = build_changelog_embed()
         except (OSError, KeyError, ValueError, TypeError) as exc:
@@ -34,7 +34,7 @@ class ChangelogCog(commands.Cog):
                 ephemeral=True,
             )
             return
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

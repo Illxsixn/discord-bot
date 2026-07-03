@@ -24,8 +24,33 @@ async def buy_lootboxes(
     Returns:
         (success, embed, economy)
     """
-    total_cost = Config.LOOTBOX_PRICE * count
     economy = await db.get_player_economy(guild_id, user_id)
+    remaining = Config.LOOTBOX_INVENTORY_MAX - economy.lootbox_count
+
+    if remaining <= 0:
+        embed = error_embed(
+            "Inventar voll",
+            f"Du kannst maximal **{Config.LOOTBOX_INVENTORY_MAX}** Lootboxen gleichzeitig besitzen.\n"
+            "Öffne zuerst Boxen mit **`/lootbox open`**, bevor du neue kaufst.",
+        )
+        return False, embed, economy
+
+    if count < 1 or count > Config.LOOTBOX_INVENTORY_MAX:
+        embed = error_embed(
+            "Ungültige Anzahl",
+            f"Pro Kauf sind **1–{Config.LOOTBOX_INVENTORY_MAX}** Lootboxen möglich.",
+        )
+        return False, embed, economy
+
+    if count > remaining:
+        embed = error_embed(
+            "Zu viele Lootboxen",
+            f"Du hast **{economy.lootbox_count}** 📦 — es passen noch **{remaining}**.\n"
+            f"Kaufe höchstens **{remaining}** Box(en) auf einmal.",
+        )
+        return False, embed, economy
+
+    total_cost = Config.LOOTBOX_PRICE * count
 
     if economy.gold < total_cost:
         embed = error_embed(

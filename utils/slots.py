@@ -7,15 +7,17 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
+from config import Config
+
 # (Emoji, Gewicht, 3×-Multiplikator)
 _SYMBOLS: tuple[tuple[str, int, int], ...] = (
-    ("🍒", 28, 2),
-    ("🍋", 24, 3),
-    ("🍊", 20, 4),
-    ("🍇", 14, 6),
-    ("🔔", 9, 10),
-    ("💎", 4, 20),
-    ("7️⃣", 1, 50),
+    ("🍒", 28, 4),
+    ("🍋", 24, 6),
+    ("🍊", 20, 8),
+    ("🍇", 14, 12),
+    ("🔔", 9, 20),
+    ("💎", 4, 40),
+    ("7️⃣", 1, 100),
 )
 
 _WEIGHTS: list[int] = [s[1] for s in _SYMBOLS]
@@ -33,21 +35,43 @@ class SpinResult:
     jackpot: bool = False
 
 
+def _pick_symbol() -> str:
+    return random.choices(_EMOJIS, weights=_WEIGHTS, k=1)[0]
+
+
+def _pick_other_symbol(exclude: str) -> str:
+    pool = [emoji for emoji in _EMOJIS if emoji != exclude] or _EMOJIS
+    weights = [_WEIGHTS[_EMOJIS.index(emoji)] for emoji in pool]
+    return random.choices(pool, weights=weights, k=1)[0]
+
+
 def spin_reels() -> tuple[str, str, str]:
-    """Dreht drei Walzen (unabhängig gewichtet)."""
+    """
+    Dreht drei Walzen mit erhöhter Trefferquote.
+
+    ~10 % Dreier · ~28 % Doppel · sonst unabhängiger Spin.
+    """
+    roll = random.random()
+    symbol = _pick_symbol()
+
+    if roll < Config.SLOT_TRIPLE_CHANCE:
+        return (symbol, symbol, symbol)
+
+    if roll < Config.SLOT_TRIPLE_CHANCE + Config.SLOT_DOUBLE_CHANCE:
+        other = _pick_other_symbol(symbol)
+        patterns = (
+            (symbol, symbol, other),
+            (symbol, other, symbol),
+            (other, symbol, symbol),
+        )
+        return random.choice(patterns)
+
     return tuple(random.choices(_EMOJIS, weights=_WEIGHTS, k=3))  # type: ignore[return-value]
 
 
 def format_reels(reels: tuple[str, str, str]) -> str:
-    """ASCII-Slot-Anzeige für Embeds."""
-    a, b, c = reels
-    return (
-        "```\n"
-        "╔══════════════════╗\n"
-        f"║   {a}  │  {b}  │  {c}   ║\n"
-        "╚══════════════════╝\n"
-        "```"
-    )
+    """Kompakte Walzen-Zeile (ohne Codeblock — Discord-Emoji-sicher)."""
+    return " · ".join(reels)
 
 
 def resolve_spin(reels: tuple[str, str, str], bet: int) -> SpinResult:

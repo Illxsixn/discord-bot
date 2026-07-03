@@ -18,7 +18,7 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from database.models import PetCooldownType, PetRarity, PetRecord
-from utils.embeds import error_embed, info_embed, success_embed
+from utils.embeds import apply_brand_footer, error_embed, info_embed, success_embed
 from utils.permissions import bot_can_use_channel
 from utils.pet_ai_images import (
     PetPortraitError,
@@ -37,7 +37,6 @@ from utils.pet_embeds import (
     build_pet_info_embed,
     build_pet_leaderboard_embed,
     build_pet_play_embed,
-    pet_embed_color,
 )
 from utils.pet_play import (
     PET_IMPULSES,
@@ -46,7 +45,6 @@ from utils.pet_play import (
     pet_play_xp_for_score,
     random_impulse_id,
 )
-from utils.economy_display import format_zombie_stat_line, get_profile_economy
 from utils.pets import (
     apply_pet_xp_boost,
     pet_xp_boost_label,
@@ -139,23 +137,6 @@ class PetImpulseView(discord.ui.View):
 
                 base_xp, hit_bonus, total_xp = pet_play_xp_for_score(self.score)
                 display_xp = apply_pet_xp_boost(total_xp, species_name=self.pet.species)
-                member = interaction.user
-                if isinstance(member, discord.Member) and interaction.guild is not None:
-                    channel = interaction.channel if isinstance(
-                        interaction.channel, (discord.TextChannel, discord.Thread)
-                    ) else None
-                    fresh_pet = await self.cog.get_pet(self.pet.id)
-                    if fresh_pet is not None:
-                        await self.cog._apply_pet_xp(
-                            fresh_pet,
-                            total_xp,
-                            member=member,
-                            channel=channel,
-                            count_interaction=True,
-                        )
-                    challenges = self.cog.bot.get_cog("ChallengesCog")
-                    if challenges is not None:
-                        await challenges.track_pet_play(member, channel=channel)  # type: ignore[attr-defined]
 
                 feedback = (
                     f"✅ **{correct_label}**"
@@ -174,6 +155,24 @@ class PetImpulseView(discord.ui.View):
                 )
                 await interaction.response.edit_message(embed=embed, view=self)
                 self.stop()
+
+                member = interaction.user
+                if isinstance(member, discord.Member) and interaction.guild is not None:
+                    channel = interaction.channel if isinstance(
+                        interaction.channel, (discord.TextChannel, discord.Thread)
+                    ) else None
+                    fresh_pet = await self.cog.get_pet(self.pet.id)
+                    if fresh_pet is not None:
+                        await self.cog._apply_pet_xp(
+                            fresh_pet,
+                            total_xp,
+                            member=member,
+                            channel=channel,
+                            count_interaction=True,
+                        )
+                    challenges = self.cog.bot.get_cog("ChallengesCog")
+                    if challenges is not None:
+                        await challenges.track_pet_play(member, channel=channel)  # type: ignore[attr-defined]
                 return
 
             feedback = (
@@ -262,6 +261,7 @@ class PetSelectView(discord.ui.View):
                 "Aktives Pet gewechselt",
                 f"{emoji} **{pet.name}** ist jetzt dein aktiver Begleiter.",
             ),
+            ephemeral=True,
         )
         self.stop()
 
@@ -481,10 +481,10 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             titles.get(milestone, "Pet-Evolution!"),
             descriptions.get(milestone, f"**{pet.name}** ist gewachsen!"),
         )
-        embed.color = pet_embed_color(pet.evolution_stage)
-        embed.set_footer(text=f"Besitzer: {member.display_name}")
+        embed.color = Config.COLOR_ARTWORK
+        apply_brand_footer(embed, prefix=f"Besitzer: {member.display_name}")
         try:
-            await channel.send(content=member.mention, embed=embed)
+            await channel.send(content=member.mention, embed=embed, embed_persistent=True)
         except discord.Forbidden:
             logger.warning("Pet-Evolution-Nachricht konnte nicht gesendet werden (Guild %s).", member.guild.id)
 
@@ -506,14 +506,14 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
     @app_commands.guild_only()
     async def ei(self, interaction: discord.Interaction) -> None:
         """Öffnet ein Pet-Ei."""
-        await interaction.response.defer()
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
             return
 
         allowed, msg = await self._ensure_bot_permissions(interaction)
         if not allowed:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 embed=error_embed("Fehlende Berechtigungen", msg or "Der Bot kann hier nicht antworten."),
+                ephemeral=True,
             )
             return
 
@@ -523,13 +523,16 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
         if remaining is not None:
             hours = int(remaining.total_seconds() // 3600)
             minutes = int((remaining.total_seconds() % 3600) // 60)
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 embed=error_embed(
                     "Cooldown",
                     f"Du kannst erst in **{hours}h {minutes}m** wieder ein Ei öffnen.",
                 ),
+                ephemeral=True,
             )
             return
+
+        await interaction.response.defer()
 
         species = random_species()
         personality = random_personality()
@@ -578,7 +581,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
                 pet_xp=Config.PET_DUPLICATE_PET_XP,
                 player_xp=Config.PET_DUPLICATE_PLAYER_XP,
             )
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, embed_persistent=True)
             return
 
         has_active = any(p.is_active for p in existing)
@@ -608,22 +611,24 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             favorite=favorite,
             catchphrase=catchphrase,
         )
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, embed_persistent=True)
 
     @app_commands.command(name="dex", description="Zeigt das Pet-Sammlungsbuch (alle Arten, öffentlich).")
     @app_commands.guild_only()
     async def dex(self, interaction: discord.Interaction) -> None:
         """Zeigt den Pet-Dex."""
-        await interaction.response.defer()
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
             return
 
         allowed, msg = await self._ensure_bot_permissions(interaction)
         if not allowed:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 embed=error_embed("Fehlende Berechtigungen", msg or "Der Bot kann hier nicht antworten."),
+                ephemeral=True,
             )
             return
+
+        await interaction.response.defer()
 
         owned = await self.db.get_pets_by_owner(interaction.guild.id, interaction.user.id)
         discovered = {pet.species for pet in owned}
@@ -635,7 +640,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
     @app_commands.guild_only()
     async def info(self, interaction: discord.Interaction) -> None:
         """Zeigt Pet-Informationen."""
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         if interaction.guild is None:
             return
 
@@ -643,6 +648,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
         if not allowed:
             await interaction.followup.send(
                 embed=error_embed("Fehlende Berechtigungen", msg or "Der Bot kann hier nicht antworten."),
+                ephemeral=True,
             )
             return
 
@@ -653,21 +659,14 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
                     "Kein aktives Pet",
                     f"{interaction.user.mention} hat noch kein aktives Pet.\nÖffne ein Ei mit **`/pet ei`**!",
                 ),
+                ephemeral=True,
             )
             return
 
         if not isinstance(interaction.user, discord.Member):
             return
-        level = (await self.db.get_user_level(interaction.guild.id, interaction.user.id)).level
-        economy = await get_profile_economy(self.db, interaction.guild.id, interaction.user.id, level)
-        zombie_line = await format_zombie_stat_line(self.db, interaction.guild.id, interaction.user.id)
-        embed = build_pet_info_embed(
-            pet,
-            interaction.user,
-            gold=economy.gold,
-            survival_stat=zombie_line,
-        )
-        await interaction.followup.send(embed=embed)
+        embed = build_pet_info_embed(pet, interaction.user)
+        await interaction.followup.send(embed=embed, ephemeral=True)
         await self._track_pet_challenge(
             interaction.user,
             "track_pet_info",
@@ -681,7 +680,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
     @app_commands.guild_only()
     async def display(self, interaction: discord.Interaction) -> None:
         """Generiert oder lädt das KI-Portrait des aktiven Pets."""
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
             return
 
@@ -689,6 +688,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
         if not allowed:
             await interaction.followup.send(
                 embed=error_embed("Fehlende Berechtigungen", msg or "Der Bot kann hier nicht antworten."),
+                ephemeral=True,
             )
             return
 
@@ -699,6 +699,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
                     "Kein aktives Pet",
                     f"{interaction.user.mention} hat noch kein aktives Pet.\nÖffne ein Ei mit **`/pet ei`**!",
                 ),
+                ephemeral=True,
             )
             return
 
@@ -709,6 +710,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
                     "Der Bot-Admin muss `AGNES_API_KEY` in der `.env` hinterlegen.\n"
                     "Key erhältlich auf [platform.agnes-ai.com](https://platform.agnes-ai.com).",
                 ),
+                ephemeral=True,
             )
             return
 
@@ -720,6 +722,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
         except PetPortraitError as exc:
             await interaction.followup.send(
                 embed=error_embed("Portrait fehlgeschlagen", str(exc)),
+                ephemeral=True,
             )
             return
 
@@ -729,9 +732,9 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             pet,
             interaction.user,
             portrait_label=portrait_status_label(pet),
+            attachment_filename=filename,
         )
-        embed.set_image(url=f"attachment://{filename}")
-        await interaction.followup.send(embed=embed, files=[attachment])
+        await interaction.followup.send(embed=embed, files=[attachment], ephemeral=True)
 
     @app_commands.command(
         name="play",
@@ -794,21 +797,24 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
     @app_commands.describe(neuer_name="Neuer Name (max. 15 Zeichen)")
     async def rename(self, interaction: discord.Interaction, neuer_name: str) -> None:
         """Benennt das aktive Pet um."""
-        await interaction.response.defer()
         if interaction.guild is None:
             return
 
         allowed, msg = await self._ensure_bot_permissions(interaction)
         if not allowed:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 embed=error_embed("Fehlende Berechtigungen", msg or "Der Bot kann hier nicht antworten."),
+                ephemeral=True,
             )
             return
 
         settings = await self.db.get_guild_settings(interaction.guild.id)
         name_error = validate_pet_name(neuer_name, settings.bad_words if settings.bad_word_filter else None)
         if name_error:
-            await interaction.followup.send(embed=error_embed("Ungültiger Name", name_error))
+            await interaction.response.send_message(
+                embed=error_embed("Ungültiger Name", name_error),
+                ephemeral=True,
+            )
             return
 
         remaining = await self._cooldown_remaining(
@@ -817,20 +823,24 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
         if remaining is not None:
             days = int(remaining.total_seconds() // 86400)
             hours = int((remaining.total_seconds() % 86400) // 3600)
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 embed=error_embed(
                     "Cooldown",
                     f"Du kannst den Namen erst in **{days}d {hours}h** wieder ändern.",
                 ),
+                ephemeral=True,
             )
             return
 
         pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
         if pet is None:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 embed=info_embed("Kein aktives Pet", "Du hast kein aktives Pet zum Umbenennen."),
+                ephemeral=True,
             )
             return
+
+        await interaction.response.defer(ephemeral=True)
 
         old_name = pet.name
         pet.name = neuer_name.strip()
@@ -846,6 +856,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
                 "Name geändert",
                 f"**{old_name}** heißt jetzt **{pet.name}**!",
             ),
+            ephemeral=True,
         )
 
     @app_commands.command(name="leaderboard", description="Zeigt die besten Pets des Servers.")
@@ -913,7 +924,7 @@ class PetsListCog(commands.Cog):
     @app_commands.guild_only()
     async def pets(self, interaction: discord.Interaction) -> None:
         """Zeigt die Pet-Sammlung."""
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         if interaction.guild is None:
             return
 
@@ -923,6 +934,7 @@ class PetsListCog(commands.Cog):
             if not allowed:
                 await interaction.followup.send(
                     embed=error_embed("Fehlende Berechtigungen", msg or "Der Bot kann hier nicht antworten."),
+                    ephemeral=True,
                 )
                 return
 
@@ -933,12 +945,13 @@ class PetsListCog(commands.Cog):
                     "Keine Pets",
                     f"{interaction.user.mention} hat noch keine Pets.\nÖffne dein erstes Ei mit **`/pet ei`**!",
                 ),
+                ephemeral=True,
             )
             return
 
         embed = build_pet_collection_embed(interaction.user.display_name, pets)
         view = PetSelectView(self.db, interaction.user.id, pets)
-        await interaction.followup.send(embed=embed, view=view)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

@@ -585,7 +585,7 @@ class TicketsCog(commands.GroupCog, group_name="ticket", group_description="Supp
 
         embed = log_event_embed(event_name, description, fields=fields)
         try:
-            await channel.send(embed=embed)
+            await channel.send(embed=embed, embed_persistent=True)
         except discord.HTTPException:
             logger.warning("Ticket-Log konnte nicht gesendet werden (Guild %s).", guild.id)
 
@@ -666,7 +666,7 @@ class TicketsCog(commands.GroupCog, group_name="ticket", group_description="Supp
         settings = await self.db.get_ticket_settings(guild.id)
         view = TicketPanelView(self, button_label=settings.panel_button_label)
         self.bot.add_view(view)
-        message = await channel.send(embed=_build_panel_embed(guild, settings), view=view)
+        message = await channel.send(embed=_build_panel_embed(guild, settings), view=view, embed_persistent=True)
         self.bot.add_view(view, message_id=message.id)
         await self.db.update_ticket_settings(
             guild.id,
@@ -730,7 +730,7 @@ class TicketsCog(commands.GroupCog, group_name="ticket", group_description="Supp
         view = TicketControlView(self, ticket.id)
         self.bot.add_view(view)
         embed = _build_ticket_embed(ticket, interaction.guild, settings, member=member)
-        await channel.send(content=member.mention, embed=embed, view=view)
+        await channel.send(content=member.mention, embed=embed, view=view, embed_persistent=True)
 
         await self._send_ticket_log(
             interaction.guild,
@@ -1059,7 +1059,10 @@ class TicketsCog(commands.GroupCog, group_name="ticket", group_description="Supp
             )
             return
 
-        await channel.send(embed=info_embed("Mitglied hinzugefügt", f"{user.mention} hat Zugriff auf dieses Ticket."))
+        await channel.send(
+            embed=info_embed("Mitglied hinzugefügt", f"{user.mention} hat Zugriff auf dieses Ticket."),
+            embed_persistent=True,
+        )
         await self._send_ticket_log(
             interaction.guild,  # type: ignore[arg-type]
             "Mitglied hinzugefügt",
@@ -1100,7 +1103,10 @@ class TicketsCog(commands.GroupCog, group_name="ticket", group_description="Supp
             )
             return
 
-        await channel.send(embed=info_embed("Mitglied entfernt", f"{user.mention} wurde aus diesem Ticket entfernt."))
+        await channel.send(
+            embed=info_embed("Mitglied entfernt", f"{user.mention} wurde aus diesem Ticket entfernt."),
+            embed_persistent=True,
+        )
         await self._send_ticket_log(
             interaction.guild,  # type: ignore[arg-type]
             "Mitglied entfernt",

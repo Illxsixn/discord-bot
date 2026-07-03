@@ -45,9 +45,11 @@ class Config:
     COLOR_ERROR: int = 0xE74C3C  # Rot
     COLOR_WARNING: int = 0xF1C40F  # Gelb
     COLOR_INFO: int = 0x3498DB  # Blau
+    COLOR_ARTWORK: int = 0x2D1B4E  # Dunkel-Lila (Standard-Inhalts-Embeds)
 
     # Cooldown in Sekunden für wiederholte Slash-Commands
     DEFAULT_COOLDOWN: float = 3.0
+    EMOJI_USER_COOLDOWN: float = 30.0
 
     # Maximale Anzahl gespeicherter Warnungen pro User (0 = unbegrenzt)
     MAX_WARNINGS_DISPLAY: int = 25
@@ -67,8 +69,15 @@ class Config:
     LOOTBOX_PRICE: int = 75
     LOOTBOX_XP_CHANCE_MIN: int = 5
     LOOTBOX_XP_CHANCE_MAX: int = 30
+    LOOTBOX_XP_MIN: int = 1
+    LOOTBOX_XP_MAX: int = 80
     LOOTBOX_XP_REWARD: int = 50
-    LOOTBOX_BATCH_MAX: int = 10
+    LOOTBOX_CONSOLATION_GOLD_MIN: int = 5
+    LOOTBOX_CONSOLATION_GOLD_MAX: int = 12
+    LOOTBOX_CONSOLATION_XP_MIN: int = 4
+    LOOTBOX_CONSOLATION_XP_MAX: int = 12
+    LOOTBOX_INVENTORY_MAX: int = 3
+    LOOTBOX_BATCH_MAX: int = 3
     LOOTBOX_LEADERBOARD_LIMIT: int = 10
 
     # Zombie Survival (Gold über Runs — Lootboxen unverändert)
@@ -106,7 +115,12 @@ class Config:
     SLOT_BET_OPTIONS: tuple[int, ...] = (5, 10, 25, 50)
     SLOT_DEFAULT_BET: int = 10
     SLOT_VIEW_TIMEOUT: float = 180.0
-    SLOT_SPIN_COOLDOWN: float = 2.0
+    SLOT_SPIN_COOLDOWN: float = 3.0
+    SLOT_TRIPLE_CHANCE: float = 0.10
+    SLOT_DOUBLE_CHANCE: float = 0.28
+
+    # Embed-Nachrichten: Auto-Löschung nach Sekunden (0 = aus)
+    EMBED_AUTO_DELETE_SECONDS: int = 300
 
     CHALLENGE_XP_MIN: int = 15
     CHALLENGE_XP_MAX: int = 40

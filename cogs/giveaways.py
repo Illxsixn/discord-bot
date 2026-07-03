@@ -151,7 +151,7 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
                     fields=[("Gewinner", ", ".join(f"<@{uid}>" for uid in winner_ids), False)],
                 )
                 try:
-                    await channel.send(embed=result_embed)
+                    await channel.send(embed=result_embed, embed_persistent=True)
                 except discord.Forbidden:
                     pass
 
@@ -230,7 +230,7 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
 
             temp = info_embed("Gewinnspiel", "Wird erstellt …")
             try:
-                message = await target.send(embed=temp)
+                message = await target.send(embed=temp, embed_persistent=True)
             except discord.Forbidden:
                 await interaction.followup.send(
                     embed=error_embed("Fehler", "Ich kann in diesem Kanal keine Nachrichten senden."),

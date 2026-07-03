@@ -75,9 +75,9 @@ class WelcomeCog(commands.GroupCog, group_name="welcome", group_description="Wel
 
                 if files:
                     embed.set_image(url="attachment://welcome.png")
-                    await channel.send(embed=embed, files=files)
+                    await channel.send(embed=embed, files=files, embed_persistent=True)
                 else:
-                    await channel.send(embed=embed)
+                    await channel.send(embed=embed, embed_persistent=True)
             else:
                 if files:
                     await channel.send(content=message_text, files=files)

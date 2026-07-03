@@ -4,6 +4,7 @@ Slot-Maschine: Embed mit Einsatz-Buttons und Dreh-Funktion.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
@@ -31,6 +32,7 @@ class SlotsView(discord.ui.View):
         self.bet = bet
         self._spinning = False
         self._last_spin = 0.0
+        self._spin_btn: discord.ui.Button | None = None
         self._build_bet_buttons()
 
     def _build_bet_buttons(self) -> None:
@@ -57,7 +59,31 @@ class SlotsView(discord.ui.View):
             custom_id="slot_spin",
         )
         spin_btn.callback = self._spin_callback
+        self._spin_btn = spin_btn
         self.add_item(spin_btn)
+
+    def _set_spin_disabled(self, disabled: bool) -> None:
+        if self._spin_btn is not None:
+            self._spin_btn.disabled = disabled
+
+    def _sync_spin_disabled(self) -> None:
+        """Spin-Button an Spin-/Cooldown-Status koppeln."""
+        self._set_spin_disabled(self._spinning or self._spin_on_cooldown())
+
+    def _spin_on_cooldown(self) -> bool:
+        return time.monotonic() - self._last_spin < Config.SLOT_SPIN_COOLDOWN
+
+    async def _reenable_spin_after(self, interaction: discord.Interaction, seconds: float) -> None:
+        await asyncio.sleep(seconds)
+        if self._spinning:
+            return
+        self._sync_spin_disabled()
+        try:
+            economy = await self.cog.db.get_player_economy(self.guild_id, self.owner_id)
+            embed = build_slots_embed(gold=economy.gold, bet=self.bet)
+            await interaction.edit_original_response(embed=embed, view=self)
+        except discord.HTTPException:
+            pass
 
     def _make_bet_callback(self, amount: int):
         async def callback(interaction: discord.Interaction) -> None:
@@ -103,22 +129,13 @@ class SlotsCog(commands.Cog):
         view.bet = amount
         view.clear_items()
         view._build_bet_buttons()
+        view._sync_spin_disabled()
         await self._refresh_view(interaction, view)
 
     async def _spin(self, interaction: discord.Interaction, view: SlotsView) -> None:
-        if view._spinning:
-            await interaction.response.send_message(
-                embed=error_embed("Moment", "Die Walzen drehen noch …"),
-                ephemeral=True,
-            )
-            return
-
-        now = time.monotonic()
-        if now - view._last_spin < Config.SLOT_SPIN_COOLDOWN:
-            await interaction.response.send_message(
-                embed=error_embed("Zu schnell", "Kurz warten, dann nochmal."),
-                ephemeral=True,
-            )
+        if view._spinning or view._spin_on_cooldown():
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
             return
 
         economy = await self.db.get_player_economy(view.guild_id, view.owner_id)
@@ -134,7 +151,8 @@ class SlotsCog(commands.Cog):
             return
 
         view._spinning = True
-        view._last_spin = now
+        view._last_spin = time.monotonic()
+        view._set_spin_disabled(True)
         await interaction.response.defer()
 
         economy.gold -= view.bet
@@ -165,7 +183,9 @@ class SlotsCog(commands.Cog):
             embed.title = "🎰 MEGA-JACKPOT!"
 
         view._spinning = False
+        view._sync_spin_disabled()
         await interaction.edit_original_response(embed=embed, view=view)
+        asyncio.create_task(view._reenable_spin_after(interaction, Config.SLOT_SPIN_COOLDOWN))
 
     @app_commands.command(name="slots", description="Öffnet die Gold-Slot-Maschine")
     @app_commands.guild_only()

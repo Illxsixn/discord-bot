@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import PurePath
 
 import aiohttp
 import discord
@@ -20,9 +21,10 @@ ALLOWED_IMAGE_TYPES = frozenset(
         "image/jpeg",
         "image/jpg",
         "image/gif",
-        "image/webp",
     }
 )
+ALLOWED_IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".gif"})
+ANIMATED_EMOJI_LIMITS = {0: 0, 1: 50, 2: 100, 3: 250}
 
 
 @dataclass(frozen=True)
@@ -67,7 +69,7 @@ def parse_custom_emoji(value: str) -> ParsedCustomEmoji | None:
         return ParsedCustomEmoji(
             name=source_name,
             emoji_id=int(emoji_id_str),
-            animated=False,
+            animated=raw.startswith("<a:"),
         )
     return None
 
@@ -101,10 +103,26 @@ async def fetch_emoji_bytes(emoji: ParsedCustomEmoji) -> bytes:
     raise ValueError("Das Emoji konnte nicht von Discord geladen werden.")
 
 
+def _attachment_content_type(attachment: discord.Attachment) -> str | None:
+    """Ermittelt den MIME-Typ — Discord liefert content_type oft nicht."""
+    if attachment.content_type in ALLOWED_IMAGE_TYPES:
+        return attachment.content_type
+
+    suffix = PurePath(attachment.filename or "").suffix.lower()
+    if suffix == ".png":
+        return "image/png"
+    if suffix in {".jpg", ".jpeg"}:
+        return "image/jpeg"
+    if suffix == ".gif":
+        return "image/gif"
+    return attachment.content_type
+
+
 def validate_attachment(attachment: discord.Attachment) -> str | None:
     """Prüft ein hochgeladenes Bild für Server-Emojis."""
-    if attachment.content_type not in ALLOWED_IMAGE_TYPES:
-        return "Erlaubt sind **PNG, JPG, GIF und WebP**."
+    content_type = _attachment_content_type(attachment)
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        return "Erlaubt sind **PNG, JPG und GIF** (Discord unterstützt kein WebP für Emojis)."
     if attachment.size > MAX_EMOJI_BYTES:
         return "Die Datei darf maximal **256 KB** groß sein."
     return None
@@ -121,11 +139,23 @@ async def read_attachment_bytes(attachment: discord.Attachment) -> bytes:
     return data
 
 
+def animated_emoji_limit(guild: discord.Guild) -> int:
+    """Maximale Anzahl animierter Emojis je Boost-Stufe."""
+    tier = guild.premium_tier or 0
+    return ANIMATED_EMOJI_LIMITS.get(tier, ANIMATED_EMOJI_LIMITS[3])
+
+
 def emoji_slot_error(guild: discord.Guild, *, animated: bool) -> str | None:
     """Prüft, ob noch Emoji-Slots frei sind."""
     if animated:
+        limit = animated_emoji_limit(guild)
+        if limit == 0:
+            return (
+                "Animierte Emojis sind auf diesem Server nicht verfügbar "
+                "(mindestens **Boost-Stufe 1** nötig)."
+            )
         animated_count = sum(1 for item in guild.emojis if item.animated)
-        if animated_count >= guild.emoji_limit:
+        if animated_count >= limit:
             return "Das Limit für **animierte Emojis** auf diesem Server ist erreicht."
         return None
 

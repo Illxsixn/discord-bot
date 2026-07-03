@@ -39,10 +39,43 @@ def _pet_rarity(pet: PetRecord | None) -> PetRarity | None:
     return get_species_rarity(pet.species)
 
 
-def tick_cooldowns(run: ZombieRunRecord) -> None:
-    """Reduziert Pet-Cooldown am Rundenende."""
+def tick_pet_cooldown_on_melee(run: ZombieRunRecord) -> None:
+    """Reduziert Pet-Cooldown nach jedem Nahkampfangriff."""
     if run.pet_action_cooldown > 0:
         run.pet_action_cooldown -= 1
+
+
+def _finish_wave_and_continue(run: ZombieRunRecord) -> list[str]:
+    """Schließt eine Welle ab, heilt und startet die nächste Welle ohne Pause."""
+    lines: list[str] = []
+    run.current_zombie_key = None
+    run.current_zombie_hp = 0
+    run.shop_available = 0
+    heal = max(1, int(run.player_max_hp * Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT / 100))
+    before = run.player_hp
+    run.player_hp = min(run.player_max_hp, run.player_hp + heal)
+    gained = run.player_hp - before
+    lines.append(f"**Welle {run.wave}** geschafft!")
+    if gained > 0:
+        lines.append(f"Kurz durchatmen — **+{gained}** HP.")
+    if run.wave >= run.max_waves:
+        return lines
+    run.wave += 1
+    lines.append(f"**Welle {run.wave}/{run.max_waves}** beginnt!")
+    lines.extend(spawn_wave(run))
+    return lines
+
+
+def resume_if_between_waves(run: ZombieRunRecord) -> list[str]:
+    """Legacy-Runs: alte Wellenpause überspringen und nächste Welle starten."""
+    if not run.between_waves or run.wave >= run.max_waves:
+        return []
+    lines: list[str] = []
+    run.wave += 1
+    run.shop_available = 0
+    lines.append(f"**Welle {run.wave}/{run.max_waves}** beginnt!")
+    lines.extend(spawn_wave(run))
+    return lines
 
 
 def spawn_wave(run: ZombieRunRecord) -> list[str]:
@@ -57,13 +90,6 @@ def _spawn_next_from_queue(run: ZombieRunRecord, queue: list[str]) -> list[str]:
     """Spawnt den nächsten Zombie aus der Welle."""
     lines: list[str] = []
     if run.zombies_remaining <= 0:
-        run.current_zombie_key = None
-        run.current_zombie_hp = 0
-        run.shop_available = 1
-        lines.append(f"**Welle {run.wave}** geschafft! Wellenpause — Käufe unter **`/shop`**.")
-        heal = max(1, int(run.player_max_hp * Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT / 100))
-        run.player_hp = min(run.player_max_hp, run.player_hp + heal)
-        lines.append(f"Kurz durchatmen — **+{heal}** HP.")
         return lines
 
     index = len(queue) - run.zombies_remaining
@@ -97,17 +123,8 @@ def _on_zombie_killed(run: ZombieRunRecord, zombie_key: str) -> CombatResult:
     run.zombies_remaining -= 1
     queue = wave_zombie_list(run.wave, run.id)
     if run.zombies_remaining <= 0:
-        run.current_zombie_key = None
-        run.current_zombie_hp = 0
-        run.shop_available = 1
-        heal = max(1, int(run.player_max_hp * Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT / 100))
-        before = run.player_hp
-        run.player_hp = min(run.player_max_hp, run.player_hp + heal)
-        gained = run.player_hp - before
         result.wave_cleared = True
-        result.lines.append(f"**Welle {run.wave}** geschafft! Wellenpause — Käufe unter **`/shop`**.")
-        if gained > 0:
-            result.lines.append(f"Kurz durchatmen — **+{gained}** HP.")
+        result.lines.extend(_finish_wave_and_continue(run))
     else:
         result.lines.extend(_spawn_next_from_queue(run, queue))
     return result
@@ -165,7 +182,6 @@ def perform_melee(
     run: ZombieRunRecord,
     *,
     player_level: int,
-    zombie_level: int,
     pet: PetRecord | None,
 ) -> CombatResult:
     """Spieler-Nahkampfangriff."""
@@ -174,7 +190,7 @@ def perform_melee(
         result.lines.append("Kein Zombie im Visier.")
         return result
 
-    base = melee_base_damage(player_level, zombie_level)
+    base = melee_base_damage(player_level)
     damage = random.randint(max(1, base - 2), base + 3)
     if run.focus_active:
         damage = int(damage * 1.5)
@@ -194,36 +210,54 @@ def perform_melee(
         result.wave_cleared = kill_result.wave_cleared
         result.run_completed = kill_result.run_completed
         result.boss_killed = kill_result.boss_killed
-        tick_cooldowns(run)
+        tick_pet_cooldown_on_melee(run)
         if run.player_hp <= 0:
             result.run_failed = True
         return result
 
     result.lines.extend(_zombie_attack(run, run.current_zombie_key))
-    tick_cooldowns(run)
+    tick_pet_cooldown_on_melee(run)
     if run.player_hp <= 0:
         result.run_failed = True
     return result
 
 
-def perform_pet_action(run: ZombieRunRecord, pet: PetRecord | None) -> CombatResult:
-    """Pet-Spezialaktion basierend auf Impuls/Mood."""
+def perform_pet_action(
+    run: ZombieRunRecord,
+    pet: PetRecord | None,
+    *,
+    action: str | None = None,
+) -> CombatResult:
+    """Pet-Spezialaktion — Fokus, Power oder Glück (explizit gewählt)."""
     result = CombatResult()
     if pet is None:
         result.lines.append("Kein aktives Pet — Pet-Aktion deaktiviert.")
         return result
     if run.pet_action_cooldown > 0:
-        result.lines.append(f"Pet-Aktion auf Cooldown (**{run.pet_action_cooldown}** Runde(n)).")
+        attacks = run.pet_action_cooldown
+        label = "Angriff" if attacks == 1 else "Angriffe"
+        result.lines.append(f"Pet-Aktion auf Cooldown (**{attacks}** {label}).")
         return result
     if not run.in_combat:
         result.lines.append("Kein Zombie aktiv.")
         return result
 
-    mood = pet.mood or PetMood.FOCUS.value
-    if mood == PetMood.FOCUS.value:
+    mood_map = {
+        "focus": PetMood.FOCUS.value,
+        "energy": PetMood.ENERGY.value,
+        "luck": PetMood.LUCK.value,
+        PetMood.FOCUS.value: PetMood.FOCUS.value,
+        PetMood.ENERGY.value: PetMood.ENERGY.value,
+        PetMood.LUCK.value: PetMood.LUCK.value,
+    }
+    chosen = mood_map.get(action or "", pet.mood or PetMood.FOCUS.value)
+    if chosen not in mood_map.values():
+        chosen = PetMood.FOCUS.value
+
+    if chosen == PetMood.FOCUS.value:
         run.focus_active = 1
         result.lines.append(f"**{pet.name}** — **Fokus**: Nächster Nahkampf +50 % Schaden.")
-    elif mood == PetMood.ENERGY.value:
+    elif chosen == PetMood.ENERGY.value:
         dmg = random.randint(15, 30)
         run.current_zombie_hp = max(0, run.current_zombie_hp - dmg)
         run.total_damage += dmg
@@ -235,7 +269,7 @@ def perform_pet_action(run: ZombieRunRecord, pet: PetRecord | None) -> CombatRes
             result.wave_cleared = kill_result.wave_cleared
             result.run_completed = kill_result.run_completed
             result.boss_killed = kill_result.boss_killed
-    elif mood == PetMood.LUCK.value:
+    elif chosen == PetMood.LUCK.value:
         max_uses = Config.ZOMBIE_LUCK_BONUS_MAX // Config.ZOMBIE_LUCK_BONUS_PERCENT
         if run.luck_bonus_uses < max_uses:
             run.luck_bonus_uses += 1
@@ -254,27 +288,6 @@ def perform_pet_action(run: ZombieRunRecord, pet: PetRecord | None) -> CombatRes
     if run.in_combat and run.current_zombie_key and not result.run_completed:
         result.lines.extend(_zombie_attack(run, run.current_zombie_key))
 
-    tick_cooldowns(run)
     if run.player_hp <= 0:
         result.run_failed = True
-    return result
-
-
-def advance_to_next_wave(run: ZombieRunRecord) -> CombatResult:
-    """Startet die nächste Welle."""
-    result = CombatResult()
-    if run.in_combat:
-        result.lines.append("Besiege zuerst den aktiven Zombie.")
-        return result
-    if not run.between_waves:
-        result.lines.append("Schließe zuerst die aktuelle Welle ab.")
-        return result
-    if run.wave >= run.max_waves:
-        result.lines.append("Alle Wellen abgeschlossen.")
-        return result
-
-    run.wave += 1
-    run.shop_available = 0
-    result.lines.append(f"**Welle {run.wave}/{run.max_waves}** beginnt!")
-    result.lines.extend(spawn_wave(run))
     return result

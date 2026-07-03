@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 import pytest_asyncio
 from discord import app_commands
+from discord.ext import tasks
 
 from config import Config
 from database.database import Database
@@ -30,6 +31,7 @@ COMMANDS_ADDED_SINCE_1_4: frozenset[str] = frozenset(
         "shop",
         "zombies start",
         "zombies status",
+        "zombies resume",
         "zombies profil",
         "zombies interface",
         "zombies leaderboard",
@@ -72,6 +74,7 @@ def _flatten_commands(tree: app_commands.CommandTree) -> set[str]:
 async def bot_commands(monkeypatch: pytest.MonkeyPatch, tmp_path) -> set[str]:
     """Lädt alle Cogs ohne Discord-Sync und gibt Command-Namen zurück."""
     monkeypatch.setattr(Config, "DATABASE_PATH", tmp_path / "test_bot.db")
+    monkeypatch.setattr(tasks.Loop, "start", lambda self: None)
     bot = DiscordBot()
     await bot.db.connect()
     await bot.db.initialize()
@@ -105,7 +108,7 @@ async def test_lootbox_commands_kept(bot_commands: set[str]) -> None:
 
 def test_slots_three_of_a_kind_pays_multiplier() -> None:
     result = resolve_spin(("7️⃣", "7️⃣", "7️⃣"), bet=10)
-    assert result.payout == 500
+    assert result.payout == 1000
     assert result.jackpot is True
 
 
@@ -139,11 +142,50 @@ async def db(tmp_path, monkeypatch):
 @pytest.mark.asyncio
 async def test_shop_buy_lootboxes_success(db: Database) -> None:
     await db.add_player_gold(1, 42, 500)
-    ok, embed, economy = await buy_lootboxes(db, 1, 42, count=2)
+    ok, embed, economy = await buy_lootboxes(db, 1, 42, count=1)
     assert ok is True
     assert economy is not None
-    assert economy.gold == 500 - Config.LOOTBOX_PRICE * 2
+    assert economy.gold == 500 - Config.LOOTBOX_PRICE
+    assert economy.lootbox_count == 1
+    assert embed.title is not None
+
+
+@pytest.mark.asyncio
+async def test_shop_buy_lootboxes_inventory_full(db: Database) -> None:
+    await db.add_player_gold(1, 42, 1000)
+    for _ in range(Config.LOOTBOX_INVENTORY_MAX):
+        ok, _, economy = await buy_lootboxes(db, 1, 42, count=1)
+        assert ok is True
+        assert economy is not None
+    ok2, embed, economy2 = await buy_lootboxes(db, 1, 42, count=1)
+    assert ok2 is False
+    assert economy2 is not None
+    assert economy2.lootbox_count == Config.LOOTBOX_INVENTORY_MAX
+    assert embed.title is not None
+
+
+@pytest.mark.asyncio
+async def test_shop_buy_lootboxes_bulk_success(db: Database) -> None:
+    await db.add_player_gold(1, 42, 500)
+    ok, embed, economy = await buy_lootboxes(db, 1, 42, count=3)
+    assert ok is True
+    assert economy is not None
+    assert economy.lootbox_count == 3
+    assert economy.gold == 500 - Config.LOOTBOX_PRICE * 3
+    assert embed.title is not None
+
+
+@pytest.mark.asyncio
+async def test_shop_buy_lootboxes_bulk_over_remaining(db: Database) -> None:
+    await db.add_player_gold(1, 42, 500)
+    ok, _, economy = await buy_lootboxes(db, 1, 42, count=2)
+    assert ok is True
+    assert economy is not None
     assert economy.lootbox_count == 2
+    ok2, embed, economy2 = await buy_lootboxes(db, 1, 42, count=2)
+    assert ok2 is False
+    assert economy2 is not None
+    assert economy2.lootbox_count == 2
     assert embed.title is not None
 
 
@@ -203,13 +245,13 @@ def test_zombies_melee_damages_or_kills() -> None:
     )
     spawn_wave(run)
     hp_before = run.current_zombie_hp
-    result = perform_melee(run, player_level=5, zombie_level=1, pet=None)
+    result = perform_melee(run, player_level=5, pet=None)
     assert run.current_zombie_hp <= hp_before or result.zombie_killed
 
 
 def test_zombies_player_hp_scales() -> None:
-    assert player_max_hp(1, 1) == Config.ZOMBIE_PLAYER_HP_BASE
-    assert player_max_hp(5, 3) > Config.ZOMBIE_PLAYER_HP_BASE
+    assert player_max_hp(1) == Config.ZOMBIE_PLAYER_HP_BASE
+    assert player_max_hp(5) > Config.ZOMBIE_PLAYER_HP_BASE
 
 
 # Live-Verbindungstest: scripts/smoke_bot.py (Bot muss separat laufen)

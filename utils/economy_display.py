@@ -26,4 +26,4 @@ def format_gold_line(economy: PlayerEconomyRecord) -> str:
 async def format_zombie_stat_line(db: Database, guild_id: int, user_id: int) -> str:
     """Kurzzeile Zombie-Survival für Profil-Embeds."""
     profile = await db.get_zombie_player(guild_id, user_id)
-    return f"Level **{profile.level}** · Welle **{profile.highest_wave}** · **{profile.total_kills}** Kills"
+    return f"Welle **{profile.highest_wave}** · **{profile.total_kills}** Kills"

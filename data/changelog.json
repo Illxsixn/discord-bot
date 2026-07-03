@@ -14,7 +14,53 @@
         "Fix: Wellenpause-Button, generische GIF-Namen",
         "Fix: Economy-Modell ohne Dungeon-Felder",
         "Fix: Abgelaufene Runs geben Trostbelohnung (auch beim Start)",
-        "Balance: Zombie-Kampf HP, Schaden & Wellenheilung"
+        "Balance: Zombie-Kampf HP, Schaden & Wellenheilung",
+        "Fix: Einheitliche Embed-Farbe (dunkel-lila) & Footer",
+        "Fix: Pet-/Changelog-Antworten nur für dich sichtbar",
+        "Pet-Embeds: lila Layout, 3er-Felder, Portrait-Thumbnail",
+        "Slots: höhere Trefferquote & Walzen-Anzeige-Fix",
+        "Lootbox: XP-Gewinn 1–80 (Spieler & Pet, je Zufall)",
+        "Embed-Nachrichten löschen sich nach 5 Min. (Ausnahmen)",
+        "Fix: /zombies start — ephemerale Run-Anzeige & Anhang-Konflikt",
+        "Pet-Aktion: Auswahlmenü Fokus/Glück/Power",
+        "Fix: parallele Spiele blockieren sich nicht mehr",
+        "Neu: /turnier_panel — Admin-UI mit Buttons",
+        "Turnier: Admin erstellt Teams & weist Spieler zu",
+        "Fix: Turnier-Antworten öffentlich im Kanal sichtbar",
+        "Fix: Turnier-Kanal — API-Fallback statt nur Cache",
+        "Turnier-Wizard: Schritt-für-Schritt-Admin-Panel",
+        "Neu: /turnier_team & Team-Interface-Buttons",
+        "Neu: /turnier_einladen (Captain lädt Spieler ein)",
+        "Lootbox: Trostpreis 5–12 Gold & 4–12 XP pro Box",
+        "Lootbox: max. 1 Box im Inventar",
+        "Fix: Lootbox-Kauf (economy vor Inventar-Check)",
+        "Turnier-Wizard: weniger Sub-Views, Slash für Details",
+        "Fix: Zombies Nahkampf — Embed-Update mit GIF-Anhang",
+        "Fix: Pet-Aktion-Menü verschwindet still nach Auswahl",
+        "Fix: Turnier-Kanal setzen (Berechtigungs-Check)",
+        "Fix: /emoji für alle Nutzer (nur Bot braucht Emojis verwalten)",
+        "Fix: /emoji — fehlender Cooldown-Config, WebP & Anhang-MIME",
+        "Fix: Zombies — Embed-Update via Run-Nachricht, kein TypeError",
+        "Fix: fehlende Config-Werte (Lootbox-Inventar, Trostpreis, Embeds)",
+        "Neu: /turnier_interface — Hub im Turnier-Kanal",
+        "Turnier-Hub bei Ankündigung & Bracket-Start automatisch",
+        "Fix: Zombies — nur ephemeral, kein Kanal-Fallback",
+        "Balance: Pet-Aktion Cooldown 3 Nahkampf-Angriffe",
+        "Zombies: Wellenpause entfernt, Wellen laufen direkt weiter",
+        "Fix: Zombie-Angriff aktualisiert nur die Run-Nachricht",
+        "Entfernt: Zombie-Survival-Level (kein Profil-XP/Level mehr)",
+        "Slots: Dreh-Button 3 s Cooldown statt Fehlermeldung",
+        "Slots: 2× Gewinn-Multiplikatoren, etwas höhere Trefferquote",
+        "Fix: Slots — Dreh-Button nach Cooldown wieder aktiv",
+        "Fix: Slots — Einsatzwechsel umgeht Cooldown nicht mehr",
+        "Fix: Zombie-XP löst kein öffentliches Level-Up aus",
+        "Neu: /zombies resume — Run nach Bot-Neustart",
+        "Zombie-Run-Embed: Nahkampf statt Level-Anzeige",
+        "Turnier-Interface persistent in DB",
+        "/emoji: 30 s Cooldown pro Nutzer",
+        "Fix: Zombie-Profil ohne Legacy-Level/XP-Spalten",
+        "Cleanup: toter Wellen-Code entfernt",
+        "Shop: max. 3 Lootboxen kaufen & gleichzeitig öffnen"
       ]
     },
     {
@@ -23,72 +69,6 @@
         "Neu: /slots — Gold-Slot-Maschine",
         "Einsatz-Buttons: 5, 10, 25, 50 Gold",
         "3× Symbole = Gewinn · 2× = 50 % zurück"
-      ]
-    },
-    {
-      "version": "1.4",
-      "changes": [
-        "Neu: /dungeon start & /dungeon status",
-        "Pet-Dungeons: GIFs, HP-Balken, freundliche Texte",
-        "Gold & Dungeon-HP in /levels level & /pet info",
-        "Balance: mehr Gold/Heilung, kürzerer Cooldown"
-      ]
-    },
-    {
-      "version": "1.3",
-      "changes": [
-        "Neu: /lootbox shop, buy, open, leaderboard",
-        "Gold-Währung pro Server (Spielsiege)",
-        "Lootbox: 5–30 % Chance auf 50 Spieler- & Pet-XP",
-        "Lootbox-Preis: 75 Gold"
-      ]
-    },
-    {
-      "version": "1.2",
-      "changes": [
-        "Neu: Turnier-System mit Match-Buttons",
-        "Neu: /turnier_erstellen, Teams, Map-Pool, Bracket",
-        "Match-Ablauf: Sieg melden, bestätigen, Einspruch",
-        "Automatische nächste Runde & Turniersieger-Embed",
-        "Fix: /pet play nur für dich sichtbar",
-        "Fix: /giveaway Kanal-Berechtigungen & Auslosung",
-        "Fix: Message.edit ohne ungültiges files-Argument"
-      ]
-    },
-    {
-      "version": "1.1",
-      "changes": [
-        "Neu: /changelog",
-        "Neu: /pet dex",
-        "Pet-Dex: 30 Arten, ✅ gefunden / ❓ unbekannt",
-        "Evolutions-Skins: 🌱 ✨ 👑 + Embed-Farben",
-        "Pet-Embeds übersichtlicher (info, ei, play, …)",
-        "Pet-Quests variabel: Play, Info, Aktivität",
-        "2 Pet-Tagesaufgaben pro Tag",
-        "Tagesaufgaben: Level-XP & Pet getrennt (4 gesamt)",
-        "Tagesaufgaben-Embed kompakter",
-        "Seltenheits-XP-Bonus: +2 % bis +10 %",
-        "Bonus gilt für Spieler- & Pet-XP",
-        "15 neue Pet-Arten",
-        "Epic/Legendary-Drop erhöht",
-        "Pet-Play-XP: 8–14 Basis + 3 pro Treffer",
-        "Fix: /changelog öffentlich sichtbar",
-        "Help-Kategorie Allgemein"
-      ]
-    },
-    {
-      "version": "1.0",
-      "changes": [
-        "Pet-System: /pet ei, info, play, display, …",
-        "/pets Sammlung & aktives Pet wechseln",
-        "15 Pet-Arten, Seltenheit, Evolution Lv. 10/25/50",
-        "KI-Portraits (/pet display, Agnes)",
-        "Level-System & /daily-challenges",
-        "Spiele: Zahlenraten, Tic-Tac-Toe, Connect 4",
-        "Moderation, AutoMod, Logs",
-        "Welcome, Leave, Tickets, Umfragen",
-        "Giveaways & Reaktionsrollen",
-        "/help mit Kategorien"
       ]
     }
   ]

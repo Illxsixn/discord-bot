@@ -7,6 +7,8 @@ sodass alle Cogs konsistente Nachrichten anzeigen.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -101,14 +103,28 @@ def _footer(*, prefix: str | None = None) -> str:
     return f"{Config.BOT_BRAND_NAME} • {now}"
 
 
-def apply_brand_footer(embed: discord.Embed, *, prefix: str | None = None) -> discord.Embed:
-    """Setzt einheitliche Footer-Signatur inkl. Marken-Icon."""
+def apply_brand_footer(
+    embed: discord.Embed,
+    *,
+    prefix: str | None = None,
+    with_icon: bool = True,
+) -> discord.Embed:
+    """Setzt einheitliche Footer-Signatur, optional mit Marken-Icon."""
     text = _footer(prefix=prefix)
-    if brand_icon_file() is not None:
+    if with_icon and brand_icon_file() is not None:
         embed.set_footer(text=text, icon_url=f"attachment://{BRAND_ICON_ATTACHMENT}")
     else:
         embed.set_footer(text=text)
     return embed
+
+
+def _embed_uses_attachment_image(embed: discord.Embed) -> bool:
+    """True wenn das Embed-Bild aus einem Anhang kommt."""
+    return bool(
+        embed.image
+        and embed.image.url
+        and embed.image.url.startswith("attachment://")
+    )
 
 
 def _collect_embeds(kwargs: dict[str, Any]) -> list[discord.Embed]:
@@ -136,6 +152,18 @@ def inject_brand_into_send_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
         files.append(single_file)
         kwargs["files"] = files
 
+    uses_attachment_image = any(_embed_uses_attachment_image(embed) for embed in embeds)
+    if uses_attachment_image:
+        for embed in embeds:
+            footer = embed.footer
+            if footer.text and Config.BOT_BRAND_NAME in footer.text:
+                continue
+            if footer.text:
+                apply_brand_footer(embed, prefix=footer.text, with_icon=False)
+            else:
+                apply_brand_footer(embed, with_icon=False)
+        return kwargs
+
     icon = brand_icon_file()
     if icon is None:
         return kwargs
@@ -162,6 +190,33 @@ def inject_brand_into_send_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
             )
 
     return kwargs
+
+
+def _pop_embed_send_flags(kwargs: dict[str, Any]) -> bool:
+    """
+    Entfernt Bot-interne Send-Flags und gibt zurück, ob Auto-Löschung geplant werden soll.
+    """
+    persistent = bool(kwargs.pop("embed_persistent", False))
+    kwargs.pop("embed_no_autodelete", None)
+    if persistent or Config.EMBED_AUTO_DELETE_SECONDS <= 0:
+        return False
+    if kwargs.get("ephemeral"):
+        return False
+    return bool(_collect_embeds(kwargs))
+
+
+def schedule_embed_message_delete(message: discord.Message) -> None:
+    """Löscht eine Embed-Nachricht nach der konfigurierten Wartezeit."""
+    delay = Config.EMBED_AUTO_DELETE_SECONDS
+
+    async def _worker() -> None:
+        await asyncio.sleep(delay)
+        try:
+            await message.delete()
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
+
+    asyncio.create_task(_worker())
 
 
 def inject_brand_into_edit_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -202,8 +257,12 @@ def install_brand_send_hooks() -> None:
 
     def _wrap_send(method: Any) -> Any:
         async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            schedule_delete = _pop_embed_send_flags(kwargs)
             kwargs = inject_brand_into_send_kwargs(kwargs)
-            return await method(self, *args, **kwargs)
+            message = await method(self, *args, **kwargs)
+            if schedule_delete and isinstance(message, discord.Message):
+                schedule_embed_message_delete(message)
+            return message
 
         return wrapper
 
@@ -220,6 +279,44 @@ def install_brand_send_hooks() -> None:
     )
     webhook_async.Webhook.send = _wrap_send(webhook_async.Webhook.send)
     discord.Message.edit = _wrap_edit(discord.Message.edit)
+
+
+def artwork_embed(
+    title: str,
+    description: str | None = None,
+    *,
+    fields: list[tuple[str, str, bool]] | None = None,
+    thumbnail: str | None = None,
+    image: str | None = None,
+) -> discord.Embed:
+    """
+    Erstellt ein neutrales Inhalts-Embed in der Markenfarbe (dunkel-lila).
+
+    Args:
+        title: Überschrift des Embeds.
+        description: Optionaler Beschreibungstext.
+        fields: Optionale Felder.
+        thumbnail: Optionale Thumbnail-URL.
+        image: Optionale Bild-URL.
+
+    Returns:
+        Fertiges discord.Embed-Objekt.
+    """
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=Config.COLOR_ARTWORK,
+        timestamp=datetime.now(timezone.utc),
+    )
+    if fields:
+        for name, value, inline in fields:
+            embed.add_field(name=name, value=value, inline=inline)
+    if thumbnail:
+        embed.set_thumbnail(url=thumbnail)
+    if image:
+        embed.set_image(url=image)
+    apply_brand_footer(embed)
+    return embed
 
 
 def success_embed(
@@ -321,33 +418,17 @@ def info_embed(
     image: str | None = None,
 ) -> discord.Embed:
     """
-    Erstellt ein blaues Informations-Embed.
+    Erstellt ein Informations-Embed in der Markenfarbe (dunkel-lila).
 
-    Args:
-        title: Überschrift des Embeds.
-        description: Optionaler Beschreibungstext.
-        fields: Optionale Felder.
-        thumbnail: Optionale Thumbnail-URL.
-        image: Optionale Bild-URL.
-
-    Returns:
-        Fertiges discord.Embed-Objekt.
+    Layout wie ``artwork_embed``: Titel, Beschreibung, optionale Felder (gern inline).
     """
-    embed = discord.Embed(
-        title=f"ℹ️ {title}",
-        description=description,
-        color=Config.COLOR_INFO,
-        timestamp=datetime.now(timezone.utc),
+    return artwork_embed(
+        f"ℹ️ {title}",
+        description,
+        fields=fields,
+        thumbnail=thumbnail,
+        image=image,
     )
-    if fields:
-        for name, value, inline in fields:
-            embed.add_field(name=name, value=value, inline=inline)
-    if thumbnail:
-        embed.set_thumbnail(url=thumbnail)
-    if image:
-        embed.set_image(url=image)
-    apply_brand_footer(embed)
-    return embed
 
 
 def warn_embed(
@@ -417,7 +498,7 @@ def moderation_embed(
     """
     embed = discord.Embed(
         title=f"🔨 {action}",
-        color=color or Config.COLOR_INFO,
+        color=color or Config.COLOR_ARTWORK,
         timestamp=datetime.now(timezone.utc),
     )
     embed.add_field(
@@ -458,7 +539,7 @@ def log_event_embed(
     embed = discord.Embed(
         title=f"📋 {event_name}",
         description=description,
-        color=color or Config.COLOR_INFO,
+        color=color or Config.COLOR_ARTWORK,
         timestamp=datetime.now(timezone.utc),
     )
     if fields:

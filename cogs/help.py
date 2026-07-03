@@ -56,6 +56,10 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
         "commands": [
             ("/help", "Alle Befehle nach Kategorie"),
             ("/changelog", "Bot-Updates und Versionshistorie"),
+            ("/emoji", "Server-Emoji hinzufügen (kopieren oder Bild hochladen)"),
+        ],
+        "hints": [
+            "Bot braucht **Emojis verwalten** · Cooldown **30 s** pro Nutzer",
         ],
     },
     HelpCategory.Moderation.value: {
@@ -77,7 +81,6 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             ("/nickname", "Ändert den Nickname eines Mitglieds"),
             ("/mute", "Mutet ein Mitglied"),
             ("/unmute", "Hebt einen Mute auf"),
-            ("/emoji", "Fügt Server-Emoji hinzu (kopieren oder Bild hochladen)"),
         ],
     },
     HelpCategory.Welcome.value: {
@@ -196,7 +199,7 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
         "hints": [
             f"Gewinner erhalten **{Config.GAME_WIN_XP} XP** (wenn Level-System aktiv ist)",
             f"Gewinner erhalten **{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX} Gold**",
-            f"`/slots` — Einsatz **{', '.join(str(b) for b in Config.SLOT_BET_OPTIONS)}** Gold",
+            f"`/slots` — Einsatz **{', '.join(str(b) for b in Config.SLOT_BET_OPTIONS)}** Gold · Dreh-Button 3 s Cooldown",
             f"`/guess` hat einen Cooldown von **{Config.GUESS_COOLDOWN // 60} Minuten**",
         ],
     },
@@ -209,9 +212,11 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             ("/lootbox leaderboard", "Gold-Rangliste des Servers"),
         ],
         "hints": [
-            f"Kaufen nur im **`/shop`** (**{Config.LOOTBOX_PRICE} Gold** pro Box)",
-            f"Jackpot: **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** Chance auf "
-            f"**{Config.LOOTBOX_XP_REWARD}** Spieler-XP **+** **{Config.LOOTBOX_XP_REWARD}** Pet-XP",
+            f"Kaufen nur im **`/shop`** (**{Config.LOOTBOX_PRICE} Gold**, max. **{Config.LOOTBOX_INVENTORY_MAX}** Boxen)",
+            f"Trostpreis pro Box: **{Config.LOOTBOX_CONSOLATION_GOLD_MIN}–{Config.LOOTBOX_CONSOLATION_GOLD_MAX}** Gold · "
+            f"**{Config.LOOTBOX_CONSOLATION_XP_MIN}–{Config.LOOTBOX_CONSOLATION_XP_MAX}** Spieler-XP **+** Pet-XP",
+            f"Jackpot: **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** extra "
+            f"**{Config.LOOTBOX_XP_MIN}–{Config.LOOTBOX_XP_MAX}** XP",
             f"Gold durch Spielsiege (**{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}**)",
             "Pet-XP nur mit aktivem Pet; Spieler-XP wenn Level-System aktiv ist",
         ],
@@ -224,8 +229,11 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             ("/shop", "Lootboxen & kaufbare Produkte anzeigen und kaufen"),
         ],
         "hints": [
-            f"Lootbox: **{Config.LOOTBOX_PRICE} Gold** · "
-            f"Jackpot **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %**",
+            f"Lootbox: **{Config.LOOTBOX_PRICE} Gold** · max. **{Config.LOOTBOX_INVENTORY_MAX}** im Inventar",
+            f"Trostpreis **{Config.LOOTBOX_CONSOLATION_GOLD_MIN}–{Config.LOOTBOX_CONSOLATION_GOLD_MAX}** Gold · "
+            f"XP **{Config.LOOTBOX_CONSOLATION_XP_MIN}–{Config.LOOTBOX_CONSOLATION_XP_MAX}**",
+            f"Jackpot **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** · "
+            f"Bonus-XP **{Config.LOOTBOX_XP_MIN}–{Config.LOOTBOX_XP_MAX}**",
             "Öffnen weiterhin mit `/lootbox open`",
             "Zombie-Perks — **Coming soon**",
         ],
@@ -236,18 +244,23 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
         "access": "Alle",
         "commands": [
             ("/zombies start", "Neuen Zombie-Run starten (3 Wellen)"),
-            ("/zombies status", "Aktiven Run wiederherstellen"),
+            ("/zombies status", "Aktiven Run oder Kurzprofil anzeigen"),
+            ("/zombies resume", "Aktiven Run nach Bot-Neustart wiederherstellen"),
             ("/zombies profil", "Zombie-Profil, Kills & Gold"),
             ("/zombies interface", "Steuerzentrale mit Buttons"),
-            ("/zombies leaderboard", "Rangliste Kills, Boss, Level, Gold"),
+            ("/zombies leaderboard", "Rangliste Kills, Boss & Gold"),
             ("/zombies help", "Kurze Modus-Erklärung"),
         ],
         "hints": [
-            f"**{Config.ZOMBIE_MAX_WAVES} Wellen** — Nahkampf & Pet-Aktion",
+            "Alle Antworten nur für dich sichtbar (ephemeral)",
+            "Nach Bot-Neustart: **`/zombies resume`** oder **`/zombies status`**",
+            f"**{Config.ZOMBIE_MAX_WAVES} Wellen** — Nahkampf & Pet-Aktion (Fokus/Glück/Power)",
             "Kein Abbrechen — Run endet durch Sieg, Niederlage oder 12h Inaktivität",
             f"Cooldown nach Run: **{Config.ZOMBIE_RUN_COOLDOWN // 60} Min.**",
             f"**+{Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT} %** HP nach jeder geschafften Welle",
-            "Lootboxen & Produkte nur unter **`/shop`**",
+            "Keine Wellenpause — nächste Welle startet automatisch",
+            "Lootboxen & Produkte jederzeit unter **`/shop`**",
+            f"Pet-Aktion: Cooldown **{Config.ZOMBIE_PET_ACTION_COOLDOWN}** Nahkampf-Angriffe",
             "Pet optional — ohne Pet ist Pet-Aktion deaktiviert",
         ],
     },
@@ -326,7 +339,10 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
         "emoji": "🏆",
         "access": "Alle / Administratoren",
         "commands": [
-            ("/turnier_erstellen", "Neues Turnier anlegen (Admin)"),
+            ("/turnier_panel", "Admin-Wizard: Kanal → Turnier → Maps → Teams → Bracket"),
+            ("/turnier_kanal_setzen", "Turnier-Kanal festlegen (Admin)"),
+            ("/turnier_interface", "Turnier-Hub im Turnier-Kanal posten (Admin)"),
+            ("/turnier_erstellen", "Neues Turnier anlegen (Admin, Slash)"),
             ("/turnier_status setzen", "Status offen/geschlossen/beendet (Admin)"),
             ("/turnier_loeschen", "Turnier löschen ohne Bracket (Admin)"),
             ("/turnier_liste", "Alle Turniere auflisten"),
@@ -335,7 +351,9 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             ("/turnier_maps_entfernen", "Map aus Pool entfernen (Admin)"),
             ("/turnier_maps_anzeigen", "Map-Pool anzeigen"),
             ("/turnier_maps_neu_verteilen", "Maps auf Matches verteilen (Admin)"),
-            ("/turnier_team_erstellen", "Team gründen (Captain)"),
+            ("/turnier_team", "Team gründen + Interface (Captain, empfohlen)"),
+            ("/turnier_einladen", "Spieler ins Team einladen (Captain)"),
+            ("/turnier_team_erstellen", "Team gründen per Slash (Captain)"),
             ("/turnier_team_beitreten", "Bestehendem Team beitreten"),
             ("/turnier_anmelden", "Team offiziell anmelden (Captain)"),
             ("/turnier_team_zuweisen", "User zu Team hinzufügen (Admin)"),
@@ -343,11 +361,15 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             ("/turnier_baum_erstellen", "Runde 1 generieren (Admin)"),
             ("/turnier_baum_anzeigen", "Bracket-Übersicht"),
             ("/turnier_abbrechen", "Turnier zurücksetzen (Admin)"),
-            ("/turnier_kanal_setzen", "Kanal für Match-Embeds (Admin)"),
             ("/turnier_match_info", "Details zu einem Match"),
         ],
         "hints": [
-            "Ablauf: Turnier erstellen → Teams anmelden → Status schließen → Bracket erstellen",
+            "Turnier-Antworten erscheinen öffentlich im Kanal (nicht nur für dich)",
+            "Admins: `/turnier_panel` — Schritt-für-Schritt-Wizard mit Fortschrittsanzeige",
+            "Turnier-Hub erscheint im Turnier-Kanal bei Ankündigung & Bracket-Start",
+            "Spieler: `/turnier_team` → Interface mit Anmelden, Status & Einladen",
+            "Ablauf: Kanal setzen → Turnier → Maps → Teams → Schließen → Bracket",
+            "Detail-Aktionen auch per Slash (siehe Befehlsliste)",
             "Matches laufen per Buttons im Turnier-Kanal (Sieg melden, bestätigen, Einspruch)",
             "Admins entscheiden bei Einspruch; nächste Runde startet automatisch",
         ],

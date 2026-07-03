@@ -8,7 +8,7 @@ import discord
 
 from config import Config
 from database.models import PlayerEconomyRecord
-from utils.embeds import info_embed
+from utils.embeds import info_embed, spaced_lines
 
 
 def build_shop_embed(economy: PlayerEconomyRecord) -> discord.Embed:
@@ -22,8 +22,15 @@ def build_shop_embed(economy: PlayerEconomyRecord) -> discord.Embed:
             ("Preis", f"**{Config.LOOTBOX_PRICE}** Gold pro Box", True),
             (
                 "📦 Lootbox",
-                f"Jackpot: **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** Chance\n"
-                f"Gewinn: **{Config.LOOTBOX_XP_REWARD}** Spieler-XP **+** **{Config.LOOTBOX_XP_REWARD}** Pet-XP",
+                spaced_lines(
+                    f"Max. **{Config.LOOTBOX_INVENTORY_MAX}** Boxen im Inventar · "
+                    f"**{Config.LOOTBOX_PRICE}** Gold",
+                    f"Trostpreis: **{Config.LOOTBOX_CONSOLATION_GOLD_MIN}–{Config.LOOTBOX_CONSOLATION_GOLD_MAX}** Gold · "
+                    f"**{Config.LOOTBOX_CONSOLATION_XP_MIN}–{Config.LOOTBOX_CONSOLATION_XP_MAX}** Spieler-XP "
+                    f"**+** Pet-XP (je Zufall)",
+                    f"Jackpot: **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** · "
+                    f"extra **{Config.LOOTBOX_XP_MIN}–{Config.LOOTBOX_XP_MAX}** XP",
+                ),
                 False,
             ),
             (

@@ -49,7 +49,7 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
 
     @app_commands.command(name="open", description="Öffnet Lootboxen aus deinem Inventar")
     @app_commands.guild_only()
-    @app_commands.describe(anzahl="Anzahl zu öffnender Lootboxen (1–10)")
+    @app_commands.describe(anzahl=f"Anzahl zu öffnender Lootboxen (1–{Config.LOOTBOX_BATCH_MAX})")
     async def open_boxes(
         self,
         interaction: discord.Interaction,
@@ -84,37 +84,34 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
 
         for i in range(count):
             roll = roll_lootbox()
-            if roll.won_xp:
-                player_ok, pet_ok = await apply_lootbox_roll(
-                    self.bot,
-                    interaction.user,
-                    roll,
-                    channel=channel,
-                )
+            applied = await apply_lootbox_roll(
+                self.bot,
+                interaction.user,
+                roll,
+                channel=channel,
+            )
+            line = (
+                f"📦 **{i + 1}:** **{applied.gold}** 🪙 · "
+                f"**{applied.player_xp}** Spieler-XP · **{applied.pet_xp}** Pet-XP"
+            )
+            if roll.won_jackpot:
                 wins += 1
-                parts: list[str] = []
-                if player_ok:
-                    parts.append(f"**{roll.player_xp}** Spieler-XP")
-                if pet_ok:
-                    parts.append(f"**{roll.pet_xp}** Pet-XP")
-                if not parts:
-                    parts.append("Jackpot — XP-Systeme nicht verfügbar")
-                lines.append(f"📦 **{i + 1}:** 🎉 **{', '.join(parts)}** ({roll.chance_percent} % Chance)")
-            else:
-                lines.append(f"📦 **{i + 1}:** Kein Jackpot ({roll.chance_percent} % Chance)")
+                line += (
+                    f"\n   🎉 **Jackpot:** +**{applied.jackpot_player_xp}** Spieler-XP · "
+                    f"+**{applied.jackpot_pet_xp}** Pet-XP ({roll.jackpot_chance_percent} % Chance)"
+                )
+            lines.append(line)
 
         economy.lootbox_count -= count
         await self.db.save_player_economy(economy)
 
         summary = (
-            f"**{count}** Lootbox(en) geöffnet · **{wins}** Jackpot(s)\n"
-            f"Verbleibend: **{economy.lootbox_count}** 📦"
+            f"**{count}** Lootbox(en) geöffnet"
+            + (f" · **{wins}** Jackpot(s)" if wins else "")
+            + f"\nVerbleibend: **{economy.lootbox_count}** 📦"
         )
         body = summary + "\n\n" + "\n".join(lines)
-        if wins:
-            embed = success_embed("Lootbox geöffnet", body)
-        else:
-            embed = info_embed("Lootbox geöffnet", body)
+        embed = success_embed("Lootbox geöffnet", body) if wins else info_embed("Lootbox geöffnet", body)
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 

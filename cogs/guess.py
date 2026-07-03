@@ -82,7 +82,7 @@ class GuessCog(commands.Cog):
 
         channel_id = interaction.channel.id
 
-        async with game_lock(channel_id):
+        async with game_lock("guess", channel_id):
             if await self.db.get_guess_game(channel_id) is not None:
                 await interaction.followup.send(
                     embed=error_embed(
@@ -103,6 +103,7 @@ class GuessCog(commands.Cog):
                 f"{interaction.user.mention} hat ein neues Spiel gestartet!\n\n"
                 f"Rate eine Zahl zwischen **{Config.GUESS_MIN}** und **{Config.GUESS_MAX}** mit `/guess`.",
             ),
+            embed_persistent=True,
         )
 
     @app_commands.command(
@@ -138,7 +139,7 @@ class GuessCog(commands.Cog):
         target_number: int | None = None
         attempts = 0
 
-        async with game_lock(channel_id):
+        async with game_lock("guess", channel_id):
             game = await self.db.get_guess_game(channel_id)
             if game is None:
                 await interaction.followup.send(
@@ -208,6 +209,7 @@ class GuessCog(commands.Cog):
                     f"{interaction.user.mention} hat das Zahlenraten gewonnen "
                     f"(Zahl **{target_number}**, **{attempts}** Versuche).",
                 ),
+                embed_persistent=True,
             )
 
     def _format_stats_line(self, guild: discord.Guild, stats: GuessStatsRecord, *, suffix: str) -> str:

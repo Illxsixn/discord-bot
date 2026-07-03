@@ -1,5 +1,8 @@
 """
 Gemeinsame asyncio-Locks für Spielzüge (Race-Condition-Schutz).
+
+Locks sind nach Scope getrennt (z. B. zombie vs. guess), damit parallele
+Spiele sich nicht gegenseitig blockieren.
 """
 
 from __future__ import annotations
@@ -7,9 +10,9 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 
-_locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
+_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
 
-def game_lock(game_id: int) -> asyncio.Lock:
-    """Gibt eine Lock-Instanz pro Spiel-ID zurück."""
-    return _locks[game_id]
+def game_lock(scope: str, game_id: int) -> asyncio.Lock:
+    """Gibt eine Lock-Instanz pro Scope und Spiel-ID zurück."""
+    return _locks[f"{scope}:{game_id}"]

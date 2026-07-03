@@ -1,5 +1,8 @@
 """
 Einheitliche, übersichtliche Embeds für das Pet-System.
+
+Layout: Titel · Beschreibung (Absätze) · Inline-Felder (3er-Reihen) · Marken-Footer.
+Farbe: durchgehend dunkel-lila (COLOR_ARTWORK).
 """
 
 from __future__ import annotations
@@ -33,34 +36,48 @@ RARITY_ORDER: tuple[PetRarity, ...] = (
 )
 
 
-def pet_embed_color(evolution_stage: str) -> int:
-    """Embed-Farbe passend zur Evolutionsstufe."""
-    colors = {
-        PetEvolutionStage.BABY.value: Config.COLOR_INFO,
-        PetEvolutionStage.TEEN.value: 0x57F287,
-        PetEvolutionStage.ADULT.value: 0xFEE75C,
-        PetEvolutionStage.LEGENDARY.value: 0xEB459E,
-    }
-    return colors.get(evolution_stage, Config.COLOR_INFO)
+def pet_embed_color(_evolution_stage: str | None = None) -> int:
+    """Einheitliche Embed-Farbe für Pet-Inhalte (dunkel-lila)."""
+    return Config.COLOR_ARTWORK
+
+
+def apply_pet_image_layout(
+    embed: discord.Embed,
+    *,
+    attachment_filename: str,
+) -> discord.Embed:
+    """
+    Großes Pet-Bild unten, dasselbe Pet klein oben rechts (Thumbnail).
+
+    Nutzen, wenn ein Pet-Portrait als Anhang mitgesendet wird.
+    """
+    url = f"attachment://{attachment_filename}"
+    embed.set_image(url=url)
+    embed.set_thumbnail(url=url)
+    return embed
 
 
 def _pet_embed(
     title: str,
     *,
     description: str | None = None,
-    evolution_stage: str = PetEvolutionStage.BABY.value,
     fields: list[tuple[str, str, bool]] | None = None,
-    color: int | None = None,
+    thumbnail: str | None = None,
+    image: str | None = None,
 ) -> discord.Embed:
     embed = discord.Embed(
         title=title,
         description=description,
-        color=color or pet_embed_color(evolution_stage),
+        color=Config.COLOR_ARTWORK,
         timestamp=datetime.now(timezone.utc),
     )
     if fields:
         for name, value, inline in fields:
             embed.add_field(name=name, value=value, inline=inline)
+    if thumbnail:
+        embed.set_thumbnail(url=thumbnail)
+    if image:
+        embed.set_image(url=image)
     apply_brand_footer(embed)
     return embed
 
@@ -68,9 +85,6 @@ def _pet_embed(
 def build_pet_info_embed(
     pet: PetRecord,
     member: discord.Member,
-    *,
-    gold: int | None = None,
-    survival_stat: str | None = None,
 ) -> discord.Embed:
     """Übersichtliches Profil des aktiven Pets."""
     species = get_species_by_name(pet.species)
@@ -79,61 +93,25 @@ def build_pet_info_embed(
     rarity = rarity_display(species.rarity) if species else "—"
     xp_bonus = pet_xp_boost_label(pet.species) if species else "—"
 
-    overview_lines = [
-        f"Level **{pet.level}** · **{pet.xp:,}** XP",
-        f"`{current:,}` / `{needed:,}` XP (**{percent} %**)",
-    ]
-    if gold is not None:
-        overview_lines.append(f"**Gold:** {gold:,} 🪙")
-    if survival_stat is not None:
-        overview_lines.append(f"**Zombie Survival:** {survival_stat}")
-
-    return _pet_embed(
-        f"{emoji} {pet.name}",
-        description=spaced_lines(
-            f"**{evolution_display(pet.evolution_stage)}**",
-            f"Besitzer: {member.mention}",
-        ),
-        evolution_stage=pet.evolution_stage,
-        fields=[
-            (
-                "📊 Fortschritt",
-                spaced_lines(*overview_lines),
-                False,
-            ),
-            (
-                "🧬 Profil",
-                spaced_lines(
-                    f"**Art:** {pet.species}",
-                    f"**Seltenheit:** {rarity}",
-                    f"**XP-Bonus:** {xp_bonus}",
-                ),
-                False,
-            ),
-            (
-                "⚡ Impuls",
-                mood_display(pet.mood),
-                False,
-            ),
-            (
-                "🎭 Charakter",
-                spaced_lines(
-                    f"**Persönlichkeit:** {pet.personality}",
-                    f"**Lieblingsaktivität:** {pet.favorite_activity}",
-                ),
-                False,
-            ),
-            ("💬 Catchphrase", f"*{pet.catchphrase}*", False),
-            (
-                "📅 Meta",
-                spaced_lines(
-                    f"**Geburtstag:** {pet_birthday(pet.adoption_date)}",
-                    f"**Interaktionen:** {pet.total_interactions:,}",
-                ),
-                False,
-            ),
-        ],
+    description = spaced_lines(
+        f"**{evolution_display(pet.evolution_stage)}** — dein aktiver Begleiter.",
+        f"Besitzer: {member.mention}",
+        f"*{pet.catchphrase}*",
     )
+
+    fields: list[tuple[str, str, bool]] = [
+        ("Level", f"**{pet.level}**", True),
+        ("XP gesamt", f"**{pet.xp:,}**", True),
+        ("Fortschritt", f"**{percent} %**\n`{current:,}` / `{needed:,}`", True),
+        ("Art", pet.species, True),
+        ("Seltenheit", rarity, True),
+        ("XP-Bonus", xp_bonus, True),
+        ("Impuls", mood_display(pet.mood), True),
+        ("Geburtstag", pet_birthday(pet.adoption_date), True),
+        ("Interaktionen", f"**{pet.total_interactions:,}**", True),
+    ]
+
+    return _pet_embed(f"{emoji} {pet.name}", description=description, fields=fields)
 
 
 def build_pet_duplicate_embed(
@@ -146,15 +124,16 @@ def build_pet_duplicate_embed(
     """Embed wenn ein bereits besessenes Pet gezogen wurde."""
     emoji = species_display_emoji(species, PetEvolutionStage.BABY.value)
     return _pet_embed(
-        f"🔄 {emoji} Duplikat — {species.name}",
+        f"🔄 Duplikat — {emoji} {species.name}",
         description=spaced_lines(
             f"{member.mention}, du hast **{species.name}** bereits in deiner Sammlung!",
-            "Statt eines zweiten Exemplars erhältst du:",
-            f"🐾 **+{pet_xp} Pet-XP** (dein {species.name})\n"
-            f"📈 **+{player_xp} Spieler-XP**",
+            "Statt eines zweiten Exemplars erhältst du Ersatz-XP:",
         ),
-        evolution_stage=PetEvolutionStage.BABY.value,
-        color=Config.COLOR_WARNING,
+        fields=[
+            ("Pet-XP", f"**+{pet_xp}** 🐾", True),
+            ("Spieler-XP", f"**+{player_xp}** 📈", True),
+            ("Seltenheit", rarity_display(species.rarity), True),
+        ],
     )
 
 
@@ -173,40 +152,47 @@ def build_pet_hatch_embed(
     status = "⭐ Aktives Pet" if pet.is_active else "📦 In Sammlung"
 
     return _pet_embed(
-        f"🐣 {emoji} {pet.name}",
+        f"🐣 Neues Pet — {emoji} {pet.name}",
         description=spaced_lines(
             f"{member.mention} hat ein neues Pet adoptiert!",
             f"**{species.name}** · {rarity_display(species.rarity)}",
-            f"{personality} · {mood_display(mood)} · {favorite}",
             f"*{catchphrase}*",
         ),
-        evolution_stage=pet.evolution_stage,
         fields=[
-            ("Status", status, False),
-            ("Evolution", evolution_display(pet.evolution_stage), False),
+            ("Status", status, True),
+            ("Evolution", evolution_display(pet.evolution_stage), True),
+            ("Impuls", mood_display(mood), True),
+            ("Level", f"**{pet.level}**", True),
         ],
-        color=Config.COLOR_SUCCESS,
     )
 
 
 def build_pet_collection_embed(owner_name: str, pets: list[PetRecord]) -> discord.Embed:
     """Sammlungsübersicht mit kompakten Einträgen."""
+    active = next((pet for pet in pets if pet.is_active), None)
+    active_line = "—"
+    if active is not None:
+        species = get_species_by_name(active.species)
+        emoji = species_display_emoji(species, active.evolution_stage)
+        active_line = f"{emoji} **{active.name}** · Lv. **{active.level}**"
+
     lines: list[str] = []
     for pet in pets:
         species = get_species_by_name(pet.species)
         emoji = species_display_emoji(species, pet.evolution_stage)
-        active = "⭐ " if pet.is_active else ""
+        star = "⭐ " if pet.is_active else ""
         rarity = rarity_display(species.rarity) if species else "—"
         lines.append(
-            spaced_lines(
-                f"{active}{emoji} **{pet.name}**",
-                f"Lv. **{pet.level}** · {evolution_display(pet.evolution_stage)} · {rarity}",
-            )
+            f"{star}{emoji} **{pet.name}** · Lv. **{pet.level}** · {rarity}"
         )
 
     return _pet_embed(
         f"🐾 Sammlung · {owner_name}",
-        description=f"**{len(pets)}** Pets · ⭐ = aktiv\n\n" + "\n\n".join(lines),
+        description=spaced_lines(
+            f"**{len(pets)}** Pets gesammelt · ⭐ = aktiv",
+            f"Aktives Pet: {active_line}",
+        ),
+        fields=split_embed_fields("Alle Pets", lines, joiner="\n"),
     )
 
 
@@ -221,7 +207,12 @@ def build_pet_dex_embed(discovered_names: set[str], *, owner_name: str | None = 
     total = len(PET_SPECIES)
     found = sum(1 for species in PET_SPECIES if species.name in discovered_names)
 
-    fields: list[tuple[str, str, bool]] = []
+    fields: list[tuple[str, str, bool]] = [
+        ("Entdeckt", f"**{found}** / **{total}**", True),
+        ("Gefunden", "✅ bekannt", True),
+        ("Unbekannt", "❓ ???", True),
+    ]
+
     for rarity in RARITY_ORDER:
         species_list = [species for species in PET_SPECIES if species.rarity == rarity]
         if not species_list:
@@ -240,11 +231,14 @@ def build_pet_dex_embed(discovered_names: set[str], *, owner_name: str | None = 
         )
 
     title = f"📖 Pet-Dex · {owner_name}" if owner_name else "📖 Pet-Dex"
-    owner_line = f"Sammlung von **{owner_name}**\n" if owner_name else ""
+    owner_line = f"Sammlung von **{owner_name}**" if owner_name else "Alle Pet-Arten im Überblick"
 
     return _pet_embed(
         title,
-        description=f"{owner_line}Entdeckt: **{found}/{total}** Arten\n✅ gefunden · ❓ noch unbekannt",
+        description=spaced_lines(
+            owner_line,
+            "Entdecke alle Arten — gefundene Pets erscheinen mit Namen.",
+        ),
         fields=fields,
     )
 
@@ -258,7 +252,10 @@ def build_pet_leaderboard_embed(
     """Server-Rangliste."""
     return _pet_embed(
         f"🏆 Pet-Rangliste · {guild_name}",
-        description=f"Sortierung: **{sort_label}**",
+        description=spaced_lines(
+            f"Sortierung: **{sort_label}**",
+            "Die stärksten Begleiter auf diesem Server.",
+        ),
         fields=split_embed_fields("Top Pets", lines) if lines else [("Top Pets", "—", False)],
     )
 
@@ -283,6 +280,8 @@ def build_pet_play_embed(
     """Embed für das Impuls-Minispiel (/pet play)."""
     emoji = species_display_emoji(species, pet.evolution_stage)
     bar = _impulse_score_bar(score, total_rounds)
+    rarity = rarity_display(species.rarity) if species else "—"
+
     description_parts = [
         f"*{pet.catchphrase}*",
         f"{bar} · Runde **{round_num}/{total_rounds}**",
@@ -298,10 +297,19 @@ def build_pet_play_embed(
     else:
         description_parts.append("**Welchen Impuls zeigt dein Pet?**")
 
+    fields: list[tuple[str, str, bool]] = [
+        ("Level", f"**{pet.level}**", True),
+        ("Evolution", evolution_display(pet.evolution_stage), True),
+        ("Impuls", mood_display(pet.mood), True),
+        ("Art", pet.species, True),
+        ("Seltenheit", rarity, True),
+        ("Score", f"**{score}** / **{total_rounds}**", True),
+    ]
+
     return _pet_embed(
         f"{emoji} Impuls-Rush · {pet.name}",
         description=spaced_lines(*description_parts),
-        evolution_stage=pet.evolution_stage,
+        fields=fields,
     )
 
 
@@ -310,19 +318,32 @@ def build_pet_display_embed(
     member: discord.Member,
     *,
     portrait_label: str,
+    attachment_filename: str | None = None,
 ) -> discord.Embed:
-    """Embed für KI-Portraits."""
+    """Embed für KI-Portraits — großes Bild unten, Pet klein oben rechts."""
     species = get_species_by_name(pet.species)
     emoji = species_display_emoji(species, pet.evolution_stage)
+    rarity = rarity_display(species.rarity) if species else "—"
+
     embed = _pet_embed(
         f"🖼️ {emoji} {pet.name}",
-        description=(
-            f"{member.mention} zeigt sein Pet\n"
-            f"**{evolution_display(pet.evolution_stage)}** · {portrait_label}\n\n"
-            f"*{pet.catchphrase}*"
+        description=spaced_lines(
+            f"{member.mention} zeigt sein aktives Pet.",
+            portrait_label,
+            f"*{pet.catchphrase}*",
         ),
-        evolution_stage=pet.evolution_stage,
+        fields=[
+            ("Level", f"**{pet.level}**", True),
+            ("Evolution", evolution_display(pet.evolution_stage), True),
+            ("Seltenheit", rarity, True),
+            ("Impuls", mood_display(pet.mood), True),
+            ("Art", pet.species, True),
+        ],
     )
+
+    if attachment_filename:
+        apply_pet_image_layout(embed, attachment_filename=attachment_filename)
+
     return embed
 
 

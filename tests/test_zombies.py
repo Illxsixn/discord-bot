@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from config import Config
 from database.models import ZombieRunRecord, ZombieRunStatus
-from utils.zombie_combat import perform_melee, spawn_wave
+from utils.zombie_combat import perform_melee, perform_pet_action, spawn_wave
 from utils.zombie_content import player_max_hp, wave_zombie_list
 
 
@@ -45,10 +45,28 @@ def test_melee_reduces_zombie_hp():
     run = _run()
     spawn_wave(run)
     hp_before = run.current_zombie_hp
-    result = perform_melee(run, player_level=5, zombie_level=1, pet=None)
+    result = perform_melee(run, player_level=5, pet=None)
     assert run.current_zombie_hp <= hp_before or result.zombie_killed
 
 
 def test_player_max_hp_scales():
-    assert player_max_hp(1, 1) == Config.ZOMBIE_PLAYER_HP_BASE
-    assert player_max_hp(5, 3) > Config.ZOMBIE_PLAYER_HP_BASE
+    assert player_max_hp(1) == Config.ZOMBIE_PLAYER_HP_BASE
+    assert player_max_hp(5) > Config.ZOMBIE_PLAYER_HP_BASE
+
+
+def test_pet_action_cooldown_last_three_melee_attacks():
+    run = _run()
+    spawn_wave(run)
+
+    class _Pet:
+        name = "Testi"
+        mood = "focus"
+        species = "cat"
+
+    pet = _Pet()
+    perform_pet_action(run, pet, action="focus")
+    assert run.pet_action_cooldown == Config.ZOMBIE_PET_ACTION_COOLDOWN
+
+    for expected in range(Config.ZOMBIE_PET_ACTION_COOLDOWN - 1, -1, -1):
+        perform_melee(run, player_level=5, pet=None)
+        assert run.pet_action_cooldown == expected

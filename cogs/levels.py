@@ -108,6 +108,9 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         if not settings.levels_announce_enabled:
             return
 
+        if channel is None:
+            return
+
         target = channel
         if settings.levels_announce_channel_id:
             ch = member.guild.get_channel(settings.levels_announce_channel_id)
@@ -128,7 +131,7 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         )
         embed.set_thumbnail(url=member.display_avatar.url)
         try:
-            await target.send(embed=embed)
+            await target.send(embed=embed, embed_persistent=True)
         except discord.Forbidden:
             logger.warning("Level-Up Nachricht konnte nicht gesendet werden (Guild %s).", member.guild.id)
 
@@ -146,6 +149,7 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         *,
         channel: discord.TextChannel | discord.Thread | None = None,
         apply_pet_boost: bool = True,
+        announce_level_up: bool = True,
     ) -> bool:
         """
         Vergibt XP an ein Mitglied (z. B. durch Spiele oder Aufgaben).
@@ -167,7 +171,7 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         record.level = level_from_xp(record.xp)
         await self.db.save_user_level(record)
 
-        if record.level > old_level:
+        if record.level > old_level and announce_level_up:
             await self._announce_level_up(member, old_level, record.level, channel)
 
         return True
