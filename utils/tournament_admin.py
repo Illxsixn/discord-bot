@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import discord
 
 from database.models import TournamentStatus
-from utils.embeds import apply_brand_footer, error_embed, info_embed, spaced_lines, success_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, success_embed
 from utils.permissions import bot_can_use_channel
 
 if TYPE_CHECKING:
@@ -255,9 +255,7 @@ async def build_wizard_embed(
                 "**Ablauf:** Teams sammeln → Status schließen → Bracket → Matches per Buttons im Kanal"
             )
 
-    embed = info_embed("🏆 Turnier-Admin · Wizard", spaced_lines(*lines))
-    apply_brand_footer(embed)
-    return embed
+    return info_embed("🏆 Turnier-Admin · Wizard", spaced_lines(*lines))
 
 
 async def build_tournament_interface_embed(
@@ -318,9 +316,12 @@ async def build_tournament_interface_embed(
     if maps:
         fields.insert(1, ("Map-Pool", ", ".join(maps[:15]), False))
 
-    embed = info_embed(headline, description, fields=fields)
-    apply_brand_footer(embed, prefix=f"Turnier #{tournament.id}")
-    return embed
+    return info_embed(
+        headline,
+        description,
+        fields=fields,
+        footer_prefix=f"Turnier #{tournament.id}",
+    )
 
 
 # Backwards-compatible alias

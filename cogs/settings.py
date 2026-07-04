@@ -62,9 +62,8 @@ class SettingsCog(commands.GroupCog, group_name="settings", group_description="B
                 f"Einstellungen – {interaction.guild.name}",
                 "Alle konfigurierbaren Optionen für diesen Server.",
                 fields=fields,
+                thumbnail=interaction.guild.icon.url if interaction.guild.icon else None,
             )
-            if interaction.guild.icon:
-                embed.set_thumbnail(url=interaction.guild.icon.url)
 
             await interaction.followup.send(embed=embed, ephemeral=True)
 

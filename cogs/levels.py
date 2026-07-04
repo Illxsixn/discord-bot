@@ -92,8 +92,8 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
                     False,
                 ),
             ],
+            thumbnail=member.display_avatar.url,
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
         return embed
 
     async def _announce_level_up(
@@ -128,8 +128,8 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         embed = success_embed(
             "Level-Up!",
             f"🎉 {member.mention} ist aufgestiegen!\nAktuelles Level: **{new_level}**",
+            thumbnail=member.display_avatar.url,
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
         try:
             await target.send(embed=embed, embed_persistent=True)
         except discord.Forbidden:

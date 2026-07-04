@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import discord
 
-from utils.embeds import apply_brand_footer, artwork_embed, spaced_lines, success_embed
+from utils.embeds import artwork_embed, spaced_lines, success_embed
 from utils.slots import format_reels, payout_table_text, slot_symbols_preview
 
 
@@ -57,15 +57,12 @@ def build_slots_embed(
         parts.append(result_line)
     parts.append(payout_table_text())
     description = spaced_lines(*parts)
+    footer = "Wähle Einsatz unten · /zombies & Spiele bringen Gold"
 
     if mega_jackpot:
-        embed = success_embed("🎰 MEGA-JACKPOT!", description)
-    elif jackpot:
-        embed = success_embed("🎰 Jackpot!", description)
-    elif won is True:
-        embed = success_embed("🎰 Gewonnen!", description)
-    else:
-        embed = artwork_embed("🎰 Gold Slots", description)
-
-    apply_brand_footer(embed, prefix="Wähle Einsatz unten · /zombies & Spiele bringen Gold")
-    return embed
+        return success_embed("🎰 MEGA-JACKPOT!", description, footer_prefix=footer)
+    if jackpot:
+        return success_embed("🎰 Jackpot!", description, footer_prefix=footer)
+    if won is True:
+        return success_embed("🎰 Gewonnen!", description, footer_prefix=footer)
+    return artwork_embed("🎰 Gold Slots", description, footer_prefix=footer)

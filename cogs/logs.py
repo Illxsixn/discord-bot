@@ -153,8 +153,8 @@ class LogsCog(commands.GroupCog, group_name="logs", group_description="Server-Lo
                 ("Mitglieder", str(member.guild.member_count), True),
             ],
             color=Config.COLOR_SUCCESS,
+            thumbnail=member.display_avatar.url,
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
         await self.send_log(member.guild, embed)
 
     @commands.Cog.listener()
@@ -165,8 +165,8 @@ class LogsCog(commands.GroupCog, group_name="logs", group_description="Server-Lo
             f"**{member.display_name}** hat den Server verlassen.",
             fields=[("Benutzer-ID", str(member.id), True)],
             color=Config.COLOR_WARNING,
+            thumbnail=member.display_avatar.url,
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
         await self.send_log(member.guild, embed)
 
     @commands.Cog.listener()

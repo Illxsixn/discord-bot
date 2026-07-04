@@ -25,7 +25,7 @@ from database.models import (
     TicketSettings,
     TicketStatus,
 )
-from utils.embeds import apply_brand_footer, error_embed, info_embed, log_event_embed, spaced_lines, split_embed_fields, success_embed
+from utils.embeds import error_embed, info_embed, log_event_embed, spaced_lines, split_embed_fields, success_embed
 from utils.helpers import format_placeholders, truncate_text
 from utils.permissions import bot_can_use_channel, is_admin
 
@@ -126,7 +126,7 @@ def _build_ticket_embed(
             "{ticket_id}", str(ticket.id)
         )
 
-    embed = info_embed(
+    return info_embed(
         f"Ticket #{ticket.id}",
         description,
         fields=[
@@ -134,19 +134,17 @@ def _build_ticket_embed(
             ("Erstellt von", opener_name, True),
             ("Übernommen von", claimed, True),
         ],
+        footer_prefix=f"Ticket #{ticket.id}",
     )
-    apply_brand_footer(embed, prefix=f"Ticket #{ticket.id}")
-    return embed
 
 
 def _build_panel_embed(guild: discord.Guild, settings: TicketSettings) -> discord.Embed:
     """Erstellt das öffentliche Ticket-Panel."""
-    embed = info_embed(
+    return info_embed(
         settings.panel_title or DEFAULT_TICKET_PANEL_TITLE,
         _format_panel_message(settings, guild),
+        footer_prefix=guild.name,
     )
-    apply_brand_footer(embed, prefix=guild.name)
-    return embed
 
 
 def _build_setup_status_embed(guild: discord.Guild, settings: TicketSettings) -> discord.Embed:
@@ -187,16 +185,15 @@ def _build_setup_status_embed(guild: discord.Guild, settings: TicketSettings) ->
             False,
         ),
     ]
-    embed = info_embed(
+    return info_embed(
         "Ticket-Setup",
         "Wähle unten die Einstellungen aus.\n"
         "Änderungen werden **sofort gespeichert**.\n\n"
         "**Platzhalter Panel:** `{server}`, `{membercount}`, `{button}`\n"
         "**Platzhalter Ticket:** `{user}`, `{username}`, `{server}`, `{ticket_id}`",
         fields=fields,
+        footer_prefix="Setup",
     )
-    apply_brand_footer(embed, prefix="Setup")
-    return embed
 
 
 class TicketPanelView(discord.ui.View):

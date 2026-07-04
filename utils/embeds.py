@@ -287,6 +287,8 @@ def artwork_embed(
     fields: list[tuple[str, str, bool]] | None = None,
     thumbnail: str | None = None,
     image: str | None = None,
+    footer_prefix: str | None = None,
+    with_icon: bool = True,
 ) -> discord.Embed:
     """
     Erstellt ein neutrales Inhalts-Embed in der Markenfarbe (dunkel-lila).
@@ -297,6 +299,8 @@ def artwork_embed(
         fields: Optionale Felder.
         thumbnail: Optionale Thumbnail-URL.
         image: Optionale Bild-URL.
+        footer_prefix: Optionaler Text vor der Marken-Signatur im Footer.
+        with_icon: Ob das Marken-Icon im Footer erscheint.
 
     Returns:
         Fertiges discord.Embed-Objekt.
@@ -314,7 +318,7 @@ def artwork_embed(
         embed.set_thumbnail(url=thumbnail)
     if image:
         embed.set_image(url=image)
-    apply_brand_footer(embed)
+    apply_brand_footer(embed, prefix=footer_prefix, with_icon=with_icon)
     return embed
 
 
@@ -323,6 +327,10 @@ def success_embed(
     description: str | None = None,
     *,
     fields: list[tuple[str, str, bool]] | None = None,
+    thumbnail: str | None = None,
+    image: str | None = None,
+    footer_prefix: str | None = None,
+    with_icon: bool = True,
 ) -> discord.Embed:
     """
     Erstellt ein grünes Erfolgs-Embed.
@@ -344,7 +352,11 @@ def success_embed(
     if fields:
         for name, value, inline in fields:
             embed.add_field(name=name, value=value, inline=inline)
-    apply_brand_footer(embed)
+    if thumbnail:
+        embed.set_thumbnail(url=thumbnail)
+    if image:
+        embed.set_image(url=image)
+    apply_brand_footer(embed, prefix=footer_prefix, with_icon=with_icon)
     return embed
 
 
@@ -353,6 +365,10 @@ def error_embed(
     description: str | None = None,
     *,
     fields: list[tuple[str, str, bool]] | None = None,
+    thumbnail: str | None = None,
+    image: str | None = None,
+    footer_prefix: str | None = None,
+    with_icon: bool = True,
 ) -> discord.Embed:
     """
     Erstellt ein rotes Fehler-Embed.
@@ -374,7 +390,11 @@ def error_embed(
     if fields:
         for name, value, inline in fields:
             embed.add_field(name=name, value=value, inline=inline)
-    apply_brand_footer(embed)
+    if thumbnail:
+        embed.set_thumbnail(url=thumbnail)
+    if image:
+        embed.set_image(url=image)
+    apply_brand_footer(embed, prefix=footer_prefix, with_icon=with_icon)
     return embed
 
 
@@ -383,6 +403,10 @@ def warning_embed(
     description: str | None = None,
     *,
     fields: list[tuple[str, str, bool]] | None = None,
+    thumbnail: str | None = None,
+    image: str | None = None,
+    footer_prefix: str | None = None,
+    with_icon: bool = True,
 ) -> discord.Embed:
     """
     Erstellt ein gelbes Warnungs-Embed.
@@ -404,7 +428,11 @@ def warning_embed(
     if fields:
         for name, value, inline in fields:
             embed.add_field(name=name, value=value, inline=inline)
-    apply_brand_footer(embed)
+    if thumbnail:
+        embed.set_thumbnail(url=thumbnail)
+    if image:
+        embed.set_image(url=image)
+    apply_brand_footer(embed, prefix=footer_prefix, with_icon=with_icon)
     return embed
 
 
@@ -415,6 +443,8 @@ def info_embed(
     fields: list[tuple[str, str, bool]] | None = None,
     thumbnail: str | None = None,
     image: str | None = None,
+    footer_prefix: str | None = None,
+    with_icon: bool = True,
 ) -> discord.Embed:
     """
     Erstellt ein Informations-Embed in der Markenfarbe (dunkel-lila).
@@ -427,6 +457,8 @@ def info_embed(
         fields=fields,
         thumbnail=thumbnail,
         image=image,
+        footer_prefix=footer_prefix,
+        with_icon=with_icon,
     )
 
 
@@ -526,6 +558,9 @@ def log_event_embed(
     *,
     color: int | None = None,
     fields: list[tuple[str, str, bool]] | None = None,
+    thumbnail: str | None = None,
+    footer_prefix: str | None = None,
+    with_icon: bool = True,
 ) -> discord.Embed:
     """
     Erstellt ein Embed für Server-Log-Ereignisse.
@@ -548,5 +583,7 @@ def log_event_embed(
     if fields:
         for name, value, inline in fields:
             embed.add_field(name=name, value=value, inline=inline)
-    apply_brand_footer(embed)
+    if thumbnail:
+        embed.set_thumbnail(url=thumbnail)
+    apply_brand_footer(embed, prefix=footer_prefix, with_icon=with_icon)
     return embed

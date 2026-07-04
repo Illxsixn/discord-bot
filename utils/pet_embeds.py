@@ -11,7 +11,7 @@ import discord
 
 from config import Config
 from database.models import PetEvolutionStage, PetRarity, PetRecord
-from utils.embeds import apply_brand_footer, artwork_embed, split_embed_fields, spaced_lines
+from utils.embeds import artwork_embed, split_embed_fields, spaced_lines
 from utils.pets import (
     PET_SPECIES,
     PetSpeciesDefinition,

@@ -18,7 +18,7 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from database.models import PetCooldownType, PetRarity, PetRecord
-from utils.embeds import apply_brand_footer, error_embed, info_embed, success_embed
+from utils.embeds import error_embed, info_embed, success_embed
 from utils.permissions import bot_can_use_channel
 from utils.pet_ai_images import (
     PetPortraitError,
@@ -476,8 +476,8 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
         embed = info_embed(
             titles.get(milestone, "Pet-Evolution!"),
             descriptions.get(milestone, f"**{pet.name}** ist gewachsen!"),
+            footer_prefix=f"Besitzer: {member.display_name}",
         )
-        apply_brand_footer(embed, prefix=f"Besitzer: {member.display_name}")
         try:
             await channel.send(content=member.mention, embed=embed, embed_persistent=True)
         except discord.Forbidden:

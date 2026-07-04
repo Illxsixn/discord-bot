@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import discord
 
 from database.models import TournamentStatus
-from utils.embeds import apply_brand_footer, error_embed, info_embed, spaced_lines, success_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, success_embed
 
 if TYPE_CHECKING:
     from cogs.tournament import TournamentCog
@@ -55,16 +55,15 @@ async def build_team_embed(cog: TournamentCog, guild: discord.Guild, team_id: in
         ("Nächste Schritte", next_steps, False),
     ]
 
-    embed = info_embed(
+    return info_embed(
         f"👥 Team **{team.name}**",
         spaced_lines(
             f"Captain: <@{team.captain_id}>",
             "Einladen: `/turnier_einladen @Spieler`",
         ),
         fields=fields,
+        footer_prefix=f"Team #{team.id}",
     )
-    apply_brand_footer(embed, prefix=f"Team #{team.id}")
-    return embed
 
 
 class TeamInterfaceView(discord.ui.View):

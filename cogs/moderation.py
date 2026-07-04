@@ -370,8 +370,8 @@ class ModerationCog(commands.Cog):
                 f"Warnungen – {user.display_name}",
                 f"Anzahl: **{len(records)}**",
                 fields=split_embed_fields("Einträge", lines),
+                thumbnail=user.display_avatar.url,
             )
-            embed.set_thumbnail(url=user.display_avatar.url)
             await interaction.followup.send(embed=embed, ephemeral=True)
 
         except Exception as exc:
