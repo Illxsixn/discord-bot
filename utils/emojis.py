@@ -14,6 +14,7 @@ import discord
 from utils.reactions import parse_emoji_input
 
 EMOJI_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]{2,32}$")
+CUSTOM_EMOJI_IN_TEXT_PATTERN = re.compile(r"<(a?):([\w]+):(\d+)>")
 MAX_EMOJI_BYTES = 256 * 1024
 ALLOWED_IMAGE_TYPES = frozenset(
     {
@@ -49,6 +50,38 @@ def validate_emoji_name(name: str) -> str | None:
             "Der Name muss **2–32 Zeichen** lang sein und darf nur "
             "**Buchstaben, Zahlen und Unterstriche** enthalten."
         )
+    return None
+
+
+def derive_emoji_name_from_filename(filename: str) -> str:
+    """Leitet einen gültigen Emoji-Namen aus einem Dateinamen ab."""
+    stem = PurePath(filename or "emoji").stem
+    cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", stem)
+    cleaned = re.sub(r"_+", "_", cleaned).strip("_").lower()
+    if len(cleaned) < 2:
+        cleaned = "emoji_upload"
+    return cleaned[:32].rstrip("_")
+
+
+def parse_first_custom_emoji_from_content(content: str) -> ParsedCustomEmoji | None:
+    """Extrahiert das erste Custom-Emoji aus einer Nachricht."""
+    match = CUSTOM_EMOJI_IN_TEXT_PATTERN.search(content)
+    if match is None:
+        return None
+    return ParsedCustomEmoji(
+        name=match.group(2),
+        emoji_id=int(match.group(3)),
+        animated=match.group(1) == "a",
+    )
+
+
+def first_valid_image_attachment(
+    attachments: list[discord.Attachment],
+) -> discord.Attachment | None:
+    """Liefert den ersten Anhang, der als Server-Emoji hochgeladen werden kann."""
+    for attachment in attachments:
+        if validate_attachment(attachment) is None:
+            return attachment
     return None
 
 
