@@ -192,16 +192,12 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
         "emoji": "🎮",
         "access": "Alle",
         "commands": [
-            ("/guess-start", "Startet Zahlenraten (1–100) im Kanal"),
-            ("/guess", "Gibt einen Tipp ab (5 Min. Cooldown)"),
-            ("/guess-leaderboard", "Bestenliste Zahlenraten"),
             ("/slots", "Gold-Slot-Maschine mit Einsatz-Buttons"),
         ],
         "hints": [
             f"Gewinner erhalten **{Config.GAME_WIN_XP} XP** (wenn Level-System aktiv ist)",
             f"Gewinner erhalten **{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX} Gold**",
             f"`/slots` — Einsatz **{', '.join(str(b) for b in Config.SLOT_BET_OPTIONS)}** Gold",
-            f"`/guess` hat einen Cooldown von **{Config.GUESS_COOLDOWN // 60} Minuten**",
         ],
     },
     HelpCategory.Lootbox.value: {

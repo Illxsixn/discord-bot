@@ -43,7 +43,6 @@ COGS: list[str] = [
     "cogs.emoji",
     "cogs.levels",
     "cogs.pets",
-    "cogs.guess",
     "cogs.challenges",
     "cogs.shop",
     "cogs.lootbox",

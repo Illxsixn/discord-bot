@@ -1,7 +1,7 @@
 """
 Gemeinsame asyncio-Locks für Spielzüge (Race-Condition-Schutz).
 
-Locks sind nach Scope getrennt (z. B. zombie vs. guess), damit parallele
+Locks sind nach Scope getrennt (z. B. zombie vs. slots), damit parallele
 Spiele sich nicht gegenseitig blockieren.
 """
 
