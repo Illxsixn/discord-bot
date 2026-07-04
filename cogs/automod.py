@@ -15,7 +15,7 @@ from discord.ext import commands
 
 from database.database import Database
 from database.models import AutoModPunishment
-from utils.embeds import error_embed, info_embed, spaced_list, success_embed, warning_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, success_embed, warning_embed
 from utils.helpers import (
     contains_bad_word,
     contains_discord_invite,
@@ -147,8 +147,11 @@ class AutoModCog(commands.GroupCog, group_name="automod", group_description="Aut
                 await message.author.send(
                     embed=warning_embed(
                         "AutoMod",
-                        f"Deine Nachricht auf **{message.guild.name}** wurde entfernt.\n**Grund:** {violation}",
-                    )
+                        spaced_lines(
+                            f"Deine Nachricht auf **{message.guild.name}** wurde entfernt.",
+                            f"**Grund:** {violation}",
+                        ),
+                    ),
                 )
             except discord.Forbidden:
                 pass

@@ -18,7 +18,7 @@ from utils.challenges import (
     normalize_daily_challenges,
     today_utc,
 )
-from utils.embeds import info_embed, spaced_lines
+from utils.embeds import info_embed, spaced_lines, spaced_list
 from utils.pet_rewards import award_pet_xp
 
 logger = logging.getLogger(__name__)
@@ -154,19 +154,19 @@ class ChallengesCog(commands.Cog):
         pet_lines = [format_challenge_task_line(index, task) for index, task in enumerate(pet_tasks, start=1)]
         completed = sum(1 for task in record.challenges if task.completed)
 
-        fields: list[tuple[str, str, bool]] = []
-        for index, line in enumerate(level_lines, start=1):
-            fields.append((f"🎮 Level · Aufgabe {index}", line, False))
-        for index, line in enumerate(pet_lines, start=1):
-            fields.append((f"🐾 Pet · Aufgabe {index}", line, False))
-
         embed = info_embed(
             "📅 Tägliche Aufgaben",
             spaced_lines(
                 f"**Datum:** {record.challenge_date} (UTC)",
                 f"**Fortschritt:** {completed}/{len(record.challenges)} erledigt",
             ),
-            fields=fields,
+            fields=[
+                ("Datum", record.challenge_date, True),
+                ("Erledigt", f"**{completed}/{len(record.challenges)}**", True),
+                ("Typen", f"**{len(level_tasks)}** Level · **{len(pet_tasks)}** Pet", True),
+                ("🎮 Level-Aufgaben", spaced_list(level_lines) if level_lines else "—", False),
+                ("🐾 Pet-Aufgaben", spaced_list(pet_lines) if pet_lines else "—", False),
+            ],
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
 

@@ -11,7 +11,7 @@ import discord
 
 from config import Config
 from database.models import PetEvolutionStage, PetRarity, PetRecord
-from utils.embeds import apply_brand_footer, artwork_embed, split_embed_fields, spaced_lines
+from utils.embeds import artwork_embed, spaced_list, split_embed_fields, spaced_lines
 from utils.pets import (
     PET_SPECIES,
     PetSpeciesDefinition,
@@ -64,7 +64,7 @@ def build_pet_info_embed(
     fields: list[tuple[str, str, bool]] = [
         ("Level", f"**{pet.level}**", True),
         ("XP gesamt", f"**{pet.xp:,}**", True),
-        ("Fortschritt", f"**{percent} %**\n`{current:,}` / `{needed:,}`", True),
+        ("Fortschritt", spaced_lines(f"**{percent} %**", f"`{current:,}` / `{needed:,}`"), True),
         ("Art", pet.species, True),
         ("Seltenheit", rarity, True),
         ("XP-Bonus", xp_bonus, True),
@@ -154,7 +154,7 @@ def build_pet_collection_embed(owner_name: str, pets: list[PetRecord]) -> discor
             f"**{len(pets)}** Pets gesammelt · ⭐ = aktiv",
             f"Aktives Pet: {active_line}",
         ),
-        fields=split_embed_fields("Alle Pets", lines, joiner="\n"),
+        fields=split_embed_fields("Alle Pets", lines, joiner="\n\n"),
     )
 
 
@@ -187,7 +187,7 @@ def build_pet_dex_embed(discovered_names: set[str], *, owner_name: str | None = 
         fields.append(
             (
                 f"{rarity_display(rarity)} ({category_found}/{len(species_list)})",
-                "\n".join(entries),
+                spaced_list(entries),
                 False,
             )
         )
@@ -300,11 +300,10 @@ def build_pet_display_embed(
             ("Seltenheit", rarity, True),
             ("Impuls", mood_display(pet.mood), True),
             ("Art", pet.species, True),
+            ("Interaktionen", f"**{pet.total_interactions:,}**", True),
         ],
+        image=f"attachment://{attachment_filename}" if attachment_filename else None,
     )
-
-    if attachment_filename:
-        apply_pet_image_layout(embed, attachment_filename=attachment_filename)
 
     return embed
 
@@ -319,8 +318,8 @@ def build_leaderboard_line(
     """Eine Zeile für die Pet-Rangliste."""
     species = get_species_by_name(pet.species)
     emoji = species_display_emoji(species, pet.evolution_stage)
-    return (
-        f"{medal_prefix} {emoji} **{pet.name}** · {owner_name}\n\n"
-        f"Lv. **{pet.level}** · **{pet.xp:,}** XP\n"
-        f"{evolution_display(pet.evolution_stage)} · **{pet.total_interactions}** Interaktionen"
+    return spaced_lines(
+        f"{medal_prefix} {emoji} **{pet.name}** · {owner_name}",
+        f"Lv. **{pet.level}** · **{pet.xp:,}** XP",
+        f"{evolution_display(pet.evolution_stage)} · **{pet.total_interactions}** Interaktionen",
     )

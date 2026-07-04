@@ -18,7 +18,7 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from database.models import PetCooldownType, PetRarity, PetRecord
-from utils.embeds import apply_brand_footer, error_embed, info_embed, success_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, success_embed
 from utils.permissions import bot_can_use_channel
 from utils.pet_ai_images import (
     PetPortraitError,
@@ -459,25 +459,25 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             Config.PET_EVOLUTION_LEGENDARY: "👑 Meisterhafte Evolution!",
         }
         descriptions = {
-            Config.PET_EVOLUTION_TEEN: (
-                f"{emoji} **{pet.name}** · Level **{milestone}** → **{stage}**\n"
-                "Dein Begleiter wird neugieriger und zeigt mehr Persönlichkeit."
+            Config.PET_EVOLUTION_TEEN: spaced_lines(
+                f"{emoji} **{pet.name}** · Level **{milestone}** → **{stage}**",
+                "Dein Begleiter wird neugieriger und zeigt mehr Persönlichkeit.",
             ),
-            Config.PET_EVOLUTION_ADULT: (
-                f"{emoji} **{pet.name}** · Level **{milestone}** → **{stage}**\n"
-                "Ein stolzer Begleiter an deiner Seite."
+            Config.PET_EVOLUTION_ADULT: spaced_lines(
+                f"{emoji} **{pet.name}** · Level **{milestone}** → **{stage}**",
+                "Ein stolzer Begleiter an deiner Seite.",
             ),
-            Config.PET_EVOLUTION_LEGENDARY: (
-                f"{emoji} **{pet.name}** · Level **{milestone}** → **{stage}**\n"
-                "Dein Begleiter hat seine Meisterform erreicht!"
+            Config.PET_EVOLUTION_LEGENDARY: spaced_lines(
+                f"{emoji} **{pet.name}** · Level **{milestone}** → **{stage}**",
+                "Dein Begleiter hat seine Meisterform erreicht!",
             ),
         }
 
         embed = info_embed(
             titles.get(milestone, "Pet-Evolution!"),
             descriptions.get(milestone, f"**{pet.name}** ist gewachsen!"),
+            footer_prefix=f"Besitzer: {member.display_name}",
         )
-        apply_brand_footer(embed, prefix=f"Besitzer: {member.display_name}")
         try:
             await channel.send(content=member.mention, embed=embed, embed_persistent=True)
         except discord.Forbidden:
@@ -652,7 +652,10 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             await interaction.followup.send(
                 embed=info_embed(
                     "Kein aktives Pet",
-                    f"{interaction.user.mention} hat noch kein aktives Pet.\nÖffne ein Ei mit **`/pet ei`**!",
+                    spaced_lines(
+                        f"{interaction.user.mention} hat noch kein aktives Pet.",
+                        "Öffne ein Ei mit **`/pet ei`**!",
+                    ),
                 ),
                 ephemeral=True,
             )
@@ -692,7 +695,10 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             await interaction.followup.send(
                 embed=info_embed(
                     "Kein aktives Pet",
-                    f"{interaction.user.mention} hat noch kein aktives Pet.\nÖffne ein Ei mit **`/pet ei`**!",
+                    spaced_lines(
+                        f"{interaction.user.mention} hat noch kein aktives Pet.",
+                        "Öffne ein Ei mit **`/pet ei`**!",
+                    ),
                 ),
                 ephemeral=True,
             )
@@ -769,7 +775,10 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             await interaction.response.send_message(
                 embed=info_embed(
                     "Kein aktives Pet",
-                    f"{interaction.user.mention} braucht ein aktives Pet.\nÖffne ein Ei mit **`/pet ei`** oder wähle eins mit **`/pets`**!",
+                    spaced_lines(
+                        f"{interaction.user.mention} braucht ein aktives Pet.",
+                        "Öffne ein Ei mit **`/pet ei`** oder wähle eins mit **`/pets`**!",
+                    ),
                 ),
                 ephemeral=True,
             )
@@ -938,7 +947,10 @@ class PetsListCog(commands.Cog):
             await interaction.followup.send(
                 embed=info_embed(
                     "Keine Pets",
-                    f"{interaction.user.mention} hat noch keine Pets.\nÖffne dein erstes Ei mit **`/pet ei`**!",
+                    spaced_lines(
+                        f"{interaction.user.mention} hat noch keine Pets.",
+                        "Öffne dein erstes Ei mit **`/pet ei`**!",
+                    ),
                 ),
                 ephemeral=True,
             )

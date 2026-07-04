@@ -8,7 +8,7 @@ import discord
 
 from config import Config
 from database.models import PetRecord, PlayerEconomyRecord, ZombiePlayerRecord, ZombieRunRecord
-from utils.embeds import info_embed, success_embed, error_embed, apply_brand_footer, spaced_lines
+from utils.embeds import info_embed, success_embed, error_embed, spaced_lines
 from utils.levels import progress_bar
 from utils.zombie_combat import pet_action_cooldown_attacks
 from utils.zombie_content import get_zombie, melee_base_damage, scaled_zombie_attack, wave_intro_text, wave_location
@@ -54,12 +54,10 @@ def build_run_embed(
     fields: list[tuple[str, str, bool]] = [
         (
             "Spieler",
-            "\n".join(
-                [
-                    f"❤️ HP: {format_hp_bar(run.player_hp, run.player_max_hp)}",
-                    f"🪙 Gold: **{economy.gold:,}** · Run-Punkte: **{run.run_gold}**",
-                    f"⚔️ Nahkampf: **{melee_base_damage(player_level)}**",
-                ]
+            spaced_lines(
+                f"❤️ HP: {format_hp_bar(run.player_hp, run.player_max_hp)}",
+                f"🪙 Gold: **{economy.gold:,}** · Run-Punkte: **{run.run_gold}**",
+                f"⚔️ Nahkampf: **{melee_base_damage(player_level)}**",
             ),
             False,
         ),
@@ -74,12 +72,10 @@ def build_run_embed(
         fields.append(
             (
                 "Gegner",
-                "\n".join(
-                    [
-                        f"{zombie.emoji} **{zombie.name}**",
-                        f"❤️ HP: {format_hp_bar(run.current_zombie_hp, zombie_max_hp)}",
-                        f"⚔️ Angriff: **{attack_value}** · {special}",
-                    ]
+                spaced_lines(
+                    f"{zombie.emoji} **{zombie.name}**",
+                    f"❤️ HP: {format_hp_bar(run.current_zombie_hp, zombie_max_hp)}",
+                    f"⚔️ Angriff: **{attack_value}** · {special}",
                 ),
                 False,
             )
@@ -91,13 +87,13 @@ def build_run_embed(
     if run.last_action_text:
         fields.append(("Letzte Aktion", run.last_action_text[:1024], False))
 
-    embed = info_embed(title, description, fields=fields)
-    apply_brand_footer(
-        embed,
-        prefix="Kein Abbrechen — Run endet durch Sieg, Niederlage oder 12h Inaktivität",
+    return info_embed(
+        title,
+        description,
+        fields=fields,
+        footer_prefix="Kein Abbrechen — Run endet durch Sieg, Niederlage oder 12h Inaktivität",
         with_icon=False,
     )
-    return embed
 
 
 def build_pet_action_picker_embed(pet: PetRecord, *, companion_rarity: str = "") -> discord.Embed:
@@ -178,9 +174,11 @@ def build_expired_embed() -> discord.Embed:
     """12-Stunden-Inaktivität."""
     return error_embed(
         "Run zusammengebrochen",
-        "Dein Run ist nach **12 Stunden** Inaktivität zusammengebrochen.\n"
-        "Du erhältst eine kleine Trostbelohnung (Gold & XP).\n"
-        f"Cooldown: **{Config.ZOMBIE_RUN_COOLDOWN // 60} Minuten** — dann `/zombies start`.",
+        spaced_lines(
+            "Dein Run ist nach **12 Stunden** Inaktivität zusammengebrochen.",
+            "Du erhältst eine kleine Trostbelohnung (Gold & XP).",
+            f"Cooldown: **{Config.ZOMBIE_RUN_COOLDOWN // 60} Minuten** — dann `/zombies start`.",
+        ),
     )
 
 
@@ -193,7 +191,7 @@ def build_profile_embed(
     """Permanentes Zombie-Profil."""
     pet_line = f"**{pet.name}** ({pet.species})" if pet else "Kein aktives Pet"
 
-    embed = info_embed(
+    return info_embed(
         f"Zombie Survival — {member.display_name}",
         member.mention,
         fields=[
@@ -217,9 +215,8 @@ def build_profile_embed(
             ("Aktives Pet", pet_line, False),
         ],
         thumbnail=member.display_avatar.url,
+        footer_prefix="Spieler-Level weiterhin unter /levels level",
     )
-    apply_brand_footer(embed, prefix="Spieler-Level weiterhin unter /levels level")
-    return embed
 
 
 def build_interface_embed(economy: PlayerEconomyRecord) -> discord.Embed:
@@ -229,6 +226,8 @@ def build_interface_embed(economy: PlayerEconomyRecord) -> discord.Embed:
         "Schnellzugriff auf Profil, Status und Shop.",
         fields=[
             ("Gold", f"**{economy.gold:,}** 🪙", True),
+            ("Lootboxen", f"**{economy.lootbox_count}** 📦", True),
+            ("Modus", "Survival", True),
             (
                 "Befehle",
                 "`/zombies start` · `/zombies resume` · `/zombies profil` · `/shop`",
@@ -263,17 +262,25 @@ def build_help_embed() -> discord.Embed:
         "🧟 Zombie Survival",
         "Wellenbasiertes Survival-RPG mit Gold, Pets und Bosskampf.",
         fields=[
+            ("Wellen", f"**{Config.ZOMBIE_MAX_WAVES}**", True),
+            ("Inaktivität", f"**{Config.ZOMBIE_RUN_INACTIVITY // 3600}h**", True),
+            ("Wellenheilung", f"**+{Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT} %** HP", True),
             (
                 "Ablauf",
-                "1. `/zombies start` · 2. Nahkampf & Pet-Aktion (Fokus/Glück/Power) · "
-                "3. Wellen laufen direkt weiter · Boss in Welle 3",
+                spaced_lines(
+                    "1. `/zombies start`",
+                    "2. Nahkampf & Pet-Aktion (Fokus/Energie/Glück)",
+                    "3. Wellen laufen direkt weiter · Boss in Welle 3",
+                ),
                 False,
             ),
             (
                 "Regeln",
-                f"**{Config.ZOMBIE_MAX_WAVES} Wellen** · **Kein Abbrechen** · "
-                f"**{Config.ZOMBIE_RUN_INACTIVITY // 3600}h** Inaktivität beendet Run · "
-                f"**+{Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT} %** HP nach jeder Welle",
+                spaced_lines(
+                    f"**{Config.ZOMBIE_MAX_WAVES} Wellen** · **Kein Abbrechen**",
+                    f"**{Config.ZOMBIE_RUN_INACTIVITY // 3600}h** Inaktivität beendet Run",
+                    f"**+{Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT} %** HP nach jeder Welle",
+                ),
                 False,
             ),
             (

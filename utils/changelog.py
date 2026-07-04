@@ -13,7 +13,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from utils.embeds import apply_brand_footer, info_embed
+from utils.embeds import info_embed, spaced_lines
 
 CHANGELOG_PATH = Path(__file__).resolve().parent.parent / "data" / "changelog.json"
 MAX_RELEASES_IN_EMBED = 2
@@ -61,15 +61,12 @@ def _format_release_section(release: ChangelogRelease) -> str:
 
 def build_changelog_embed(*, max_releases: int = MAX_RELEASES_IN_EMBED):
     """Erstellt ein kompaktes Changelog-Embed (max. 2 Versionen)."""
-    import discord
     data = load_changelog()
     shown = data.releases[:max_releases]
     sections = [_format_release_section(release) for release in shown]
 
-    description = "\n\n".join(sections) if sections else "Noch keine Einträge."
+    description = spaced_lines(*sections) if sections else "Noch keine Einträge."
     if len(data.releases) > max_releases:
         description += f"\n\n*Ältere Versionen: v{data.releases[-1].version} …*"
 
-    embed = info_embed("📋 Changelog", description)
-    apply_brand_footer(embed, prefix=f"Version {data.version}")
-    return embed
+    return info_embed("📋 Changelog", description, footer_prefix=f"Version {data.version}")

@@ -9,7 +9,7 @@ import discord
 from config import Config
 from database.database import Database
 from database.models import PlayerEconomyRecord
-from utils.embeds import error_embed, success_embed
+from utils.embeds import error_embed, spaced_lines, success_embed
 
 
 async def buy_lootboxes(
@@ -30,8 +30,10 @@ async def buy_lootboxes(
     if remaining <= 0:
         embed = error_embed(
             "Inventar voll",
-            f"Du kannst maximal **{Config.LOOTBOX_INVENTORY_MAX}** Lootboxen gleichzeitig besitzen.\n"
-            "Öffne zuerst Boxen mit **`/lootbox open`**, bevor du neue kaufst.",
+            spaced_lines(
+                f"Du kannst maximal **{Config.LOOTBOX_INVENTORY_MAX}** Lootboxen gleichzeitig besitzen.",
+                "Öffne zuerst Boxen mit **`/lootbox open`**, bevor du neue kaufst.",
+            ),
         )
         return False, embed, economy
 
@@ -45,8 +47,10 @@ async def buy_lootboxes(
     if count > remaining:
         embed = error_embed(
             "Zu viele Lootboxen",
-            f"Du hast **{economy.lootbox_count}** 📦 — es passen noch **{remaining}**.\n"
-            f"Kaufe höchstens **{remaining}** Box(en) auf einmal.",
+            spaced_lines(
+                f"Du hast **{economy.lootbox_count}** 📦 — es passen noch **{remaining}**.",
+                f"Kaufe höchstens **{remaining}** Box(en) auf einmal.",
+            ),
         )
         return False, embed, economy
 
@@ -55,9 +59,11 @@ async def buy_lootboxes(
     if economy.gold < total_cost:
         embed = error_embed(
             "Nicht genug Gold",
-            f"Du brauchst **{total_cost:,}** Gold, hast aber nur **{economy.gold:,}** 🪙.\n"
-            f"Gold z. B. durch **`/zombies`**, Spielsiege "
-            f"(**{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}**) oder **`/slots`**.",
+            spaced_lines(
+                f"Du brauchst **{total_cost:,}** Gold, hast aber nur **{economy.gold:,}** 🪙.",
+                f"Gold z. B. durch **`/zombies`**, Spielsiege "
+                f"(**{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}**) oder **`/slots`**.",
+            ),
         )
         return False, embed, economy
 
@@ -67,8 +73,14 @@ async def buy_lootboxes(
 
     embed = success_embed(
         "Lootboxen gekauft",
-        f"**{count}** Lootbox(en) für **{total_cost:,}** Gold.\n"
-        f"Inventar: **{economy.lootbox_count}** 📦 · Gold: **{economy.gold:,}** 🪙\n\n"
-        "Öffne sie mit **`/lootbox open`**.",
+        spaced_lines(
+            f"**{count}** Lootbox(en) für **{total_cost:,}** Gold.",
+            "Öffne sie mit **`/lootbox open`**.",
+        ),
+        fields=[
+            ("Gekauft", f"**{count}** 📦", True),
+            ("Gold übrig", f"**{economy.gold:,}** 🪙", True),
+            ("Inventar", f"**{economy.lootbox_count}** 📦", True),
+        ],
     )
     return True, embed, economy

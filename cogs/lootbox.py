@@ -70,8 +70,10 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
         if economy.lootbox_count < count:
             embed = error_embed(
                 "Keine Lootboxen",
-                f"Du hast nur **{economy.lootbox_count}** Lootbox(en).\n"
-                f"Kaufe welche im **`/shop`** (**{Config.LOOTBOX_PRICE}** Gold pro Stück).",
+                spaced_lines(
+                    f"Du hast nur **{economy.lootbox_count}** Lootbox(en).",
+                    f"Kaufe welche im **`/shop`** (**{Config.LOOTBOX_PRICE}** Gold pro Stück).",
+                ),
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
@@ -90,28 +92,33 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
                 roll,
                 channel=channel,
             )
-            line = (
+            line = spaced_lines(
                 f"📦 **{i + 1}:** **{applied.gold}** 🪙 · "
-                f"**{applied.player_xp}** Spieler-XP · **{applied.pet_xp}** Pet-XP"
+                f"**{applied.player_xp}** Spieler-XP · **{applied.pet_xp}** Pet-XP",
+                (
+                    f"🎉 **Jackpot:** +**{applied.jackpot_player_xp}** Spieler-XP · "
+                    f"+**{applied.jackpot_pet_xp}** Pet-XP ({roll.jackpot_chance_percent} % Chance)"
+                    if roll.won_jackpot
+                    else ""
+                ),
             )
             if roll.won_jackpot:
                 wins += 1
-                line += (
-                    f"\n   🎉 **Jackpot:** +**{applied.jackpot_player_xp}** Spieler-XP · "
-                    f"+**{applied.jackpot_pet_xp}** Pet-XP ({roll.jackpot_chance_percent} % Chance)"
-                )
             lines.append(line)
 
         economy.lootbox_count -= count
         await self.db.save_player_economy(economy)
 
-        summary = (
-            f"**{count}** Lootbox(en) geöffnet"
-            + (f" · **{wins}** Jackpot(s)" if wins else "")
-            + f"\nVerbleibend: **{economy.lootbox_count}** 📦"
-        )
-        body = spaced_lines(summary, *lines)
-        embed = success_embed("Lootbox geöffnet", body) if wins else info_embed("Lootbox geöffnet", body)
+        body_fields = [
+            ("Geöffnet", f"**{count}** 📦", True),
+            ("Jackpots", f"**{wins}** 🎉" if wins else "—", True),
+            ("Verbleibend", f"**{economy.lootbox_count}** 📦", True),
+            ("Ergebnisse", spaced_list(lines), False),
+        ]
+        if wins:
+            embed = success_embed("Lootbox geöffnet", None, fields=body_fields)
+        else:
+            embed = info_embed("Lootbox geöffnet", None, fields=body_fields)
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
@@ -138,7 +145,11 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
             medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, f"**{rank}.**")
             lines.append(f"{medal} {name} — **{record.gold:,}** 🪙")
 
-        embed = info_embed("Gold-Rangliste", spaced_list(lines))
+        embed = info_embed(
+            "Gold-Rangliste",
+            f"Top **{len(lines)}** auf **{interaction.guild.name}**",
+            fields=[("Rangliste", spaced_list(lines), False)],
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 

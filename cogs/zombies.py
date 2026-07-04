@@ -21,6 +21,7 @@ from database.models import (
     ZombieRunStatus,
 )
 from utils.embeds import error_embed, info_embed, spaced_list, warning_embed
+from utils.game_locks import game_lock
 from utils.pets import get_species_rarity
 from utils.zombie_assets import apply_zombie_visual
 from utils.zombie_combat import (

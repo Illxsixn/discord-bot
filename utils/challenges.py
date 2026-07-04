@@ -163,8 +163,10 @@ def challenge_progress_text(task: ChallengeTask) -> str:
 
 def format_challenge_task_line(index: int, task: ChallengeTask) -> str:
     """Formatiert eine Tagesaufgabe übersichtlich."""
-    return (
-        f"**{task.label}**\n\n"
-        f"{challenge_progress_text(task)}\n"
-        f"Belohnung: {task.reward_text}"
+    from utils.embeds import spaced_lines
+
+    return spaced_lines(
+        f"**{task.label}**",
+        challenge_progress_text(task),
+        f"Belohnung: {task.reward_text}",
     )

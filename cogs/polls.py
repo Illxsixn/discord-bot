@@ -17,7 +17,7 @@ from discord.ext import commands, tasks
 from config import Config
 from database.database import Database
 from database.models import PollRecord, PollType
-from utils.embeds import apply_brand_footer, error_embed, info_embed, spaced_lines, spaced_list, success_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, success_embed
 from utils.helpers import parse_duration_minutes
 from utils.permissions import bot_can_use_channel, can_manage_community
 from utils.reactions import (
@@ -65,13 +65,12 @@ class PollsCog(commands.GroupCog, group_name="poll", group_description="Umfragen
         if poll.ended:
             description_parts.append("🔒 **Umfrage beendet**")
 
-        embed = info_embed(
+        return info_embed(
             "Umfrage",
             spaced_lines(*description_parts),
             fields=[("Optionen", options_text, False)],
+            footer_prefix=footer or f"Umfrage #{poll.id} • Reagiere zum Abstimmen",
         )
-        apply_brand_footer(embed, prefix=footer or f"Umfrage #{poll.id} • Reagiere zum Abstimmen")
-        return embed
 
     async def _add_poll_reactions(self, message: discord.Message, poll: PollRecord) -> None:
         """Fügt Reaktions-Emojis zur Umfrage hinzu."""
@@ -134,18 +133,18 @@ class PollsCog(commands.GroupCog, group_name="poll", group_description="Umfragen
                 winner_label = ("Ja", "Nein")[idx]
             else:
                 winner_label = poll.options[emojis.index(best_emoji)]
-            winner_line = f"\n\n🏆 **Führend:** {winner_label} ({best_votes} Stimmen)"
+            winner_line = f"🏆 **Führend:** {winner_label} ({best_votes} Stimmen)"
 
         result_embed = info_embed(
             "Umfrage — Ergebnis",
-            poll.question + winner_line,
+            spaced_lines(poll.question, winner_line) if winner_line else poll.question,
             fields=[
                 ("Stimmen gesamt", str(total), True),
                 ("Status", "Beendet", True),
                 ("Auswertung", spaced_list(lines), False),
             ],
+            footer_prefix=f"Umfrage #{poll.id} • Beendet",
         )
-        apply_brand_footer(result_embed, prefix=f"Umfrage #{poll.id} • Beendet")
 
         try:
             await message.edit(embed=result_embed)

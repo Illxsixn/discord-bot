@@ -62,22 +62,28 @@ class WelcomeCog(commands.GroupCog, group_name="welcome", group_description="Wel
                     files.append(welcome_file)
 
             if settings.welcome_use_embed:
-                fields: list[tuple[str, str, bool]] = [
-                    ("Mitglied", member.mention, True),
-                    ("ID", str(member.id), True),
-                ]
                 if settings.welcome_show_join_date:
-                    fields.insert(0, ("Beigetreten", format_join_date(member), True))
+                    fields = [
+                        ("Beigetreten", format_join_date(member), True),
+                        ("Mitglied", member.mention, True),
+                        ("ID", str(member.id), True),
+                    ]
+                else:
+                    fields = [
+                        ("Mitglied", member.mention, True),
+                        ("ID", str(member.id), True),
+                        ("Server", member.guild.name, True),
+                    ]
 
                 embed = info_embed(
                     "Willkommen!",
                     message_text,
                     fields=fields,
                     thumbnail=member.display_avatar.url,
+                    image="attachment://welcome.png" if files else None,
                 )
 
                 if files:
-                    embed.set_image(url="attachment://welcome.png")
                     await channel.send(embed=embed, files=files, embed_persistent=True)
                 else:
                     await channel.send(embed=embed, embed_persistent=True)

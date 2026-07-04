@@ -67,17 +67,9 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
             f"Level — {member.display_name}",
             member.mention,
             fields=[
-                (
-                    "📊 Übersicht",
-                    spaced_lines(
-                        f"**Level:** {record.level}",
-                        f"**Rang:** #{rank}",
-                        f"**XP gesamt:** {record.xp:,}",
-                        f"**Gold:** {economy.gold:,} 🪙",
-                        f"**Zombie Survival:** {zombie_line}",
-                    ),
-                    False,
-                ),
+                ("Level", f"**{record.level}**", True),
+                ("Rang", f"**#{rank}**", True),
+                ("Gold", f"**{economy.gold:,}** 🪙", True),
                 (
                     "Fortschritt",
                     spaced_lines(
@@ -87,13 +79,17 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
                     False,
                 ),
                 (
-                    "XP pro Nachricht",
-                    f"**{Config.XP_PER_MESSAGE} XP** (Cooldown: **{Config.LEVEL_XP_COOLDOWN}s**)",
+                    "Statistik",
+                    spaced_lines(
+                        f"**XP gesamt:** {record.xp:,}",
+                        f"**Zombie Survival:** {zombie_line}",
+                        f"**XP pro Nachricht:** {Config.XP_PER_MESSAGE} (Cooldown: **{Config.LEVEL_XP_COOLDOWN}s**)",
+                    ),
                     False,
                 ),
             ],
+            thumbnail=member.display_avatar.url,
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
         return embed
 
     async def _announce_level_up(
@@ -128,8 +124,8 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         embed = success_embed(
             "Level-Up!",
             f"🎉 {member.mention} ist aufgestiegen!\nAktuelles Level: **{new_level}**",
+            thumbnail=member.display_avatar.url,
         )
-        embed.set_thumbnail(url=member.display_avatar.url)
         try:
             await target.send(embed=embed, embed_persistent=True)
         except discord.Forbidden:
@@ -288,7 +284,12 @@ class LevelsCog(commands.GroupCog, group_name="levels", group_description="Level
         embed = info_embed(
             f"Leaderboard — {interaction.guild.name}",  # type: ignore[union-attr]
             f"Top **{len(records)}** aktivste Mitglieder",
-            fields=[("Rangliste", spaced_list(lines), False)],
+            fields=[
+                ("Einträge", f"**{len(records)}**", True),
+                ("Server", interaction.guild.name, True),  # type: ignore[union-attr]
+                ("Sortierung", "XP gesamt", True),
+                ("Rangliste", spaced_list(lines), False),
+            ],
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
 

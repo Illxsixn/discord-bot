@@ -18,7 +18,7 @@ from discord.ext import commands, tasks
 from config import Config
 from database.database import Database
 from database.models import GiveawayRecord
-from utils.embeds import apply_brand_footer, error_embed, info_embed, spaced_lines, success_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, success_embed
 from utils.helpers import parse_duration_minutes
 from utils.permissions import bot_can_use_channel, can_manage_giveaways
 from utils.reactions import (
@@ -81,9 +81,11 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
 
         description = spaced_lines(*parts)
 
-        embed = info_embed("Gewinnspiel", description)
-        apply_brand_footer(embed, prefix=f"Giveaway #{giveaway.id}")
-        return embed
+        return info_embed(
+            "Gewinnspiel",
+            description,
+            footer_prefix=f"Giveaway #{giveaway.id}",
+        )
 
     async def _draw_winners(
         self,

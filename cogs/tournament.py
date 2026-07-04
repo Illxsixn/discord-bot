@@ -17,7 +17,7 @@ from database.models import (
     TournamentRecord,
     TournamentStatus,
 )
-from utils.embeds import apply_brand_footer, error_embed, info_embed, spaced_lines, spaced_list, split_embed_fields, success_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, split_embed_fields, success_embed
 from utils.helpers import truncate_text
 from utils.permissions import bot_can_use_channel, is_admin
 from utils.tournament_bracket import (
@@ -284,29 +284,20 @@ class TournamentCog(commands.Cog):
         status_text = MATCH_STATUS_LABELS.get(match.status, match.status.value)
         t1 = team1_name or "—"
         t2 = team2_name or "Freilos"
-        description = f"**{t1}** vs **{t2}**"
-        if extra_note:
-            description += f"\n\n{extra_note}"
+        winner_line = ""
         if match.status == TournamentMatchStatus.FINISHED and match.winner_id:
-            description += f"\n\n🏆 Sieger: **{t1 if match.winner_id == match.team1_id else t2}**"
+            winner_line = f"🏆 Sieger: **{t1 if match.winner_id == match.team1_id else t2}**"
 
-        embed = info_embed(
+        return info_embed(
             f"Match #{match.id} – Runde {match.round}",
-            description,
+            spaced_lines(f"**{t1}** vs **{t2}**", extra_note, winner_line),
             fields=[
-                (
-                    "Details",
-                    spaced_lines(
-                        f"**Map:** {match.map_name or '—'}",
-                        f"**Status:** {status_text}",
-                        f"**Turnier:** #{match.tournament_id}",
-                    ),
-                    False,
-                ),
+                ("Map", match.map_name or "—", True),
+                ("Status", status_text, True),
+                ("Turnier", f"#{match.tournament_id}", True),
             ],
+            footer_prefix=f"Match #{match.id}",
         )
-        apply_brand_footer(embed, prefix=f"Match #{match.id}")
-        return embed
 
     async def _refresh_match_message(
         self,
@@ -379,10 +370,12 @@ class TournamentCog(commands.Cog):
                 if channel and team and tournament:
                     embed = success_embed(
                         f"🏆 Turniersieger: {team.name}",
-                        f"**{tournament.name}** ({tournament.game}) ist beendet!\n"
-                        f"Glückwunsch an **{team.name}**!",
+                        spaced_lines(
+                            f"**{tournament.name}** ({tournament.game}) ist beendet!",
+                            f"Glückwunsch an **{team.name}**!",
+                        ),
+                        footer_prefix=f"Turnier #{tournament_id}",
                     )
-                    apply_brand_footer(embed, prefix=f"Turnier #{tournament_id}")
                     await channel.send(embed=embed, embed_persistent=True)
             return
 
@@ -925,11 +918,13 @@ class TournamentCog(commands.Cog):
         )
         embed = success_embed(
             f"Turnier #{tournament.id} erstellt",
-            f"**{tournament.name}** ({tournament.game})\n"
-            f"Max. Teams: **{tournament.max_teams}**\n"
-            f"Status: **{TOURNAMENT_STATUS_LABELS[tournament.status]}**",
+            spaced_lines(
+                f"**{tournament.name}** ({tournament.game})",
+                f"Max. Teams: **{tournament.max_teams}**",
+                f"Status: **{TOURNAMENT_STATUS_LABELS[tournament.status]}**",
+            ),
+            footer_prefix=f"Turnier #{tournament.id}",
         )
-        apply_brand_footer(embed, prefix=f"Turnier #{tournament.id}")
         await interaction.response.send_message(embed=embed)
 
     turnier_status_group = app_commands.Group(
@@ -1038,15 +1033,9 @@ class TournamentCog(commands.Cog):
         registered = sum(1 for t in teams if t.registered)
         maps = await self.db.get_tournament_maps(turnier_id)
         fields = [
-            (
-                "📋 Übersicht",
-                spaced_lines(
-                    f"**Spiel:** {tournament.game}",
-                    f"**Status:** {TOURNAMENT_STATUS_LABELS[tournament.status]}",
-                    f"**Teams:** {registered}/{tournament.max_teams} angemeldet",
-                ),
-                False,
-            ),
+            ("Spiel", tournament.game, True),
+            ("Status", TOURNAMENT_STATUS_LABELS[tournament.status], True),
+            ("Teams", f"**{registered}/{tournament.max_teams}**", True),
             ("🗺️ Maps", ", ".join(maps) if maps else "—", False),
         ]
         if tournament.description:
@@ -1063,8 +1052,11 @@ class TournamentCog(commands.Cog):
             )
         if team_lines:
             fields.extend(split_embed_fields("Teams", team_lines))
-        embed = info_embed(f"Turnier #{tournament.id}: {tournament.name}", fields=fields)
-        apply_brand_footer(embed, prefix=f"Turnier #{tournament.id}")
+        embed = info_embed(
+            f"Turnier #{tournament.id}: {tournament.name}",
+            fields=fields,
+            footer_prefix=f"Turnier #{tournament.id}",
+        )
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="turnier_maps_hinzufuegen", description="Fügt Maps zum Pool hinzu (Admin)")
@@ -1767,8 +1759,8 @@ class TournamentCog(commands.Cog):
                 ("Map", match.map_name or "—", True),
                 ("Sieger", winner, True),
             ],
+            footer_prefix=f"Match #{match.id}",
         )
-        apply_brand_footer(embed, prefix=f"Match #{match.id}")
         await interaction.response.send_message(embed=embed)
 
 
