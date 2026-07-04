@@ -8,7 +8,7 @@ import discord
 
 from config import Config
 from database.models import PetRecord, PlayerEconomyRecord, ZombiePlayerRecord, ZombieRunRecord
-from utils.embeds import info_embed, success_embed, error_embed, apply_brand_footer
+from utils.embeds import info_embed, success_embed, error_embed, apply_brand_footer, spaced_lines
 from utils.levels import progress_bar
 from utils.zombie_content import get_zombie, melee_base_damage, wave_intro_text, wave_location
 from utils.zombie_rewards import RunRewards
@@ -50,46 +50,45 @@ def build_run_embed(
         title = f"🧟 Welle {run.wave}/{run.max_waves} · {location}"
         description = "Bereit für den nächsten Einsatz."
 
-    embed = info_embed(title, description)
-
-    embed.add_field(
-        name="Spieler",
-        value="\n".join(
-            [
-                f"❤️ HP: {format_hp_bar(run.player_hp, run.player_max_hp)}",
-                f"🪙 Gold: **{economy.gold:,}** · Run-Punkte: **{run.run_gold}**",
-                f"⚔️ Nahkampf: **{melee_base_damage(player_level)}**",
-            ]
+    fields: list[tuple[str, str, bool]] = [
+        (
+            "Spieler",
+            "\n".join(
+                [
+                    f"❤️ HP: {format_hp_bar(run.player_hp, run.player_max_hp)}",
+                    f"🪙 Gold: **{economy.gold:,}** · Run-Punkte: **{run.run_gold}**",
+                    f"⚔️ Nahkampf: **{melee_base_damage(player_level)}**",
+                ]
+            ),
+            False,
         ),
-        inline=False,
-    )
+    ]
 
     if run.in_combat and zombie:
         special = "Spezialangriff möglich" if zombie.is_boss else (
             "Doppelangriff möglich" if zombie.double_attack_chance else "Standardangriff"
         )
-        embed.add_field(
-            name="Gegner",
-            value="\n".join(
-                [
-                    f"{zombie.emoji} **{zombie.name}**",
-                    f"❤️ HP: {format_hp_bar(run.current_zombie_hp, zombie.hp)}",
-                    f"⚔️ Angriff: **{zombie.attack}** · {special}",
-                ]
-            ),
-            inline=False,
+        fields.append(
+            (
+                "Gegner",
+                "\n".join(
+                    [
+                        f"{zombie.emoji} **{zombie.name}**",
+                        f"❤️ HP: {format_hp_bar(run.current_zombie_hp, zombie.hp)}",
+                        f"⚔️ Angriff: **{zombie.attack}** · {special}",
+                    ]
+                ),
+                False,
+            )
         )
 
     pet_name = pet.name if pet else "—"
-    embed.add_field(
-        name=f"🐾 {pet_name}",
-        value=_pet_action_label(run, pet),
-        inline=False,
-    )
+    fields.append((f"🐾 {pet_name}", _pet_action_label(run, pet), False))
 
     if run.last_action_text:
-        embed.add_field(name="Letzte Aktion", value=run.last_action_text[:1024], inline=False)
+        fields.append(("Letzte Aktion", run.last_action_text[:1024], False))
 
+    embed = info_embed(title, description, fields=fields)
     apply_brand_footer(
         embed,
         prefix="Kein Abbrechen — Run endet durch Sieg, Niederlage oder 12h Inaktivität",
@@ -126,25 +125,28 @@ def build_victory_embed(
     rewards: RunRewards,
 ) -> discord.Embed:
     """Run abgeschlossen — Sieg."""
-    embed = success_embed(
+    fields: list[tuple[str, str, bool]] = [
+        ("Wellen", f"**{run.max_waves}/{run.max_waves}**", True),
+        ("Boss besiegt", "Ja", True),
+        ("Schaden", f"**{run.total_damage:,}**", True),
+        ("Gold", f"**+{rewards.gold:,}** 🪙", True),
+        ("XP", f"**+{rewards.player_xp:,}**", True),
+        ("Pet-XP", f"**+{rewards.pet_xp:,}**", True),
+    ]
+    if rewards.luck_bonus_percent:
+        fields.append(
+            (
+                "Glück-Bonus",
+                f"**+{rewards.luck_bonus_percent} %** auf Belohnungen",
+                False,
+            )
+        )
+
+    return success_embed(
         "🏆 Run abgeschlossen",
         "Du hast alle Wellen überlebt und den Seuchenbrecher besiegt!",
-        fields=[
-            ("Wellen", f"**{run.max_waves}/{run.max_waves}**", True),
-            ("Boss besiegt", "Ja", True),
-            ("Schaden", f"**{run.total_damage:,}**", True),
-            ("Gold", f"**+{rewards.gold:,}** 🪙", True),
-            ("XP", f"**+{rewards.player_xp:,}**", True),
-            ("Pet-XP", f"**+{rewards.pet_xp:,}**", True),
-        ],
+        fields=fields,
     )
-    if rewards.luck_bonus_percent:
-        embed.add_field(
-            name="Glück-Bonus",
-            value=f"**+{rewards.luck_bonus_percent} %** auf Belohnungen",
-            inline=False,
-        )
-    return embed
 
 
 def build_defeat_embed(
@@ -152,21 +154,20 @@ def build_defeat_embed(
     rewards: RunRewards,
 ) -> discord.Embed:
     """Niederlage."""
-    embed = error_embed(
+    return error_embed(
         "💀 Überrannt",
         f"Du wurdest in **Welle {run.wave}** besiegt.",
         fields=[
             ("Gold", f"**+{rewards.gold:,}** 🪙 (Trost)", True),
             ("XP", f"**+{rewards.player_xp:,}**", True),
             ("Pet-XP", f"**+{rewards.pet_xp:,}**", True),
+            (
+                "Tipp",
+                "Nutze Pet-Aktion clever — Fokus, Power oder Glück je nach Impuls.",
+                False,
+            ),
         ],
     )
-    embed.add_field(
-        name="Tipp",
-        value="Nutze Pet-Aktion clever — Fokus, Power oder Glück je nach Impuls.",
-        inline=False,
-    )
-    return embed
 
 
 def build_expired_embed() -> discord.Embed:
@@ -194,29 +195,25 @@ def build_profile_embed(
         fields=[
             (
                 "Profil",
-                "\n".join(
-                    [
-                        f"**Gold:** {economy.gold:,} 🪙",
-                        f"**Höchste Welle:** {profile.highest_wave}/{Config.ZOMBIE_MAX_WAVES}",
-                    ]
+                spaced_lines(
+                    f"**Gold:** {economy.gold:,} 🪙",
+                    f"**Höchste Welle:** {profile.highest_wave}/{Config.ZOMBIE_MAX_WAVES}",
                 ),
                 False,
             ),
             (
                 "Statistik",
-                "\n".join(
-                    [
-                        f"**Zombie-Kills:** {profile.total_kills:,}",
-                        f"**Boss-Kills:** {profile.boss_kills:,}",
-                        f"**Runs:** {profile.runs_completed} Siege · {profile.runs_failed} Niederlagen",
-                    ]
+                spaced_lines(
+                    f"**Zombie-Kills:** {profile.total_kills:,}",
+                    f"**Boss-Kills:** {profile.boss_kills:,}",
+                    f"**Runs:** {profile.runs_completed} Siege · {profile.runs_failed} Niederlagen",
                 ),
                 False,
             ),
             ("Aktives Pet", pet_line, False),
         ],
+        thumbnail=member.display_avatar.url,
     )
-    embed.set_thumbnail(url=member.display_avatar.url)
     apply_brand_footer(embed, prefix="Spieler-Level weiterhin unter /levels level")
     return embed
 
@@ -252,8 +249,8 @@ def build_idle_status_embed(
     ]
     if cooldown:
         lines.append(f"⏳ **Cooldown:** {cooldown // 60}:{cooldown % 60:02d}")
-    lines.append("\nStarte einen Run mit **`/zombies start`**.")
-    return info_embed(f"Zombie Survival — {member.display_name}", "\n".join(lines))
+    lines.append("Starte einen Run mit **`/zombies start`**.")
+    return info_embed(f"Zombie Survival — {member.display_name}", spaced_lines(*lines))
 
 
 def build_help_embed() -> discord.Embed:

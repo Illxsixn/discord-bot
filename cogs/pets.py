@@ -477,11 +477,10 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             ),
         }
 
-        embed = success_embed(
+        embed = info_embed(
             titles.get(milestone, "Pet-Evolution!"),
             descriptions.get(milestone, f"**{pet.name}** ist gewachsen!"),
         )
-        embed.color = Config.COLOR_ARTWORK
         apply_brand_footer(embed, prefix=f"Besitzer: {member.display_name}")
         try:
             await channel.send(content=member.mention, embed=embed, embed_persistent=True)

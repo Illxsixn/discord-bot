@@ -139,3 +139,40 @@ def test_run_embed_matches_mockup_layout():
     assert "Fokus" in embed.fields[2].value
     assert "12 Schaden" in embed.fields[3].value
     assert "Kein Abbrechen" in embed.footer.text
+
+
+def test_slot_embed_matches_mockup_layout():
+    from utils.slot_embeds import build_slots_embed
+
+    embed = build_slots_embed(gold=1250, bet=25)
+
+    assert embed.title == "🎰 Slot-Maschine"
+    assert embed.color.value == Config.COLOR_ARTWORK
+    field_names = [field.name for field in embed.fields]
+    assert field_names == ["Einsatz", "Dein Gold"]
+    assert "1,250" in embed.fields[1].value
+    assert embed.timestamp is not None
+    assert Config.BOT_BRAND_NAME in (embed.footer.text or "")
+
+
+def test_pet_info_embed_uses_artwork_layout():
+    from utils.pet_embeds import build_pet_info_embed
+
+    member = MagicMock()
+    member.display_name = "MaxMustermann"
+    member.mention = "<@123>"
+
+    pet = PetRecord(
+        id=1,
+        owner_id=2,
+        guild_id=1,
+        name="Shadow",
+        species="Wolf",
+    )
+    embed = build_pet_info_embed(pet, member)
+
+    assert embed.color.value == Config.COLOR_ARTWORK
+    assert "Shadow" in (embed.title or "")
+    assert embed.timestamp is not None
+    assert Config.BOT_BRAND_NAME in (embed.footer.text or "")
+    assert len(embed.fields) >= 6

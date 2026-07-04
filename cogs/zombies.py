@@ -19,7 +19,7 @@ from database.models import (
     ZombieRunRecord,
     ZombieRunStatus,
 )
-from utils.embeds import error_embed, info_embed, warning_embed
+from utils.embeds import error_embed, info_embed, spaced_list, warning_embed
 from utils.game_locks import game_lock
 from utils.zombie_assets import attach_zombie_visual, set_zombie_visual_url
 from utils.zombie_combat import (
@@ -874,7 +874,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, f"**{rank}.**")
                 lines.append(f"{medal} {name} — **{record.gold:,}** 🪙")
             await interaction.response.send_message(
-                embed=info_embed("Gold-Rangliste", "\n".join(lines)),
+                embed=info_embed("Gold-Rangliste", spaced_list(lines)),
                 ephemeral=True,
             )
             return
@@ -905,7 +905,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             lines.append(f"{medal} {name} — {formatter(record)}")
 
         await interaction.response.send_message(
-            embed=info_embed(f"Rangliste — {title}", "\n".join(lines)),
+            embed=info_embed(f"Rangliste — {title}", spaced_list(lines)),
             ephemeral=True,
         )
 

@@ -482,6 +482,7 @@ def moderation_embed(
     reason: str | None = None,
     *,
     color: int | None = None,
+    fields: list[tuple[str, str, bool]] | None = None,
 ) -> discord.Embed:
     """
     Erstellt ein Moderations-Log-Embed für Aktionen wie Ban, Kick, etc.
@@ -512,6 +513,9 @@ def moderation_embed(
         inline=True,
     )
     embed.add_field(name="Grund", value=reason or "Kein Grund angegeben", inline=False)
+    if fields:
+        for name, value, inline in fields:
+            embed.add_field(name=name, value=value, inline=inline)
     embed.set_thumbnail(url=target.display_avatar.url)
     apply_brand_footer(embed)
     return embed

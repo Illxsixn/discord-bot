@@ -64,20 +64,22 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
 
     def _build_giveaway_embed(self, giveaway: GiveawayRecord) -> discord.Embed:
         """Erstellt Gewinnspiel-Embed."""
-        description = spaced_lines(
+        parts = [
             f"🎁 **Preis:** {giveaway.prize}",
             f"🏆 **Gewinner:** {giveaway.winner_count}",
             f"{emoji_display(giveaway.emoji)} Reagiere mit {emoji_display(giveaway.emoji)} um teilzunehmen!",
-        )
+        ]
         if not giveaway.ended:
-            description += f"\n\n⏱ Endet: {discord.utils.format_dt(giveaway.ends_at, 'R')}"
+            parts.append(f"⏱ Endet: {discord.utils.format_dt(giveaway.ends_at, 'R')}")
         else:
-            description += "\n\n🔒 **Beendet**"
+            parts.append("🔒 **Beendet**")
             if giveaway.winner_ids:
                 winners = ", ".join(f"<@{uid}>" for uid in giveaway.winner_ids)
-                description += f"\n\n🎉 **Gewinner:** {winners}"
+                parts.append(f"🎉 **Gewinner:** {winners}")
             else:
-                description += "\n\n❌ Keine gültigen Teilnehmer."
+                parts.append("❌ Keine gültigen Teilnehmer.")
+
+        description = spaced_lines(*parts)
 
         embed = info_embed("Gewinnspiel", description)
         apply_brand_footer(embed, prefix=f"Giveaway #{giveaway.id}")

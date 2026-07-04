@@ -1,110 +1,58 @@
 """
-
 Slot-Maschinen-Embeds.
-
 """
-
-
 
 from __future__ import annotations
 
-
-
 import discord
 
-
-
 from config import Config
-
-from utils.embeds import apply_brand_footer
-
+from utils.embeds import apply_brand_footer, artwork_embed, spaced_lines, success_embed
 from utils.slots import payout_table_text
 
 
-
-
-
 def build_slots_embed(
-
     *,
-
     gold: int,
-
     bet: int,
-
     reels: tuple[str, str, str] | None = None,
-
     result_line: str | None = None,
-
     won: bool | None = None,
-
+    jackpot: bool = False,
 ) -> discord.Embed:
-
     """Slot-Maschinen-Embed mit Walzen und Einsatz."""
-
-    if won is True:
-
-        color = Config.COLOR_SUCCESS
-
-        title = "🎰 Gewonnen!"
-
-    else:
-
-        color = Config.COLOR_ARTWORK
-
-        title = "🎰 Slot-Maschine"
-
-
-
     if reels:
-
         description = result_line or " "
-
     else:
-
-        description = (
-
-            "Setze deinen **Einsatz** und drücke **Drehen**!\n\n"
-
-            f"{payout_table_text()}"
-
+        description = spaced_lines(
+            "Setze deinen **Einsatz** und drücke **Drehen**!",
+            payout_table_text(),
         )
 
-
-
-    embed = discord.Embed(
-
-        title=title,
-
-        description=description,
-
-        color=color,
-
+    fields: list[tuple[str, str, bool]] = []
+    if reels:
+        a, b, c = reels
+        fields.extend(
+            [
+                ("Walze 1", a, True),
+                ("Walze 2", b, True),
+                ("Walze 3", c, True),
+            ]
+        )
+    fields.extend(
+        [
+            ("Einsatz", f"**{bet:,}** 🪙", True),
+            ("Dein Gold", f"**{gold:,}** 🪙", True),
+        ]
     )
 
-
-
-    if reels:
-
-        a, b, c = reels
-
-        # Drei Inline-Felder — Emoji-Breite in Codeblöcken bricht sonst das Layout.
-
-        embed.add_field(name="Walze 1", value=a, inline=True)
-
-        embed.add_field(name="Walze 2", value=b, inline=True)
-
-        embed.add_field(name="Walze 3", value=c, inline=True)
-
-
-
-    embed.add_field(name="Einsatz", value=f"**{bet:,}** 🪙", inline=True)
-
-    embed.add_field(name="Dein Gold", value=f"**{gold:,}** 🪙", inline=True)
+    if jackpot:
+        embed = success_embed("🎰 MEGA-JACKPOT!", description, fields=fields)
+    elif won is True:
+        embed = success_embed("🎰 Gewonnen!", description, fields=fields)
+    else:
+        embed = artwork_embed("🎰 Slot-Maschine", description, fields=fields)
 
     apply_brand_footer(embed, prefix="Wähle Einsatz unten · /zombies & Spiele bringen Gold")
-
     embed.set_image(url="https://media.tenor.com/m/koF9C6Zc0pAAAAAd/coins.gif")
-
     return embed
-
