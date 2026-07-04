@@ -176,15 +176,8 @@ class ZombieRunView(discord.ui.View):
             )
             return
 
-        remaining = self.action_cooldown_remaining()
-        if remaining > 0:
-            await interaction.response.send_message(
-                embed=warning_embed(
-                    "Cooldown",
-                    f"Kurz warten (**{remaining:.1f}** s), dann erneut.",
-                ),
-                ephemeral=True,
-            )
+        if self.action_cooldown_remaining() > 0:
+            await interaction.response.defer(ephemeral=True)
             return
 
         await self.cog._handle_run_action(
