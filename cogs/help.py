@@ -199,7 +199,7 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
         "hints": [
             f"Gewinner erhalten **{Config.GAME_WIN_XP} XP** (wenn Level-System aktiv ist)",
             f"Gewinner erhalten **{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX} Gold**",
-            f"`/slots` — Einsatz **{', '.join(str(b) for b in Config.SLOT_BET_OPTIONS)}** Gold · Dreh-Button 3 s Cooldown",
+            f"`/slots` — Einsatz **{', '.join(str(b) for b in Config.SLOT_BET_OPTIONS)}** Gold",
             f"`/guess` hat einen Cooldown von **{Config.GUESS_COOLDOWN // 60} Minuten**",
         ],
     },
