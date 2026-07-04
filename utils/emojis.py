@@ -52,6 +52,16 @@ def validate_emoji_name(name: str) -> str | None:
     return None
 
 
+def derive_emoji_name_from_filename(filename: str) -> str:
+    """Leitet einen gültigen Emoji-Namen aus einem Dateinamen ab."""
+    stem = PurePath(filename or "emoji").stem
+    cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", stem)
+    cleaned = re.sub(r"_+", "_", cleaned).strip("_").lower()
+    if len(cleaned) < 2:
+        cleaned = "emoji_upload"
+    return cleaned[:32].rstrip("_")
+
+
 def parse_custom_emoji(value: str) -> ParsedCustomEmoji | None:
     """Extrahiert Custom-Emoji-Daten aus Mention oder ``name:id``."""
     raw = value.strip()

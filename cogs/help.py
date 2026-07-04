@@ -56,7 +56,7 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
         "commands": [
             ("/help", "Alle Befehle nach Kategorie"),
             ("/changelog", "Bot-Updates und Versionshistorie"),
-            ("/emoji", "Server-Emoji hinzufügen (kopieren oder Bild hochladen)"),
+            ("/emoji", "Server-Emoji kopieren oder per Bild hochladen (Name automatisch)"),
         ],
         "hints": [
             "Bot braucht **Emojis verwalten** · Cooldown **30 s** pro Nutzer",

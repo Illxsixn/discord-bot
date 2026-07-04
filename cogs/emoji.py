@@ -14,6 +14,7 @@ from discord.ext import commands
 from config import Config
 from utils.embeds import error_embed, spaced_lines, success_embed
 from utils.emojis import (
+    derive_emoji_name_from_filename,
     fetch_emoji_bytes,
     is_animated_image,
     parse_custom_emoji,
@@ -37,7 +38,6 @@ class EmojiCog(commands.Cog):
         description="Fügt ein Server-Emoji hinzu — kopieren oder eigenes Bild hochladen.",
     )
     @app_commands.describe(
-        name="Name für das neue Emoji (2–32 Zeichen)",
         emoji="Emoji von einem anderen Server (<:name:id> oder Emoji-Picker)",
         bild="Eigenes Bild hochladen (PNG, JPG, GIF · max. 256 KB)",
     )
@@ -45,7 +45,6 @@ class EmojiCog(commands.Cog):
     async def emoji(
         self,
         interaction: discord.Interaction,
-        name: str,
         emoji: str | None = None,
         bild: discord.Attachment | None = None,
     ) -> None:
@@ -68,11 +67,6 @@ class EmojiCog(commands.Cog):
             )
             return
 
-        name_error = validate_emoji_name(name)
-        if name_error:
-            await interaction.followup.send(embed=error_embed("Ungültiger Name", name_error), ephemeral=True)
-            return
-
         if emoji and bild:
             await interaction.followup.send(
                 embed=error_embed(
@@ -90,6 +84,7 @@ class EmojiCog(commands.Cog):
                     spaced_lines(
                         "**Option 1 — Kopieren:** `emoji` mit einem Custom-Emoji von einem anderen Server",
                         "**Option 2 — Hochladen:** `bild` mit PNG, JPG oder GIF (max. 256 KB)",
+                        "Der Name wird automatisch vom Emoji bzw. Dateinamen übernommen.",
                     ),
                 ),
                 ephemeral=True,
@@ -109,6 +104,7 @@ class EmojiCog(commands.Cog):
         image_data: bytes
         animated = False
         source_label = "Bild-Upload"
+        emoji_name = ""
 
         try:
             if emoji:
@@ -124,11 +120,13 @@ class EmojiCog(commands.Cog):
                     )
                     return
 
+                emoji_name = parsed.name
                 image_data = await fetch_emoji_bytes(parsed)
                 animated = parsed.animated or is_animated_image(image_data)
                 source_label = f"Kopie von {discord.PartialEmoji(name=parsed.name, id=parsed.emoji_id, animated=parsed.animated)}"
             else:
                 assert bild is not None
+                emoji_name = derive_emoji_name_from_filename(bild.filename or "emoji")
                 image_data = await read_attachment_bytes(bild)
                 animated = is_animated_image(image_data)
                 source_label = f"Upload: `{bild.filename}`"
@@ -146,6 +144,20 @@ class EmojiCog(commands.Cog):
             )
             return
 
+        name_error = validate_emoji_name(emoji_name)
+        if name_error:
+            await interaction.followup.send(
+                embed=error_embed(
+                    "Ungültiger Name",
+                    spaced_lines(
+                        f"Der abgeleitete Name **`{emoji_name}`** ist ungültig.",
+                        name_error,
+                    ),
+                ),
+                ephemeral=True,
+            )
+            return
+
         slot_error = emoji_slot_error(interaction.guild, animated=animated)
         if slot_error:
             await interaction.followup.send(embed=error_embed("Emoji-Limit", slot_error), ephemeral=True)
@@ -153,7 +165,7 @@ class EmojiCog(commands.Cog):
 
         try:
             created = await interaction.guild.create_emoji(
-                name=name.strip(),
+                name=emoji_name,
                 image=image_data,
                 reason=f"/emoji von {interaction.user} ({interaction.user.id})",
             )
@@ -161,7 +173,7 @@ class EmojiCog(commands.Cog):
             logger.warning("Emoji-Erstellung fehlgeschlagen: %s", exc)
             message = "Das Emoji konnte nicht erstellt werden."
             if exc.status == 400:
-                message = "Discord hat das Bild oder den Namen abgelehnt. Prüfe Format, Größe und Namen."
+                message = "Discord hat das Bild oder den Namen abgelehnt. Prüfe Format und Größe."
             elif exc.status == 403:
                 message = "Keine Berechtigung, Emojis auf diesem Server zu erstellen."
             await interaction.followup.send(embed=error_embed("Erstellung fehlgeschlagen", message), ephemeral=True)

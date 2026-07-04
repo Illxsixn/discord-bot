@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 from utils.emojis import (
     animated_emoji_limit,
+    derive_emoji_name_from_filename,
     emoji_slot_error,
     parse_custom_emoji,
     validate_attachment,
@@ -37,6 +38,12 @@ def test_parse_custom_emoji_rejects_unicode() -> None:
 def test_validate_emoji_name() -> None:
     assert validate_emoji_name("ok_name") is None
     assert validate_emoji_name("a") is not None
+
+
+def test_derive_emoji_name_from_filename() -> None:
+    assert derive_emoji_name_from_filename("Cool-Pet.gif") == "cool_pet"
+    assert derive_emoji_name_from_filename("x.png") == "emoji_upload"
+    assert len(derive_emoji_name_from_filename("a" * 40 + ".png")) <= 32
 
 
 def test_validate_attachment_uses_filename_when_content_type_missing() -> None:
