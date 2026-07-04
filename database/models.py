@@ -257,6 +257,7 @@ class ZombieRunRecord:
     total_damage: int = 0
     last_action_text: str = ""
     shop_available: int = 0
+    current_zombie_image_url: str = ""
 
     @classmethod
     def from_row(cls, row: dict[str, Any]) -> "ZombieRunRecord":

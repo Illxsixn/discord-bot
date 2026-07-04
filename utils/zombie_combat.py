@@ -98,6 +98,7 @@ def _spawn_next_from_queue(run: ZombieRunRecord, queue: list[str]) -> list[str]:
     if zombie is None:
         return lines
 
+    run.current_zombie_image_url = ""
     run.current_zombie_key = key
     run.current_zombie_hp = zombie.hp
     lines.append(f"Ein **{zombie.emoji} {zombie.name}** erscheint!")
