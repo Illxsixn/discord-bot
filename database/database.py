@@ -1047,6 +1047,7 @@ class Database:
         allowed = {
             "kills": "total_kills",
             "boss_kills": "boss_kills",
+            "waves": "highest_wave",
         }
         column = allowed.get(sort_by, "total_kills")
         cursor = await self.conn.execute(

@@ -341,7 +341,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         file: discord.File | None = None,
     ) -> None:
         """Sendet das Run-Panel als öffentliche Nachricht (persistent Views)."""
-        kwargs: dict = {"embed": embed, "view": view}
+        kwargs: dict = {"embed": embed, "view": view, "embed_persistent": True}
         if file:
             kwargs["file"] = file
         await interaction.response.send_message(**kwargs)
@@ -487,6 +487,24 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         embed, file, view = await self._build_run_message(
             member, checked, refresh_visual=True, use_attachment=False
         )
+        if run.message_id and run.channel_id:
+            channel = interaction.guild.get_channel(run.channel_id)
+            if isinstance(channel, (discord.TextChannel, discord.Thread)):
+                try:
+                    message = await channel.fetch_message(run.message_id)
+                    await message.edit(embed=embed, view=view, attachments=[])
+                    self._persist_run_view(view, message.id)
+                    if not interaction.response.is_done():
+                        await interaction.response.send_message(
+                            embed=info_embed(
+                                "Run aktualisiert",
+                                f"Dein Run-Panel: {message.jump_url}",
+                            ),
+                            ephemeral=True,
+                        )
+                    return True
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    pass
         await self._send_run_panel(
             interaction,
             member,
@@ -519,7 +537,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 use_attachment=False,
             )
             view = view or run_view
-            payload = {"embed": embed, "view": view, "attachments": []}
+            payload = {"embed": embed, "view": view, "attachments": [], "embed_persistent": True}
 
         try:
             if interaction.response.is_done():
@@ -931,7 +949,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         sortierung=[
             app_commands.Choice(name="Zombie-Kills", value="kills"),
             app_commands.Choice(name="Boss-Kills", value="boss_kills"),
-            app_commands.Choice(name="Zombie-Level", value="level"),
+            app_commands.Choice(name="Höchste Welle", value="waves"),
             app_commands.Choice(name="Gold", value="gold"),
         ]
     )
@@ -981,7 +999,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         labels = {
             "kills": ("Zombie-Kills", lambda r: f"**{r.total_kills:,}** 💀"),
             "boss_kills": ("Boss-Kills", lambda r: f"**{r.boss_kills:,}** 👁️"),
-            "level": ("Zombie-Level", lambda r: f"Level **{r.level}** · **{r.xp:,}** XP"),
+            "waves": ("Höchste Welle", lambda r: f"**{r.highest_wave}/{Config.ZOMBIE_MAX_WAVES}** 🏆"),
         }
         title, formatter = labels.get(key, labels["kills"])
         lines = []
