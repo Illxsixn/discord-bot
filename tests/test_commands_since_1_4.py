@@ -120,10 +120,30 @@ def test_slots_rtp_at_most_target() -> None:
     assert rtp <= Config.SLOT_TARGET_RTP + 0.01
 
 
+def test_slots_rtp_equal_for_all_bets() -> None:
+    from utils.slots import simulate_rtp
+
+    rtps = {
+        bet: simulate_rtp(spins=250_000, bet=bet, seed=7)
+        for bet in Config.SLOT_BET_OPTIONS
+    }
+    values = list(rtps.values())
+    assert max(values) - min(values) <= 0.01
+
+
 def test_slots_two_match_returns_partial_bet() -> None:
     result = resolve_spin(("🍒", "🍒", "🍋"), bet=10)
-    assert result.payout == 5
+    assert result.payout == 4
     assert result.jackpot is False
+
+
+def test_slots_pair_payout_scales_linearly() -> None:
+    from utils.slots import _pair_payout
+
+    assert _pair_payout(5) == 2
+    assert _pair_payout(10) == 4
+    assert _pair_payout(25) == 10
+    assert _pair_payout(50) == 20
 
 
 def test_slots_no_match_zero_payout() -> None:
