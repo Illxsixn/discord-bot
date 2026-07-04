@@ -48,3 +48,4 @@ def test_embed_helpers_expose_footer_prefix() -> None:
     assert "footer_prefix" in embeds.artwork_embed.__code__.co_varnames
     assert "footer_prefix" in embeds.info_embed.__code__.co_varnames
     assert "footer_prefix" in embeds.success_embed.__code__.co_varnames
+    assert "author_name" in embeds.artwork_embed.__code__.co_varnames

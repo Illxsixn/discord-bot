@@ -16,11 +16,10 @@ from discord import app_commands
 from discord.ext import commands
 
 from config import Config
-from utils.embeds import BRAND_ICON_ATTACHMENT, apply_brand_footer, brand_name, error_embed, info_embed, spaced_lines
+from utils.embeds import BRAND_ICON_ATTACHMENT, brand_name, error_embed, info_embed, spaced_lines, split_embed_fields
 
 logger = logging.getLogger(__name__)
 
-DISCORD_FIELD_LIMIT = 1024
 HELP_VIEW_TIMEOUT = 600.0
 
 
@@ -402,48 +401,25 @@ def _append_hint_fields(
     return fields
 
 
-def _format_commands(commands_list: list[tuple[str, str]]) -> str:
-    """Formatiert Befehle als kompakte Liste."""
-    return "\n".join(f"`{cmd}` — {desc}" for cmd, desc in commands_list)
-
-
 def _split_command_fields(commands_list: list[tuple[str, str]]) -> list[tuple[str, str, bool]]:
-    """
-    Teilt lange Befehlslisten in mehrere Embed-Felder (Discord-Limit: 1024 Zeichen).
-
-    Args:
-        commands_list: Liste aus (Befehl, Beschreibung).
-
-    Returns:
-        Feld-Tupel für info_embed.
-    """
+    """Teilt lange Befehlslisten in mehrere Embed-Felder (Discord-Limit: 1024 Zeichen)."""
     if not commands_list:
         return [("Befehle", "Keine Befehle in dieser Kategorie.", False)]
+    entries = [f"`{cmd}` — {desc}" for cmd, desc in commands_list]
+    return split_embed_fields("Befehle", entries, joiner="\n")
 
-    fields: list[tuple[str, str, bool]] = []
-    chunk: list[tuple[str, str]] = []
-    chunk_len = 0
-    part = 1
 
-    for entry in commands_list:
-        line = f"`{entry[0]}` — {entry[1]}"
-        line_len = len(line) + (1 if chunk else 0)
+def _help_footer_prefix(*, page: int, total_pages: int, command_count: int) -> str:
+    if total_pages > 1:
+        return f"Seite {page + 1}/{total_pages} • {command_count} Befehle • /help"
+    return f"{command_count} Befehle • /help"
 
-        if chunk and chunk_len + line_len > DISCORD_FIELD_LIMIT:
-            label = "Befehle" if part == 1 and len(commands_list) == len(chunk) else f"Befehle ({part})"
-            fields.append((label, _format_commands(chunk), False))
-            chunk = [entry]
-            chunk_len = len(line)
-            part += 1
-        else:
-            chunk.append(entry)
-            chunk_len += line_len
 
-    if chunk:
-        label = "Befehle" if part == 1 else f"Befehle ({part})"
-        fields.append((label, _format_commands(chunk), False))
-
-    return fields
+def _help_author_kwargs() -> dict[str, str]:
+    return {
+        "author_name": brand_name(),
+        "author_icon_url": f"attachment://{BRAND_ICON_ATTACHMENT}",
+    }
 
 
 def _resolve_category_key(kategorie: HelpCategory | app_commands.Choice[str] | str | None) -> str | None:
@@ -481,27 +457,6 @@ def _total_command_count() -> int:
     return sum(len(_category_commands(key)) for key in HELP_CATEGORIES)
 
 
-def _apply_embed_meta(
-    embed: discord.Embed,
-    bot: commands.Bot,
-    *,
-    page: int,
-    total_pages: int,
-    command_count: int,
-) -> discord.Embed:
-    """Setzt Autor, Footer und Seitenangabe auf dem Help-Embed."""
-    icon_url = f"attachment://{BRAND_ICON_ATTACHMENT}"
-    embed.set_author(name=brand_name(), icon_url=icon_url)
-
-    if total_pages > 1:
-        prefix = f"Seite {page + 1}/{total_pages} • {command_count} Befehle • /help"
-    else:
-        prefix = f"{command_count} Befehle • /help"
-
-    apply_brand_footer(embed, prefix=prefix)
-    return embed
-
-
 def _build_overview_page(bot: commands.Bot, page_index: int) -> discord.Embed:
     """Erstellt eine einzelne Übersichtsseite (frisch, für Pagination)."""
     total_cmds = _total_command_count()
@@ -522,14 +477,14 @@ def _build_overview_page(bot: commands.Bot, page_index: int) -> discord.Embed:
             "Nutze die Buttons, das Menü unten oder `/help kategorie:<Bereich>`.",
         ),
         fields=fields,
+        footer_prefix=_help_footer_prefix(
+            page=page_index,
+            total_pages=total_pages,
+            command_count=len(cmds),
+        ),
+        **_help_author_kwargs(),
     )
-    return _apply_embed_meta(
-        embed,
-        bot,
-        page=page_index,
-        total_pages=total_pages,
-        command_count=len(cmds),
-    )
+    return embed
 
 
 def _build_overview_embeds(bot: commands.Bot) -> list[discord.Embed]:
@@ -565,14 +520,14 @@ def _build_category_page(bot: commands.Bot, category: str, page_index: int) -> d
         f"{data['emoji']} {data['label']} — Befehle",
         description,
         fields=fields,
+        footer_prefix=_help_footer_prefix(
+            page=page_index,
+            total_pages=total_pages,
+            command_count=len(cmds),
+        ),
+        **_help_author_kwargs(),
     )
-    return _apply_embed_meta(
-        embed,
-        bot,
-        page=page_index,
-        total_pages=total_pages,
-        command_count=len(cmds),
-    )
+    return embed
 
 
 def _build_category_embeds(bot: commands.Bot, category: str) -> list[discord.Embed]:

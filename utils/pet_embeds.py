@@ -34,15 +34,6 @@ RARITY_ORDER: tuple[PetRarity, ...] = (
 )
 
 
-def apply_pet_image_layout(
-    embed: discord.Embed,
-    *,
-    attachment_filename: str,
-) -> discord.Embed:
-    """Setzt das Pet-Portrait einmal als großes Embed-Bild (kein Thumbnail-Duplikat)."""
-    embed.set_image(url=f"attachment://{attachment_filename}")
-    return embed
-
 
 def build_pet_info_embed(
     pet: PetRecord,

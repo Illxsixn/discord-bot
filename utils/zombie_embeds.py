@@ -13,6 +13,7 @@ from utils.levels import progress_bar
 from utils.zombie_combat import pet_action_cooldown_attacks
 from utils.zombie_content import get_zombie, melee_base_damage, scaled_zombie_attack, wave_intro_text, wave_location
 from utils.zombie_rewards import RunRewards
+from utils.zombie_assets import apply_zombie_visual
 
 
 def format_hp_bar(current: int, maximum: int) -> str:
@@ -94,6 +95,37 @@ def build_run_embed(
         footer_prefix="Kein Abbrechen — Run endet durch Sieg, Niederlage oder 12h Inaktivität",
         with_icon=False,
     )
+
+
+def build_run_message_embed(
+    run: ZombieRunRecord,
+    *,
+    pet: PetRecord | None,
+    economy: PlayerEconomyRecord,
+    player_level: int,
+    refresh_visual: bool = False,
+    use_attachment: bool = False,
+) -> tuple[discord.Embed, discord.File | None]:
+    """Run-Embed inkl. optionalem Zombie-GIF (zentral gebaut, keine Cog-Mutation)."""
+    embed = build_run_embed(
+        run,
+        pet=pet,
+        economy=economy,
+        player_level=player_level,
+    )
+    file: discord.File | None = None
+    if run.in_combat and run.current_zombie_key:
+        zombie = get_zombie(run.current_zombie_key)
+        if zombie:
+            file = apply_zombie_visual(
+                embed,
+                run,
+                run.current_zombie_key,
+                is_boss=zombie.is_boss,
+                use_attachment=use_attachment,
+                refresh_visual=refresh_visual,
+            )
+    return embed, file
 
 
 def build_pet_action_picker_embed(pet: PetRecord, *, companion_rarity: str = "") -> discord.Embed:
