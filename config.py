@@ -76,8 +76,9 @@ class Config:
     LOOTBOX_CONSOLATION_GOLD_MAX: int = 12
     LOOTBOX_CONSOLATION_XP_MIN: int = 4
     LOOTBOX_CONSOLATION_XP_MAX: int = 12
-    LOOTBOX_INVENTORY_MAX: int = 3
-    LOOTBOX_BATCH_MAX: int = 3
+    LOOTBOX_INVENTORY_MAX: int = 10
+    LOOTBOX_BATCH_MAX: int = 10
+    LOOTBOX_BUY_OPTIONS: tuple[int, ...] = (1, 5, 10)
     LOOTBOX_LEADERBOARD_LIMIT: int = 10
 
     # Zombie Survival (Gold über Runs — Lootboxen unverändert)

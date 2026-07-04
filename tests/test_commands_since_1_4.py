@@ -180,26 +180,26 @@ async def test_shop_buy_lootboxes_inventory_full(db: Database) -> None:
 
 @pytest.mark.asyncio
 async def test_shop_buy_lootboxes_bulk_success(db: Database) -> None:
-    await db.add_player_gold(1, 42, 500)
-    ok, embed, economy = await buy_lootboxes(db, 1, 42, count=3)
+    await db.add_player_gold(1, 42, 5000)
+    ok, embed, economy = await buy_lootboxes(db, 1, 42, count=10)
     assert ok is True
     assert economy is not None
-    assert economy.lootbox_count == 3
-    assert economy.gold == 500 - Config.LOOTBOX_PRICE * 3
+    assert economy.lootbox_count == 10
+    assert economy.gold == 5000 - Config.LOOTBOX_PRICE * 10
     assert embed.title is not None
 
 
 @pytest.mark.asyncio
 async def test_shop_buy_lootboxes_bulk_over_remaining(db: Database) -> None:
-    await db.add_player_gold(1, 42, 500)
-    ok, _, economy = await buy_lootboxes(db, 1, 42, count=2)
+    await db.add_player_gold(1, 42, 5000)
+    ok, _, economy = await buy_lootboxes(db, 1, 42, count=8)
     assert ok is True
     assert economy is not None
-    assert economy.lootbox_count == 2
-    ok2, embed, economy2 = await buy_lootboxes(db, 1, 42, count=2)
+    assert economy.lootbox_count == 8
+    ok2, embed, economy2 = await buy_lootboxes(db, 1, 42, count=5)
     assert ok2 is False
     assert economy2 is not None
-    assert economy2.lootbox_count == 2
+    assert economy2.lootbox_count == 8
     assert embed.title is not None
 
 

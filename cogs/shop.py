@@ -40,7 +40,7 @@ class ShopView(discord.ui.View):
             buy_btn.callback = self._inventory_full
             self.add_item(buy_btn)
         else:
-            for amount in (1, 2, 3):
+            for amount in Config.LOOTBOX_BUY_OPTIONS:
                 if amount > remaining:
                     continue
                 btn = discord.ui.Button(
