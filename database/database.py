@@ -401,6 +401,11 @@ _TOURNAMENT_MIGRATIONS = [
     "ALTER TABLE turniere ADD COLUMN interface_message_id INTEGER",
 ]
 
+_ZOMBIE_RUN_MIGRATIONS = [
+    "ALTER TABLE zombie_runs ADD COLUMN companion_rarity TEXT DEFAULT ''",
+    "ALTER TABLE zombie_runs ADD COLUMN current_zombie_max_hp INTEGER DEFAULT 0",
+]
+
 class Database:
     """
     Asynchrone SQLite-Datenbankverbindung für den Bot.
@@ -443,6 +448,7 @@ class Database:
         await self._migrate_ticket_settings()
         await self._migrate_player_economy()
         await self._migrate_tournaments()
+        await self._migrate_zombie_runs()
         await self._connection.commit()
         logger.info("Datenbankschema initialisiert.")
 
@@ -473,6 +479,14 @@ class Database:
     async def _migrate_tournaments(self) -> None:
         """Fügt Interface-Spalten zu turniere hinzu (idempotent)."""
         for sql in _TOURNAMENT_MIGRATIONS:
+            try:
+                await self._connection.execute(sql)
+            except aiosqlite.OperationalError:
+                pass
+
+    async def _migrate_zombie_runs(self) -> None:
+        """Fügt Pet-Schwierigkeit und Zombie-Max-HP zu zombie_runs hinzu (idempotent)."""
+        for sql in _ZOMBIE_RUN_MIGRATIONS:
             try:
                 await self._connection.execute(sql)
             except aiosqlite.OperationalError:
@@ -898,10 +912,11 @@ class Database:
                 UPDATE zombie_runs SET
                     channel_id = ?, message_id = ?, status = ?, wave = ?, max_waves = ?,
                     player_hp = ?, player_max_hp = ?, run_gold = ?,
-                    current_zombie_key = ?, current_zombie_hp = ?, zombies_remaining = ?,
+                    current_zombie_key = ?, current_zombie_hp = ?, current_zombie_max_hp = ?,
+                    zombies_remaining = ?,
                     pet_action_cooldown = ?, luck_bonus_uses = ?, focus_active = ?,
                     total_damage = ?, last_action_text = ?, shop_available = ?,
-                    updated_at = ?
+                    companion_rarity = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -915,6 +930,7 @@ class Database:
                     run.run_gold,
                     run.current_zombie_key,
                     run.current_zombie_hp,
+                    run.current_zombie_max_hp,
                     run.zombies_remaining,
                     run.pet_action_cooldown,
                     run.luck_bonus_uses,
@@ -922,6 +938,7 @@ class Database:
                     run.total_damage,
                     run.last_action_text,
                     run.shop_available,
+                    run.companion_rarity,
                     updated,
                     run.id,
                 ),
@@ -933,9 +950,10 @@ class Database:
                 INSERT INTO zombie_runs (
                     guild_id, user_id, channel_id, message_id, status, wave, max_waves,
                     player_hp, player_max_hp, run_gold, current_zombie_key, current_zombie_hp,
-                    zombies_remaining, pet_action_cooldown, luck_bonus_uses, focus_active,
-                    total_damage, last_action_text, shop_available, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    current_zombie_max_hp, zombies_remaining, pet_action_cooldown, luck_bonus_uses,
+                    focus_active, total_damage, last_action_text, shop_available, companion_rarity,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run.guild_id,
@@ -950,6 +968,7 @@ class Database:
                     run.run_gold,
                     run.current_zombie_key,
                     run.current_zombie_hp,
+                    run.current_zombie_max_hp,
                     run.zombies_remaining,
                     run.pet_action_cooldown,
                     run.luck_bonus_uses,
@@ -957,6 +976,7 @@ class Database:
                     run.total_damage,
                     run.last_action_text,
                     run.shop_available,
+                    run.companion_rarity,
                     created,
                     updated,
                 ),

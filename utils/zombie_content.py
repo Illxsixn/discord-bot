@@ -137,3 +137,25 @@ def melee_base_damage(player_level: int) -> int:
     """Basis-Nahkampfschaden."""
     return 11 + max(0, player_level - 1) // 2
 
+
+def zombie_difficulty_multipliers(companion_rarity: str | None) -> tuple[float, float]:
+    """HP- und Angriffs-Multiplikator abhängig von der Pet-Seltenheit beim Run-Start."""
+    if not companion_rarity:
+        return 1.0, 1.0
+    key = companion_rarity.lower()
+    hp_scale = Config.ZOMBIE_PET_DIFFICULTY_HP.get(key, 1.0)
+    attack_scale = Config.ZOMBIE_PET_DIFFICULTY_ATTACK.get(key, 1.0)
+    return hp_scale, attack_scale
+
+
+def scaled_zombie_hp(zombie: ZombieDefinition, companion_rarity: str | None) -> int:
+    """Zombie-HP mit Pet-Schwierigkeits-Skalierung."""
+    hp_scale, _ = zombie_difficulty_multipliers(companion_rarity)
+    return max(1, int(round(zombie.hp * hp_scale)))
+
+
+def scaled_zombie_attack(zombie: ZombieDefinition, companion_rarity: str | None) -> int:
+    """Zombie-Angriff mit Pet-Schwierigkeits-Skalierung."""
+    _, attack_scale = zombie_difficulty_multipliers(companion_rarity)
+    return max(1, int(round(zombie.attack * attack_scale)))
+

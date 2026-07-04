@@ -10,7 +10,8 @@ from config import Config
 from database.models import PetRecord, PlayerEconomyRecord, ZombiePlayerRecord, ZombieRunRecord
 from utils.embeds import info_embed, success_embed, error_embed, apply_brand_footer, spaced_lines
 from utils.levels import progress_bar
-from utils.zombie_content import get_zombie, melee_base_damage, wave_intro_text, wave_location
+from utils.zombie_combat import pet_action_cooldown_attacks
+from utils.zombie_content import get_zombie, melee_base_damage, scaled_zombie_attack, wave_intro_text, wave_location
 from utils.zombie_rewards import RunRewards
 
 
@@ -65,6 +66,8 @@ def build_run_embed(
     ]
 
     if run.in_combat and zombie:
+        zombie_max_hp = run.current_zombie_max_hp or zombie.hp
+        attack_value = scaled_zombie_attack(zombie, run.companion_rarity or None)
         special = "Spezialangriff möglich" if zombie.is_boss else (
             "Doppelangriff möglich" if zombie.double_attack_chance else "Standardangriff"
         )
@@ -74,8 +77,8 @@ def build_run_embed(
                 "\n".join(
                     [
                         f"{zombie.emoji} **{zombie.name}**",
-                        f"❤️ HP: {format_hp_bar(run.current_zombie_hp, zombie.hp)}",
-                        f"⚔️ Angriff: **{zombie.attack}** · {special}",
+                        f"❤️ HP: {format_hp_bar(run.current_zombie_hp, zombie_max_hp)}",
+                        f"⚔️ Angriff: **{attack_value}** · {special}",
                     ]
                 ),
                 False,
@@ -97,14 +100,15 @@ def build_run_embed(
     return embed
 
 
-def build_pet_action_picker_embed(pet: PetRecord) -> discord.Embed:
+def build_pet_action_picker_embed(pet: PetRecord, *, companion_rarity: str = "") -> discord.Embed:
     """Separates Menü zur Auswahl der Pet-Spezialaktion im Kampf."""
+    cooldown = pet_action_cooldown_attacks(companion_rarity or None)
     return info_embed(
         f"🐾 Pet-Aktion — {pet.name}",
         "Wähle **eine** Spezialaktion für diesen Kampfzug.",
         fields=[
             ("🎯 Fokus", "Nächster Nahkampf **+50 %** Schaden", True),
-            ("⚡ Power", "Sofort **15–30** Schaden am Zombie", True),
+            ("⚡ Power", "Sofort-Schaden am Zombie (schwächer bei Epic/Legendary)", True),
             (
                 "🍀 Glück",
                 f"Endbonus **+{Config.ZOMBIE_LUCK_BONUS_PERCENT} %** "
@@ -113,7 +117,7 @@ def build_pet_action_picker_embed(pet: PetRecord) -> discord.Embed:
             ),
             (
                 "Cooldown",
-                f"**{Config.ZOMBIE_PET_ACTION_COOLDOWN}** Nahkampf-Angriffe nach der Aktion",
+                f"**{cooldown}** Nahkampf-Angriffe nach der Aktion",
                 False,
             ),
         ],

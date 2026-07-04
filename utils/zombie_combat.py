@@ -10,14 +10,28 @@ from dataclasses import dataclass, field
 from config import Config
 from database.models import PetMood, PetRecord, PetRarity, ZombieRunRecord
 from utils.pets import get_species_rarity
-from utils.zombie_content import get_zombie, melee_base_damage, wave_zombie_list
+from utils.zombie_content import (
+    get_zombie,
+    melee_base_damage,
+    scaled_zombie_attack,
+    scaled_zombie_hp,
+    wave_zombie_list,
+)
 
 _PASSIVE_HELP_CHANCE: dict[PetRarity, float] = {
     PetRarity.COMMON: 0.05,
     PetRarity.UNCOMMON: 0.10,
     PetRarity.RARE: 0.15,
-    PetRarity.EPIC: 0.20,
-    PetRarity.LEGENDARY: 0.25,
+    PetRarity.EPIC: 0.16,
+    PetRarity.LEGENDARY: 0.12,
+}
+
+_POWER_DAMAGE_BY_RARITY: dict[PetRarity, tuple[int, int]] = {
+    PetRarity.COMMON: (15, 30),
+    PetRarity.UNCOMMON: (15, 30),
+    PetRarity.RARE: (14, 28),
+    PetRarity.EPIC: (12, 24),
+    PetRarity.LEGENDARY: (10, 20),
 }
 
 
@@ -39,6 +53,24 @@ def _pet_rarity(pet: PetRecord | None) -> PetRarity | None:
     return get_species_rarity(pet.species)
 
 
+def pet_action_cooldown_attacks(companion_rarity: str | None) -> int:
+    """Nahkampf-Angriffe bis zur nächsten Pet-Aktion — Legendary-Pets brauchen länger."""
+    if not companion_rarity:
+        return Config.ZOMBIE_PET_ACTION_COOLDOWN
+    key = companion_rarity.lower()
+    if key == PetRarity.LEGENDARY.value:
+        return Config.ZOMBIE_PET_ACTION_COOLDOWN_LEGENDARY
+    if key == PetRarity.EPIC.value:
+        return Config.ZOMBIE_PET_ACTION_COOLDOWN_EPIC
+    return Config.ZOMBIE_PET_ACTION_COOLDOWN
+
+
+def _power_damage_range(rarity: PetRarity | None) -> tuple[int, int]:
+    if rarity is None:
+        return _POWER_DAMAGE_BY_RARITY[PetRarity.COMMON]
+    return _POWER_DAMAGE_BY_RARITY.get(rarity, (15, 30))
+
+
 def tick_pet_cooldown_on_melee(run: ZombieRunRecord) -> None:
     """Reduziert Pet-Cooldown nach jedem Nahkampfangriff."""
     if run.pet_action_cooldown > 0:
@@ -50,6 +82,7 @@ def _finish_wave_and_continue(run: ZombieRunRecord) -> list[str]:
     lines: list[str] = []
     run.current_zombie_key = None
     run.current_zombie_hp = 0
+    run.current_zombie_max_hp = 0
     run.shop_available = 0
     heal = max(1, int(run.player_max_hp * Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT / 100))
     before = run.player_hp
@@ -100,7 +133,9 @@ def _spawn_next_from_queue(run: ZombieRunRecord, queue: list[str]) -> list[str]:
 
     run.current_zombie_image_url = ""
     run.current_zombie_key = key
-    run.current_zombie_hp = zombie.hp
+    scaled_hp = scaled_zombie_hp(zombie, run.companion_rarity or None)
+    run.current_zombie_hp = scaled_hp
+    run.current_zombie_max_hp = scaled_hp
     lines.append(f"Ein **{zombie.emoji} {zombie.name}** erscheint!")
     return lines
 
@@ -117,6 +152,7 @@ def _on_zombie_killed(run: ZombieRunRecord, zombie_key: str) -> CombatResult:
             result.lines.append(f"**{zombie.name}** fällt! Der Seuchenherd ist gesäubert.")
             run.current_zombie_key = None
             run.current_zombie_hp = 0
+            run.current_zombie_max_hp = 0
             run.zombies_remaining = 0
             run.shop_available = 0
             return result
@@ -139,7 +175,8 @@ def _zombie_attack(run: ZombieRunRecord, zombie_key: str) -> list[str]:
 
     lines: list[str] = []
     defense_bonus = 0
-    damage = max(1, zombie.attack - defense_bonus)
+    attack_value = scaled_zombie_attack(zombie, run.companion_rarity or None)
+    damage = max(1, attack_value - defense_bonus)
 
     if zombie.double_attack_chance and random.random() < zombie.double_attack_chance:
         damage *= 2
@@ -259,7 +296,8 @@ def perform_pet_action(
         run.focus_active = 1
         result.lines.append(f"**{pet.name}** — **Fokus**: Nächster Nahkampf +50 % Schaden.")
     elif chosen == PetMood.ENERGY.value:
-        dmg = random.randint(15, 30)
+        low, high = _power_damage_range(_pet_rarity(pet))
+        dmg = random.randint(low, high)
         run.current_zombie_hp = max(0, run.current_zombie_hp - dmg)
         run.total_damage += dmg
         result.lines.append(f"**{pet.name}** — **Power**: **{dmg}** Schaden!")
@@ -284,7 +322,7 @@ def perform_pet_action(
         run.focus_active = 1
         result.lines.append(f"**{pet.name}** konzentriert sich — nächster Angriff verstärkt.")
 
-    run.pet_action_cooldown = Config.ZOMBIE_PET_ACTION_COOLDOWN
+    run.pet_action_cooldown = pet_action_cooldown_attacks(run.companion_rarity or None)
 
     if run.in_combat and run.current_zombie_key and not result.run_completed:
         result.lines.extend(_zombie_attack(run, run.current_zombie_key))

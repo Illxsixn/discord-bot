@@ -259,7 +259,9 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             f"**+{Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT} %** HP nach jeder geschafften Welle",
             "Keine Wellenpause — nächste Welle startet automatisch",
             "Lootboxen & Produkte jederzeit unter **`/shop`**",
-            f"Pet-Aktion: Cooldown **{Config.ZOMBIE_PET_ACTION_COOLDOWN}** Nahkampf-Angriffe",
+            f"Pet-Aktion: Cooldown **{Config.ZOMBIE_PET_ACTION_COOLDOWN}** Nahkampf-Angriffe "
+            f"(Epic **{Config.ZOMBIE_PET_ACTION_COOLDOWN_EPIC}**, Legendary **{Config.ZOMBIE_PET_ACTION_COOLDOWN_LEGENDARY}**)",
+            "Legendary-Pets ziehen **stärkere Zombies** an (+35 % HP, +28 % Angriff)",
             "Pet optional — ohne Pet ist Pet-Aktion deaktiviert",
         ],
     },

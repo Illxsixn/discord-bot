@@ -81,3 +81,25 @@ def test_zombie_run_view_persistent_until_timeout():
     assert view.is_persistent()
     view.timeout = 900.0
     assert not view.is_persistent()
+
+
+def test_legendary_pet_scales_zombie_hp_and_attack():
+    from database.models import PetRarity
+    from utils.zombie_combat import pet_action_cooldown_attacks
+    from utils.zombie_content import ZOMBIES, ZOMBIE_TYPE_STREUNER, scaled_zombie_attack, scaled_zombie_hp
+
+    zombie = ZOMBIES[ZOMBIE_TYPE_STREUNER]
+    assert scaled_zombie_hp(zombie, None) == zombie.hp
+    assert scaled_zombie_hp(zombie, PetRarity.LEGENDARY.value) > zombie.hp
+    assert scaled_zombie_attack(zombie, PetRarity.LEGENDARY.value) > zombie.attack
+    assert pet_action_cooldown_attacks(PetRarity.LEGENDARY.value) == Config.ZOMBIE_PET_ACTION_COOLDOWN_LEGENDARY
+
+
+def test_legendary_spawn_sets_scaled_hp_on_run():
+    from database.models import PetRarity
+
+    run = _run(companion_rarity=PetRarity.LEGENDARY.value)
+    lines = spawn_wave(run)
+    assert lines
+    assert run.current_zombie_max_hp > 0
+    assert run.current_zombie_hp == run.current_zombie_max_hp

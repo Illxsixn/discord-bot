@@ -88,6 +88,23 @@ class Config:
     ZOMBIE_PLAYER_HP_BASE: int = 105
     ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT: int = 32
     ZOMBIE_PET_ACTION_COOLDOWN: int = 2
+    ZOMBIE_PET_ACTION_COOLDOWN_EPIC: int = 3
+    ZOMBIE_PET_ACTION_COOLDOWN_LEGENDARY: int = 4
+    # Multiplikatoren (HP, Angriff) wenn ein Pet den Run begleitet — Legendary = härtere Horde
+    ZOMBIE_PET_DIFFICULTY_HP: dict[str, float] = {
+        "gewöhnlich": 1.0,
+        "ungewöhnlich": 1.0,
+        "selten": 1.05,
+        "episch": 1.12,
+        "legendär": 1.35,
+    }
+    ZOMBIE_PET_DIFFICULTY_ATTACK: dict[str, float] = {
+        "gewöhnlich": 1.0,
+        "ungewöhnlich": 1.0,
+        "selten": 1.05,
+        "episch": 1.10,
+        "legendär": 1.28,
+    }
     ZOMBIE_ACTION_COOLDOWN: float = 1.5
     ZOMBIE_LUCK_BONUS_PERCENT: int = 5
     ZOMBIE_LUCK_BONUS_MAX: int = 25

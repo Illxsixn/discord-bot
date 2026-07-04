@@ -15,12 +15,13 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from database.models import (
+    PetRarity,
     ZombieCooldownType,
     ZombieRunRecord,
     ZombieRunStatus,
 )
 from utils.embeds import error_embed, info_embed, spaced_list, warning_embed
-from utils.game_locks import game_lock
+from utils.pets import get_species_rarity
 from utils.zombie_assets import apply_zombie_visual
 from utils.zombie_combat import (
     perform_melee,
@@ -632,7 +633,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             )
             return
 
-        embed = build_pet_action_picker_embed(pet)
+        embed = build_pet_action_picker_embed(pet, companion_rarity=run.companion_rarity)
         view = ZombiePetActionView(self, run_id, interaction.user.id)
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -824,6 +825,12 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         hp_max = player_max_hp(player_level)
         now = datetime.now(timezone.utc)
         channel = self._channel(interaction)
+        pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
+        companion_rarity = ""
+        if pet is not None:
+            rarity = get_species_rarity(pet.species)
+            if rarity is not None:
+                companion_rarity = rarity.value
 
         run = ZombieRunRecord(
             id=0,
@@ -837,9 +844,15 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             player_max_hp=hp_max,
             created_at=now,
             updated_at=now,
+            companion_rarity=companion_rarity,
         )
         run = await self.db.save_zombie_run(run)
         spawn_lines = spawn_wave(run)
+        if companion_rarity == PetRarity.LEGENDARY.value:
+            spawn_lines.insert(
+                0,
+                "Dein **legendäres Pet** zieht eine **verstärkte Seuche** an — mehr HP & Angriff!",
+            )
         run.last_action_text = "\n".join(spawn_lines)
         run = await self.db.save_zombie_run(run)
 
