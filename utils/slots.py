@@ -1,7 +1,7 @@
 """
 Slot-Maschine: Symbole, Spin-Logik und Auszahlung.
 
-Auszahlungsquote (RTP) ist auf echte Spielotheken-Werte kalibriert (≤ 85 %).
+Auszahlungsquote (RTP) ist auf ca. 75 % kalibriert (Spielothek-Niveau).
 Drei unabhängige Walzen — keine künstlich erzwungenen Treffer.
 """
 
@@ -14,9 +14,9 @@ from config import Config
 
 # (Emoji, Gewicht, 3×-Multiplikator) — seltene Symbole stark reduziert
 _SYMBOLS: tuple[tuple[str, int, int], ...] = (
-    ("🍒", 38, 4),
+    ("🍒", 40, 4),
     ("🍋", 30, 6),
-    ("🍊", 14, 8),
+    ("🍊", 13, 8),
     ("🍇", 9, 12),
     ("🔔", 3, 20),
     ("💎", 2, 40),

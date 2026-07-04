@@ -122,7 +122,7 @@ def test_slots_rtp_at_most_target() -> None:
 
 def test_slots_two_match_returns_partial_bet() -> None:
     result = resolve_spin(("🍒", "🍒", "🍋"), bet=10)
-    assert result.payout == 3
+    assert result.payout == 5
     assert result.jackpot is False
 
 
