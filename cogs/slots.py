@@ -4,9 +4,7 @@ Slot-Maschine: Embed mit Einsatz-Buttons und Dreh-Funktion.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import time
 
 import discord
 from discord import app_commands
@@ -31,7 +29,6 @@ class SlotsView(discord.ui.View):
         self.guild_id = guild_id
         self.bet = bet
         self._spinning = False
-        self._last_spin = 0.0
         self._spin_btn: discord.ui.Button | None = None
         self._build_bet_buttons()
 
@@ -67,23 +64,8 @@ class SlotsView(discord.ui.View):
             self._spin_btn.disabled = disabled
 
     def _sync_spin_disabled(self) -> None:
-        """Spin-Button an Spin-/Cooldown-Status koppeln."""
-        self._set_spin_disabled(self._spinning or self._spin_on_cooldown())
-
-    def _spin_on_cooldown(self) -> bool:
-        return time.monotonic() - self._last_spin < Config.SLOT_SPIN_COOLDOWN
-
-    async def _reenable_spin_after(self, interaction: discord.Interaction, seconds: float) -> None:
-        await asyncio.sleep(seconds)
-        if self._spinning:
-            return
-        self._sync_spin_disabled()
-        try:
-            economy = await self.cog.db.get_player_economy(self.guild_id, self.owner_id)
-            embed = build_slots_embed(gold=economy.gold, bet=self.bet)
-            await interaction.edit_original_response(embed=embed, view=self)
-        except discord.HTTPException:
-            pass
+        """Spin-Button während laufender Drehung deaktivieren."""
+        self._set_spin_disabled(self._spinning)
 
     def _make_bet_callback(self, amount: int):
         async def callback(interaction: discord.Interaction) -> None:
@@ -133,7 +115,7 @@ class SlotsCog(commands.Cog):
         await self._refresh_view(interaction, view)
 
     async def _spin(self, interaction: discord.Interaction, view: SlotsView) -> None:
-        if view._spinning or view._spin_on_cooldown():
+        if view._spinning:
             if not interaction.response.is_done():
                 await interaction.response.defer(ephemeral=True)
             return
@@ -151,7 +133,6 @@ class SlotsCog(commands.Cog):
             return
 
         view._spinning = True
-        view._last_spin = time.monotonic()
         view._set_spin_disabled(True)
         await interaction.response.defer()
 
@@ -184,7 +165,6 @@ class SlotsCog(commands.Cog):
         view._spinning = False
         view._sync_spin_disabled()
         await interaction.edit_original_response(embed=embed, view=view)
-        asyncio.create_task(view._reenable_spin_after(interaction, Config.SLOT_SPIN_COOLDOWN))
 
     @app_commands.command(name="slots", description="Öffnet die Gold-Slot-Maschine")
     @app_commands.guild_only()
