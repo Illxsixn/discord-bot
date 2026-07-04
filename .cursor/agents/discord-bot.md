@@ -49,7 +49,11 @@ When invoked:
 
 ## Features
 
-- Neue User-Features → `data/changelog.json` aktualisieren
+- **Changelog** (`data/changelog.json`) bei User-Features aktualisieren:
+  - **Neue Patch-Version** pro Änderungsbatch (z. B. `1.7` → `1.7.1`), nicht alles in einen Block
+  - **Max. 5 kurze Punkte** pro Version (ein Satz, kein Roman)
+  - `version` oben in JSON = aktuelle Bot-Version
+  - `/changelog`-Embed zeigt nur die **2 neuesten** Versionen — ältere bleiben in JSON als Archiv
 - Economy-/Game-Balance-Werte in `config.py`, nicht in Cogs
 - Assets unter `assets/` (zombies, pets, …)
 

@@ -1,74 +1,60 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "releases": [
+    {
+      "version": "1.7",
+      "changes": [
+        "Fix: Pet-Portraits — ein Bild, kein Doppelgesicht",
+        "Fix: Zombie-Start — ephemeral ohne Anhang-Fehler",
+        "Slots: Walzen-Streifen UI, kein Dreh-Cooldown",
+        "Zombie: GIF im Embed, Nahkampf-Cooldown 1,5 s"
+      ]
+    },
+    {
+      "version": "1.6.4",
+      "changes": [
+        "Einheitliches Embed-Design (dunkel-lila)",
+        "Fix: Zombie-Buttons & Embed bei ephemeral Runs",
+        "Slots: Trefferquote & Walzen-Anzeige"
+      ]
+    },
+    {
+      "version": "1.6.3",
+      "changes": [
+        "/turnier_interface — Hub im Turnier-Kanal",
+        "/turnier_team & Einladen, Team-Buttons",
+        "Turnier-Wizard für Admins"
+      ]
+    },
+    {
+      "version": "1.6.2",
+      "changes": [
+        "/shop — zentraler Marktplatz",
+        "Lootbox: XP 1–80, max. 1 Box Inventar",
+        "Entfernt: /lootbox buy, Dungeon-Altcode"
+      ]
+    },
+    {
+      "version": "1.6.1",
+      "changes": [
+        "/zombies resume nach Bot-Neustart",
+        "Pet-Aktion: Menü Fokus, Glück, Power",
+        "Wellen ohne Pause, kein Shop zwischen Wellen"
+      ]
+    },
     {
       "version": "1.6",
       "changes": [
-        "Neu: /zombies — Zombie Survival (3 Wellen, Boss)",
-        "Nahkampf, Pet-Aktion, Shop, Interface, Leaderboard",
-        "Persistente Runs · 12h Inaktivität · kein Abbrechen",
-        "Ersetzt Pet-Dungeons (/dungeon)",
-        "Neu: /shop — zentraler Marktplatz für Lootboxen",
-        "Zombie-GIFs via Agnes-API (scripts/generate_zombie_assets.py)",
-        "Fix: Dungeon-Altcode entfernt, /lootbox buy → /shop",
-        "Fix: Wellenpause-Button, generische GIF-Namen",
-        "Fix: Economy-Modell ohne Dungeon-Felder",
-        "Fix: Abgelaufene Runs geben Trostbelohnung (auch beim Start)",
-        "Balance: Zombie-Kampf HP, Schaden & Wellenheilung",
-        "Fix: Einheitliche Embed-Farbe (dunkel-lila) & Footer",
-        "Fix: Pet-/Changelog-Antworten nur für dich sichtbar",
-        "Pet-Embeds: lila Layout, 3er-Felder, Portrait-Thumbnail",
-        "Slots: höhere Trefferquote & Walzen-Anzeige-Fix",
-        "Lootbox: XP-Gewinn 1–80 (Spieler & Pet, je Zufall)",
-        "Embed-Nachrichten löschen sich nach 5 Min. (Ausnahmen)",
-        "Fix: /zombies start — ephemerale Run-Anzeige & Anhang-Konflikt",
-        "Pet-Aktion: Auswahlmenü Fokus/Glück/Power",
-        "Fix: parallele Spiele blockieren sich nicht mehr",
-        "Neu: /turnier_panel — Admin-UI mit Buttons",
-        "Turnier: Admin erstellt Teams & weist Spieler zu",
-        "Fix: Turnier-Antworten öffentlich im Kanal sichtbar",
-        "Fix: Turnier-Kanal — API-Fallback statt nur Cache",
-        "Turnier-Wizard: Schritt-für-Schritt-Admin-Panel",
-        "Neu: /turnier_team & Team-Interface-Buttons",
-        "Neu: /turnier_einladen (Captain lädt Spieler ein)",
-        "Lootbox: Trostpreis 5–12 Gold & 4–12 XP pro Box",
-        "Lootbox: max. 1 Box im Inventar",
-        "Fix: Lootbox-Kauf (economy vor Inventar-Check)",
-        "Turnier-Wizard: weniger Sub-Views, Slash für Details",
-        "Fix: Zombies Nahkampf — Embed-Update mit GIF-Anhang",
-        "Fix: Pet-Aktion-Menü verschwindet still nach Auswahl",
-        "Fix: Turnier-Kanal setzen (Berechtigungs-Check)",
-        "Fix: /emoji für alle Nutzer (nur Bot braucht Emojis verwalten)",
-        "Fix: /emoji — fehlender Cooldown-Config, WebP & Anhang-MIME",
-        "Fix: Zombies — Embed-Update via Run-Nachricht, kein TypeError",
-        "Fix: fehlende Config-Werte (Lootbox-Inventar, Trostpreis, Embeds)",
-        "Neu: /turnier_interface — Hub im Turnier-Kanal",
-        "Turnier-Hub bei Ankündigung & Bracket-Start automatisch",
-        "Fix: Zombies — nur ephemeral, kein Kanal-Fallback",
-        "Balance: Pet-Aktion Cooldown 3 Nahkampf-Angriffe",
-        "Zombies: Wellenpause entfernt, Wellen laufen direkt weiter",
-        "Fix: Zombie-Angriff aktualisiert nur die Run-Nachricht",
-        "Entfernt: Zombie-Survival-Level (kein Profil-XP/Level mehr)",
-        "Slots: Dreh-Button 3 s Cooldown statt Fehlermeldung",
-        "Slots: 2× Gewinn-Multiplikatoren, etwas höhere Trefferquote",
-        "Fix: Slots — Dreh-Button nach Cooldown wieder aktiv",
-        "Fix: Slots — Einsatzwechsel umgeht Cooldown nicht mehr",
-        "Fix: Zombie-XP löst kein öffentliches Level-Up aus",
-        "Neu: /zombies resume — Run nach Bot-Neustart",
-        "Zombie-Run-Embed: Nahkampf statt Level-Anzeige",
-        "Turnier-Interface persistent in DB",
-        "/emoji: 30 s Cooldown pro Nutzer",
-        "Fix: Zombie-Profil ohne Legacy-Level/XP-Spalten",
-        "Cleanup: toter Wellen-Code entfernt",
-        "Shop: max. 3 Lootboxen kaufen & gleichzeitig öffnen"
+        "Neu: /zombies — 3 Wellen, Boss, Nahkampf",
+        "Leaderboard, Interface, 12h Inaktivität",
+        "Ersetzt Pet-Dungeons (/dungeon)"
       ]
     },
     {
       "version": "1.5",
       "changes": [
         "Neu: /slots — Gold-Slot-Maschine",
-        "Einsatz-Buttons: 5, 10, 25, 50 Gold",
-        "3× Symbole = Gewinn · 2× = 50 % zurück"
+        "Einsatz 5–50 Gold, 3× = Gewinn"
       ]
     }
   ]
