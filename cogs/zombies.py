@@ -178,7 +178,14 @@ class ZombieRunView(discord.ui.View):
             return
 
         if self.action_cooldown_remaining() > 0:
-            await interaction.response.defer(ephemeral=True)
+            remaining = self.action_cooldown_remaining()
+            await interaction.response.send_message(
+                embed=warning_embed(
+                    "Cooldown",
+                    f"Kurz warten — **{remaining:.1f} s** bis zur nächsten Aktion.",
+                ),
+                ephemeral=True,
+            )
             return
 
         await self.cog._handle_run_action(
@@ -683,6 +690,9 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         if view is not None:
             view.set_busy(True)
 
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+
         followup_embed: discord.Embed | None = None
         final_embed: discord.Embed | None = None
         saved_run: ZombieRunRecord | None = None
@@ -829,52 +839,58 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             )
             return
 
-        player_level = (await self.db.get_user_level(interaction.guild.id, interaction.user.id)).level
-        hp_max = player_max_hp(player_level)
-        now = datetime.now(timezone.utc)
-        channel = self._channel(interaction)
-        pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
-        companion_rarity = ""
-        if pet is not None:
-            rarity = get_species_rarity(pet.species)
-            if rarity is not None:
-                companion_rarity = rarity.value
+        async with game_lock("zombie_start", interaction.user.id):
+            active = await self.db.get_active_zombie_run(interaction.guild.id, interaction.user.id)
+            if active is not None:
+                await self._restore_active_run_panel(interaction, interaction.user)
+                return
 
-        run = ZombieRunRecord(
-            id=0,
-            guild_id=interaction.guild.id,
-            user_id=interaction.user.id,
-            channel_id=channel.id if channel else None,
-            status=ZombieRunStatus.ACTIVE.value,
-            wave=1,
-            max_waves=Config.ZOMBIE_MAX_WAVES,
-            player_hp=hp_max,
-            player_max_hp=hp_max,
-            created_at=now,
-            updated_at=now,
-            companion_rarity=companion_rarity,
-        )
-        run = await self.db.save_zombie_run(run)
-        spawn_lines = spawn_wave(run)
-        if companion_rarity == PetRarity.LEGENDARY.value:
-            spawn_lines.insert(
-                0,
-                "Dein **legendäres Pet** zieht eine **verstärkte Seuche** an — mehr HP & Angriff!",
+            player_level = (await self.db.get_user_level(interaction.guild.id, interaction.user.id)).level
+            hp_max = player_max_hp(player_level)
+            now = datetime.now(timezone.utc)
+            channel = self._channel(interaction)
+            pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
+            companion_rarity = ""
+            if pet is not None:
+                rarity = get_species_rarity(pet.species)
+                if rarity is not None:
+                    companion_rarity = rarity.value
+
+            run = ZombieRunRecord(
+                id=0,
+                guild_id=interaction.guild.id,
+                user_id=interaction.user.id,
+                channel_id=channel.id if channel else None,
+                status=ZombieRunStatus.ACTIVE.value,
+                wave=1,
+                max_waves=Config.ZOMBIE_MAX_WAVES,
+                player_hp=hp_max,
+                player_max_hp=hp_max,
+                created_at=now,
+                updated_at=now,
+                companion_rarity=companion_rarity,
             )
-        run.last_action_text = "\n".join(spawn_lines)
-        run = await self.db.save_zombie_run(run)
+            run = await self.db.save_zombie_run(run)
+            spawn_lines = spawn_wave(run)
+            if companion_rarity == PetRarity.LEGENDARY.value:
+                spawn_lines.insert(
+                    0,
+                    "Dein **legendäres Pet** zieht eine **verstärkte Seuche** an — mehr HP & Angriff!",
+                )
+            run.last_action_text = "\n".join(spawn_lines)
+            run = await self.db.save_zombie_run(run)
 
-        embed, file, view = await self._build_run_message(
-            interaction.user, run, refresh_visual=True, use_attachment=False
-        )
-        await self._send_run_panel(
-            interaction,
-            interaction.user,
-            run,
-            embed=embed,
-            view=view,
-            file=file,
-        )
+            embed, file, view = await self._build_run_message(
+                interaction.user, run, refresh_visual=True, use_attachment=False
+            )
+            await self._send_run_panel(
+                interaction,
+                interaction.user,
+                run,
+                embed=embed,
+                view=view,
+                file=file,
+            )
 
     @app_commands.command(name="status", description="Zeigt den aktiven Run oder Kurzprofil")
     @app_commands.guild_only()

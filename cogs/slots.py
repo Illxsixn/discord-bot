@@ -13,6 +13,7 @@ from discord.ext import commands
 
 from config import Config
 from database.database import Database
+from utils.game_locks import economy_lock
 from utils.embeds import error_embed
 from utils.slot_embeds import build_slots_embed
 from utils.slots import random_reel_display, resolve_spin, spin_reels
@@ -121,65 +122,65 @@ class SlotsCog(commands.Cog):
                 await interaction.response.defer(ephemeral=True)
             return
 
-        economy = await self.db.get_player_economy(view.guild_id, view.owner_id)
-        if economy.gold < view.bet:
-            await interaction.response.send_message(
-                embed=error_embed(
+        await interaction.response.defer()
+
+        async with economy_lock(view.guild_id, view.owner_id):
+            economy = await self.db.get_player_economy(view.guild_id, view.owner_id)
+            if economy.gold < view.bet:
+                embed = error_embed(
                     "Nicht genug Gold",
                     f"Du brauchst **{view.bet:,}** 🪙, hast **{economy.gold:,}**.\n"
                     "Gold durch /zombies, Spiele oder Minigames.",
-                ),
-                ephemeral=True,
-            )
-            return
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                return
 
-        view._spinning = True
-        view._set_spin_disabled(True)
-        await interaction.response.defer()
+            view._spinning = True
+            view._set_spin_disabled(True)
 
-        economy.gold -= view.bet
-        await self.db.save_player_economy(economy)
+            economy.gold -= view.bet
+            await self.db.save_player_economy(economy)
 
-        for _ in range(Config.SLOT_SPIN_ANIMATION_STEPS):
-            preview = random_reel_display()
-            anim_embed = build_slots_embed(
+            for _ in range(Config.SLOT_SPIN_ANIMATION_STEPS):
+                preview = random_reel_display()
+                anim_embed = build_slots_embed(
+                    gold=economy.gold,
+                    bet=view.bet,
+                    reels=preview,
+                    spinning=True,
+                )
+                await interaction.edit_original_response(embed=anim_embed, view=view)
+                await asyncio.sleep(Config.SLOT_SPIN_ANIMATION_DELAY)
+
+            reels = spin_reels()
+            result = resolve_spin(reels, view.bet)
+            economy.gold += result.payout
+            await self.db.save_player_economy(economy)
+
+            net = result.payout - view.bet
+            if net > 0:
+                result_line = f"{result.message}\n**Netto: +{net:,}** 🪙"
+                won = True
+            elif net == 0:
+                result_line = f"{result.message}\n**Break-even** — Einsatz zurück."
+                won = None
+            else:
+                result_line = f"{result.message}\n**−{abs(net):,}** 🪙"
+                won = False
+
+            embed = build_slots_embed(
                 gold=economy.gold,
                 bet=view.bet,
-                reels=preview,
-                spinning=True,
+                reels=reels,
+                result_line=result_line,
+                won=won if not result.jackpot else True,
+                jackpot=result.jackpot,
+                mega_jackpot=result.mega_jackpot,
             )
-            await interaction.edit_original_response(embed=anim_embed, view=view)
-            await asyncio.sleep(Config.SLOT_SPIN_ANIMATION_DELAY)
 
-        reels = spin_reels()
-        result = resolve_spin(reels, view.bet)
-        economy.gold += result.payout
-        await self.db.save_player_economy(economy)
-
-        net = result.payout - view.bet
-        if net > 0:
-            result_line = f"{result.message}\n**Netto: +{net:,}** 🪙"
-            won = True
-        elif net == 0:
-            result_line = f"{result.message}\n**Break-even** — Einsatz zurück."
-            won = None
-        else:
-            result_line = f"{result.message}\n**−{abs(net):,}** 🪙"
-            won = False
-
-        embed = build_slots_embed(
-            gold=economy.gold,
-            bet=view.bet,
-            reels=reels,
-            result_line=result_line,
-            won=won if not result.jackpot else True,
-            jackpot=result.jackpot,
-            mega_jackpot=result.mega_jackpot,
-        )
-
-        view._spinning = False
-        view._sync_spin_disabled()
-        await interaction.edit_original_response(embed=embed, view=view)
+            view._spinning = False
+            view._sync_spin_disabled()
+            await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(name="slots", description="Öffnet die Gold-Slot-Maschine")
     @app_commands.guild_only()

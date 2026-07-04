@@ -13,6 +13,7 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, success_embed
+from utils.game_locks import economy_lock
 from utils.lootboxes import apply_lootbox_roll, roll_lootbox
 
 logger = logging.getLogger(__name__)
@@ -65,49 +66,51 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
             return
 
         count = int(anzahl)
-        economy = await self.db.get_player_economy(interaction.guild.id, interaction.user.id)
-
-        if economy.lootbox_count < count:
-            embed = error_embed(
-                "Keine Lootboxen",
-                spaced_lines(
-                    f"Du hast nur **{economy.lootbox_count}** Lootbox(en).",
-                    f"Kaufe welche im **`/shop`** (**{Config.LOOTBOX_PRICE}** Gold pro Stück).",
-                ),
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
 
         await interaction.response.defer(ephemeral=True)
 
-        channel = self._channel(interaction)
-        wins = 0
-        lines: list[str] = []
+        async with economy_lock(interaction.guild.id, interaction.user.id):
+            economy = await self.db.get_player_economy(interaction.guild.id, interaction.user.id)
 
-        for i in range(count):
-            roll = roll_lootbox()
-            applied = await apply_lootbox_roll(
-                self.bot,
-                interaction.user,
-                roll,
-                channel=channel,
-            )
-            line = spaced_lines(
-                f"📦 **{i + 1}:** **{applied.gold}** 🪙 · "
-                f"**{applied.player_xp}** Spieler-XP · **{applied.pet_xp}** Pet-XP",
-                (
-                    f"🎉 **Jackpot:** +**{applied.jackpot_player_xp}** Spieler-XP · "
-                    f"+**{applied.jackpot_pet_xp}** Pet-XP ({roll.jackpot_chance_percent} % Chance)"
-                    if roll.won_jackpot
-                    else ""
-                ),
-            )
-            if roll.won_jackpot:
-                wins += 1
-            lines.append(line)
+            if economy.lootbox_count < count:
+                embed = error_embed(
+                    "Keine Lootboxen",
+                    spaced_lines(
+                        f"Du hast nur **{economy.lootbox_count}** Lootbox(en).",
+                        f"Kaufe welche im **`/shop`** (**{Config.LOOTBOX_PRICE}** Gold pro Stück).",
+                    ),
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                return
 
-        economy.lootbox_count -= count
-        await self.db.save_player_economy(economy)
+            economy.lootbox_count -= count
+            await self.db.save_player_economy(economy)
+
+            channel = self._channel(interaction)
+            wins = 0
+            lines: list[str] = []
+
+            for i in range(count):
+                roll = roll_lootbox()
+                applied = await apply_lootbox_roll(
+                    self.bot,
+                    interaction.user,
+                    roll,
+                    channel=channel,
+                )
+                line = spaced_lines(
+                    f"📦 **{i + 1}:** **{applied.gold}** 🪙 · "
+                    f"**{applied.player_xp}** Spieler-XP · **{applied.pet_xp}** Pet-XP",
+                    (
+                        f"🎉 **Jackpot:** +**{applied.jackpot_player_xp}** Spieler-XP · "
+                        f"+**{applied.jackpot_pet_xp}** Pet-XP ({roll.jackpot_chance_percent} % Chance)"
+                        if roll.won_jackpot
+                        else ""
+                    ),
+                )
+                if roll.won_jackpot:
+                    wins += 1
+                lines.append(line)
 
         body_fields = [
             ("Geöffnet", f"**{count}** 📦", True),

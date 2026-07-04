@@ -730,6 +730,8 @@ class Database:
 
     async def save_player_economy(self, record: PlayerEconomyRecord) -> PlayerEconomyRecord:
         """Speichert Gold und Lootbox-Inventar."""
+        record.gold = max(0, record.gold)
+        record.lootbox_count = max(0, min(record.lootbox_count, Config.LOOTBOX_INVENTORY_MAX))
         await self.conn.execute(
             """
             INSERT INTO player_economy (guild_id, user_id, gold, lootbox_count)
@@ -1265,12 +1267,14 @@ class Database:
         return [GiveawayRecord.from_row(dict(row)) for row in rows]
 
     async def finish_giveaway(self, giveaway_id: int, winner_ids: list[int]) -> GiveawayRecord | None:
-        """Beendet Gewinnspiel und speichert Gewinner."""
-        await self.conn.execute(
-            "UPDATE giveaways SET ended = 1, winner_ids_json = ? WHERE id = ?",
+        """Beendet Gewinnspiel und speichert Gewinner (nur wenn noch aktiv)."""
+        cursor = await self.conn.execute(
+            "UPDATE giveaways SET ended = 1, winner_ids_json = ? WHERE id = ? AND ended = 0",
             (json.dumps(winner_ids), giveaway_id),
         )
         await self.conn.commit()
+        if cursor.rowcount == 0:
+            return None
         return await self.get_giveaway(giveaway_id)
 
     async def update_giveaway_winners(self, giveaway_id: int, winner_ids: list[int]) -> GiveawayRecord | None:
