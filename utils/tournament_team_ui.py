@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 
 async def build_team_embed(cog: TournamentCog, guild: discord.Guild, team_id: int) -> discord.Embed:
     """Embed für das persistente Team-Interface."""
-    from cogs.tournament import TOURNAMENT_STATUS_LABELS
-
     team = await cog.db.get_tournament_team(team_id)
     if team is None:
         return error_embed("Fehler", f"Team #{team_id} nicht gefunden.")
@@ -41,16 +39,9 @@ async def build_team_embed(cog: TournamentCog, guild: discord.Guild, team_id: in
     )
 
     fields: list[tuple[str, str, bool]] = [
-        ("Turnier", f"#{tournament.id} **{tournament.name}** ({tournament.game})", False),
-        (
-            "Status",
-            spaced_lines(
-                f"Turnier: **{TOURNAMENT_STATUS_LABELS[tournament.status]}**",
-                f"Team: **{reg_status}**",
-                f"Plätze: **{registered}/{tournament.max_teams}**",
-            ),
-            False,
-        ),
+        ("Turnier", f"#{tournament.id}", True),
+        ("Team-Status", reg_status, True),
+        ("Plätze", f"**{registered}/{tournament.max_teams}**", True),
         ("Mitglieder", member_text, False),
         ("Nächste Schritte", next_steps, False),
     ]

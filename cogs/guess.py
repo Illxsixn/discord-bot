@@ -15,7 +15,7 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from database.models import GuessStatsRecord
-from utils.embeds import error_embed, info_embed, spaced_list, success_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, success_embed
 from utils.game_locks import game_lock
 from utils.game_rewards import award_game_xp
 
@@ -87,8 +87,10 @@ class GuessCog(commands.Cog):
                 await interaction.followup.send(
                     embed=error_embed(
                         "Spiel läuft bereits",
-                        "In diesem Kanal läuft schon ein Zahlenraten-Spiel.\n"
-                        "Nutze `/guess`, um zu raten.",
+                        spaced_lines(
+                            "In diesem Kanal läuft schon ein Zahlenraten-Spiel.",
+                            "Nutze `/guess`, um zu raten.",
+                        ),
                     ),
                     ephemeral=True,
                 )
@@ -100,8 +102,10 @@ class GuessCog(commands.Cog):
         await interaction.followup.send(
             embed=success_embed(
                 "Zahlenraten gestartet",
-                f"{interaction.user.mention} hat ein neues Spiel gestartet!\n\n"
-                f"Rate eine Zahl zwischen **{Config.GUESS_MIN}** und **{Config.GUESS_MAX}** mit `/guess`.",
+                spaced_lines(
+                    f"{interaction.user.mention} hat ein neues Spiel gestartet!",
+                    f"Rate eine Zahl zwischen **{Config.GUESS_MIN}** und **{Config.GUESS_MAX}** mit `/guess`.",
+                ),
             ),
             embed_persistent=True,
         )
@@ -145,7 +149,10 @@ class GuessCog(commands.Cog):
                 await interaction.followup.send(
                     embed=error_embed(
                         "Kein Spiel aktiv",
-                        "In diesem Kanal läuft kein Zahlenraten-Spiel.\nStarte eins mit `/guess-start`.",
+                        spaced_lines(
+                            "In diesem Kanal läuft kein Zahlenraten-Spiel.",
+                            "Starte eins mit `/guess-start`.",
+                        ),
                     ),
                     ephemeral=True,
                 )
@@ -158,7 +165,10 @@ class GuessCog(commands.Cog):
                 await interaction.followup.send(
                     embed=info_embed(
                         "Tipp",
-                        f"Die gesuchte Zahl ist **höher**.\nVersuch **#{attempts}**",
+                        spaced_lines(
+                            "Die gesuchte Zahl ist **höher**.",
+                            f"Versuch **#{attempts}**",
+                        ),
                     ),
                     ephemeral=True,
                 )
@@ -169,7 +179,10 @@ class GuessCog(commands.Cog):
                 await interaction.followup.send(
                     embed=info_embed(
                         "Tipp",
-                        f"Die gesuchte Zahl ist **niedriger**.\nVersuch **#{attempts}**",
+                        spaced_lines(
+                            "Die gesuchte Zahl ist **niedriger**.",
+                            f"Versuch **#{attempts}**",
+                        ),
                     ),
                     ephemeral=True,
                 )
@@ -192,12 +205,15 @@ class GuessCog(commands.Cog):
         channel = interaction.channel if isinstance(interaction.channel, (discord.TextChannel, discord.Thread)) else None
         xp_note = ""
         if member is not None and await award_game_xp(self.bot, member, channel=channel):
-            xp_note = f"\n\n🎁 Du erhältst **{Config.GAME_WIN_XP} XP**!"
+            xp_note = f"🎁 Du erhältst **{Config.GAME_WIN_XP} XP**!"
 
         await interaction.followup.send(
             embed=success_embed(
                 "Richtig geraten!",
-                f"🎉 Du hast die Zahl **{target_number}** in **{attempts}** Versuchen erraten!{xp_note}",
+                spaced_lines(
+                    f"🎉 Du hast die Zahl **{target_number}** in **{attempts}** Versuchen erraten!",
+                    xp_note,
+                ),
             ),
             ephemeral=True,
         )
@@ -258,6 +274,9 @@ class GuessCog(commands.Cog):
             f"Zahlenraten — {interaction.guild.name}",
             "Bestenliste für diesen Server.",
             fields=[
+                ("Kategorien", "**3**", True),
+                ("Server", interaction.guild.name, True),
+                ("Spiel", "1–100", True),
                 ("Meiste Siege", spaced_list(win_lines), False),
                 ("Wenigste Ø Versuche", spaced_list(attempt_lines), False),
                 ("Schnellster Sieg", spaced_list(fast_lines), False),

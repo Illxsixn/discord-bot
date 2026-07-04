@@ -174,9 +174,11 @@ def build_expired_embed() -> discord.Embed:
     """12-Stunden-Inaktivität."""
     return error_embed(
         "Run zusammengebrochen",
-        "Dein Run ist nach **12 Stunden** Inaktivität zusammengebrochen.\n"
-        "Du erhältst eine kleine Trostbelohnung (Gold & XP).\n"
-        f"Cooldown: **{Config.ZOMBIE_RUN_COOLDOWN // 60} Minuten** — dann `/zombies start`.",
+        spaced_lines(
+            "Dein Run ist nach **12 Stunden** Inaktivität zusammengebrochen.",
+            "Du erhältst eine kleine Trostbelohnung (Gold & XP).",
+            f"Cooldown: **{Config.ZOMBIE_RUN_COOLDOWN // 60} Minuten** — dann `/zombies start`.",
+        ),
     )
 
 
@@ -224,6 +226,8 @@ def build_interface_embed(economy: PlayerEconomyRecord) -> discord.Embed:
         "Schnellzugriff auf Profil, Status und Shop.",
         fields=[
             ("Gold", f"**{economy.gold:,}** 🪙", True),
+            ("Lootboxen", f"**{economy.lootbox_count}** 📦", True),
+            ("Modus", "Survival", True),
             (
                 "Befehle",
                 "`/zombies start` · `/zombies resume` · `/zombies profil` · `/shop`",
@@ -258,17 +262,25 @@ def build_help_embed() -> discord.Embed:
         "🧟 Zombie Survival",
         "Wellenbasiertes Survival-RPG mit Gold, Pets und Bosskampf.",
         fields=[
+            ("Wellen", f"**{Config.ZOMBIE_MAX_WAVES}**", True),
+            ("Inaktivität", f"**{Config.ZOMBIE_RUN_INACTIVITY // 3600}h**", True),
+            ("Wellenheilung", f"**+{Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT} %** HP", True),
             (
                 "Ablauf",
-                "1. `/zombies start` · 2. Nahkampf & Pet-Aktion (Fokus/Glück/Power) · "
-                "3. Wellen laufen direkt weiter · Boss in Welle 3",
+                spaced_lines(
+                    "1. `/zombies start`",
+                    "2. Nahkampf & Pet-Aktion (Fokus/Energie/Glück)",
+                    "3. Wellen laufen direkt weiter · Boss in Welle 3",
+                ),
                 False,
             ),
             (
                 "Regeln",
-                f"**{Config.ZOMBIE_MAX_WAVES} Wellen** · **Kein Abbrechen** · "
-                f"**{Config.ZOMBIE_RUN_INACTIVITY // 3600}h** Inaktivität beendet Run · "
-                f"**+{Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT} %** HP nach jeder Welle",
+                spaced_lines(
+                    f"**{Config.ZOMBIE_MAX_WAVES} Wellen** · **Kein Abbrechen**",
+                    f"**{Config.ZOMBIE_RUN_INACTIVITY // 3600}h** Inaktivität beendet Run",
+                    f"**+{Config.ZOMBIE_BETWEEN_WAVE_HEAL_PERCENT} %** HP nach jeder Welle",
+                ),
                 False,
             ),
             (

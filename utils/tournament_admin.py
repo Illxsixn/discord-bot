@@ -310,11 +310,18 @@ async def build_tournament_interface_embed(
     )
 
     fields: list[tuple[str, str, bool]] = [
-        ("Teams", teams_text, False),
-        ("Nächste Schritte", next_steps, False),
+        ("Status", TOURNAMENT_STATUS_LABELS[tournament.status], True),
+        ("Angemeldet", f"**{registered}/{tournament.max_teams}**", True),
+        ("Maps", str(len(maps)), True),
     ]
     if maps:
-        fields.insert(1, ("Map-Pool", ", ".join(maps[:15]), False))
+        fields.append(("Map-Pool", ", ".join(maps[:15]), False))
+    fields.extend(
+        [
+            ("Teams", teams_text, False),
+            ("Nächste Schritte", next_steps, False),
+        ]
+    )
 
     return info_embed(
         headline,

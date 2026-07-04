@@ -16,7 +16,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from config import Config
-from utils.embeds import BRAND_ICON_ATTACHMENT, apply_brand_footer, brand_name, error_embed, info_embed
+from utils.embeds import BRAND_ICON_ATTACHMENT, apply_brand_footer, brand_name, error_embed, info_embed, spaced_lines
 
 logger = logging.getLogger(__name__)
 
@@ -519,9 +519,11 @@ def _build_overview_page(bot: commands.Bot, page_index: int) -> discord.Embed:
 
     embed = info_embed(
         f"{data['emoji']} {data['label']} — Befehle",
-        f"**{total_cmds} Befehle** in **{len(HELP_CATEGORIES)} Kategorien**.\n"
-        f"**Zugriff:** {data['access']}\n"
-        "Nutze die Buttons, das Menü unten oder `/help kategorie:<Bereich>`.",
+        spaced_lines(
+            f"**{total_cmds} Befehle** in **{len(HELP_CATEGORIES)} Kategorien**.",
+            f"**Zugriff:** {data['access']}",
+            "Nutze die Buttons, das Menü unten oder `/help kategorie:<Bereich>`.",
+        ),
         fields=fields,
     )
     return _apply_embed_meta(
@@ -554,9 +556,9 @@ def _build_category_page(bot: commands.Bot, category: str, page_index: int) -> d
     total_pages = max(len(field_groups), 1)
     page_index = max(0, min(page_index, total_pages - 1))
 
-    description = f"**Zugriff:** {data['access']}"
+    description = spaced_lines(f"**Zugriff:** {data['access']}")
     if total_pages > 1:
-        description += f"\n**Abschnitt {page_index + 1}/{total_pages}**"
+        description = spaced_lines(description, f"**Abschnitt {page_index + 1}/{total_pages}**")
 
     fields = [field_groups[page_index]] if field_groups else [("Befehle", "Keine Befehle in dieser Kategorie.", False)]
     if page_index == total_pages - 1:

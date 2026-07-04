@@ -133,11 +133,11 @@ class PollsCog(commands.GroupCog, group_name="poll", group_description="Umfragen
                 winner_label = ("Ja", "Nein")[idx]
             else:
                 winner_label = poll.options[emojis.index(best_emoji)]
-            winner_line = f"\n\n🏆 **Führend:** {winner_label} ({best_votes} Stimmen)"
+            winner_line = f"🏆 **Führend:** {winner_label} ({best_votes} Stimmen)"
 
         result_embed = info_embed(
             "Umfrage — Ergebnis",
-            spaced_lines(poll.question, winner_line.strip()),
+            spaced_lines(poll.question, winner_line) if winner_line else poll.question,
             fields=[
                 ("Stimmen gesamt", str(total), True),
                 ("Status", "Beendet", True),

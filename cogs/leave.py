@@ -60,7 +60,9 @@ class LeaveCog(commands.GroupCog, group_name="leave", group_description="Leave-S
                     "Mitglied verlassen",
                     message_text,
                     fields=[
-                        ("Benutzer", f"{member.display_name} (`{member.id}`)", False),
+                        ("Mitglied", member.mention, True),
+                        ("ID", str(member.id), True),
+                        ("Server", member.guild.name, True),
                     ],
                     thumbnail=member.display_avatar.url,
                 )

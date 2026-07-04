@@ -129,8 +129,10 @@ class ReactionRolesCog(commands.GroupCog, group_name="reactionrole", group_descr
             await interaction.followup.send(
                 embed=success_embed(
                     "Reaktionsrolle erstellt",
-                    f"{emoji_display(emoji_value)} → {role.mention}\n"
-                    f"Nachricht: {message.jump_url}",
+                    spaced_lines(
+                        f"{emoji_display(emoji_value)} → {role.mention}",
+                        f"Nachricht: {message.jump_url}",
+                    ),
                 ),
                 ephemeral=True,
             )
@@ -168,8 +170,13 @@ class ReactionRolesCog(commands.GroupCog, group_name="reactionrole", group_descr
 
             embed = info_embed(
                 "Reaktionsrollen",
-                f"**{len(records)}** Eintrag/Einträge",
-                fields=split_embed_fields("Übersicht", lines),
+                f"**{len(records)}** Eintrag/Einträge auf **{interaction.guild.name}**",
+                fields=[
+                    ("Einträge", f"**{len(records)}**", True),
+                    ("Angezeigt", f"**{min(len(records), 25)}**", True),
+                    ("Server", interaction.guild.name, True),
+                    *split_embed_fields("Übersicht", lines),
+                ],
             )
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as exc:

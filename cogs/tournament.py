@@ -284,25 +284,17 @@ class TournamentCog(commands.Cog):
         status_text = MATCH_STATUS_LABELS.get(match.status, match.status.value)
         t1 = team1_name or "—"
         t2 = team2_name or "Freilos"
-        description = f"**{t1}** vs **{t2}**"
-        if extra_note:
-            description += f"\n\n{extra_note}"
+        winner_line = ""
         if match.status == TournamentMatchStatus.FINISHED and match.winner_id:
-            description += f"\n\n🏆 Sieger: **{t1 if match.winner_id == match.team1_id else t2}**"
+            winner_line = f"🏆 Sieger: **{t1 if match.winner_id == match.team1_id else t2}**"
 
         return info_embed(
             f"Match #{match.id} – Runde {match.round}",
-            description,
+            spaced_lines(f"**{t1}** vs **{t2}**", extra_note, winner_line),
             fields=[
-                (
-                    "Details",
-                    spaced_lines(
-                        f"**Map:** {match.map_name or '—'}",
-                        f"**Status:** {status_text}",
-                        f"**Turnier:** #{match.tournament_id}",
-                    ),
-                    False,
-                ),
+                ("Map", match.map_name or "—", True),
+                ("Status", status_text, True),
+                ("Turnier", f"#{match.tournament_id}", True),
             ],
             footer_prefix=f"Match #{match.id}",
         )
@@ -1041,15 +1033,9 @@ class TournamentCog(commands.Cog):
         registered = sum(1 for t in teams if t.registered)
         maps = await self.db.get_tournament_maps(turnier_id)
         fields = [
-            (
-                "📋 Übersicht",
-                spaced_lines(
-                    f"**Spiel:** {tournament.game}",
-                    f"**Status:** {TOURNAMENT_STATUS_LABELS[tournament.status]}",
-                    f"**Teams:** {registered}/{tournament.max_teams} angemeldet",
-                ),
-                False,
-            ),
+            ("Spiel", tournament.game, True),
+            ("Status", TOURNAMENT_STATUS_LABELS[tournament.status], True),
+            ("Teams", f"**{registered}/{tournament.max_teams}**", True),
             ("🗺️ Maps", ", ".join(maps) if maps else "—", False),
         ]
         if tournament.description:
