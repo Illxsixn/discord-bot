@@ -5,7 +5,7 @@
       "version": "1.7",
       "changes": [
         "Fix: Pet-Portraits — ein Bild, kein Doppelgesicht",
-        "Fix: Zombie-Start — ephemeral ohne Anhang-Fehler",
+        "Fix: Zombie-Start — öffentliche Run-Nachricht, URL-GIFs",
         "Slots: Walzen-Streifen UI, kein Dreh-Cooldown",
         "Zombie: GIF im Embed, Nahkampf-Cooldown 1,5 s"
       ]

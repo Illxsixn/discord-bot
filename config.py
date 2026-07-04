@@ -157,7 +157,7 @@ class Config:
     PET_EVOLUTION_ADULT: int = 25
     PET_EVOLUTION_LEGENDARY: int = 50
     PET_IMAGE_DIR: Path = BASE_DIR / "assets" / "pets"
-    PET_PORTRAIT_PROMPT_VERSION: int = 3
+    PET_PORTRAIT_PROMPT_VERSION: int = 4
     AGNES_API_KEY: str = os.getenv("AGNES_API_KEY", "")
     AGNES_API_URL: str = os.getenv(
         "AGNES_API_URL",

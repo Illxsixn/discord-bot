@@ -483,7 +483,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
             return True
         embed, file, view = await self._build_run_message(
-            member, checked, refresh_visual=True, use_attachment=True
+            member, checked, refresh_visual=True, use_attachment=False
         )
         await self._send_run_panel(
             interaction,
@@ -844,7 +844,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         run = await self.db.save_zombie_run(run)
 
         embed, file, view = await self._build_run_message(
-            interaction.user, run, refresh_visual=True, use_attachment=True
+            interaction.user, run, refresh_visual=True, use_attachment=False
         )
         await self._send_run_panel(
             interaction,
