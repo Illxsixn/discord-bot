@@ -1,5 +1,5 @@
 """
-Shop-Embeds — einzige Anzeige für kaufbare Produkte (Lootboxen, Perks, …).
+Shop-Embeds — einzige Anzeige für kaufbare Produkte (Lootboxen, …).
 """
 
 from __future__ import annotations
@@ -31,11 +31,6 @@ def build_shop_embed(economy: PlayerEconomyRecord) -> discord.Embed:
                     f"Jackpot: **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** · "
                     f"extra **{Config.LOOTBOX_XP_MIN}–{Config.LOOTBOX_XP_MAX}** XP",
                 ),
-                False,
-            ),
-            (
-                "🧟 Zombie-Perks",
-                "Glück · Fokus · Energie — **Coming soon**",
                 False,
             ),
             (

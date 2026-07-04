@@ -1150,7 +1150,7 @@ class TournamentCog(commands.Cog):
         if tournament is None:
             return
         maps = await self.db.get_tournament_maps(turnier_id)
-        text = "\n".join(f"• {m}" for m in maps) if maps else "Keine Maps im Pool."
+        text = spaced_list(f"• {m}" for m in maps) if maps else "Keine Maps im Pool."
         await interaction.response.send_message(
             embed=info_embed(f"Map-Pool – Turnier #{turnier_id}", text),
 

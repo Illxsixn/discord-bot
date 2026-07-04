@@ -12,7 +12,7 @@ from discord.ext import commands
 
 from config import Config
 from database.database import Database
-from utils.embeds import error_embed, info_embed, success_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, success_embed
 from utils.lootboxes import apply_lootbox_roll, roll_lootbox
 
 logger = logging.getLogger(__name__)
@@ -110,7 +110,7 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
             + (f" · **{wins}** Jackpot(s)" if wins else "")
             + f"\nVerbleibend: **{economy.lootbox_count}** 📦"
         )
-        body = summary + "\n\n" + "\n".join(lines)
+        body = spaced_lines(summary, *lines)
         embed = success_embed("Lootbox geöffnet", body) if wins else info_embed("Lootbox geöffnet", body)
 
         await interaction.followup.send(embed=embed, ephemeral=True)
@@ -138,7 +138,7 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
             medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(rank, f"**{rank}.**")
             lines.append(f"{medal} {name} — **{record.gold:,}** 🪙")
 
-        embed = info_embed("Gold-Rangliste", "\n".join(lines))
+        embed = info_embed("Gold-Rangliste", spaced_list(lines))
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 

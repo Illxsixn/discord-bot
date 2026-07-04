@@ -16,7 +16,7 @@ from discord.ext import commands
 
 from config import Config
 from database.database import Database
-from utils.embeds import error_embed, log_event_embed, success_embed
+from utils.embeds import error_embed, log_event_embed, spaced_list, success_embed
 from utils.helpers import truncate_text
 from utils.permissions import is_admin
 
@@ -296,7 +296,7 @@ class LogsCog(commands.GroupCog, group_name="logs", group_description="Server-Lo
         embed = log_event_embed(
             "Kanal aktualisiert",
             after.mention if hasattr(after, "mention") else after.name,
-            fields=[("Änderungen", "\n".join(changes), False)],
+            fields=[("Änderungen", spaced_list(changes), False)],
         )
         await self.send_log(after.guild, embed)
 

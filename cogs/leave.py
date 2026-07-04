@@ -56,8 +56,14 @@ class LeaveCog(commands.GroupCog, group_name="leave", group_description="Leave-S
             message_text = format_placeholders(settings.leave_message, member, member.guild)
 
             if settings.leave_use_embed:
-                embed = info_embed("Mitglied verlassen", message_text, thumbnail=member.display_avatar.url)
-                embed.add_field(name="Benutzer", value=f"{member.display_name} (`{member.id}`)", inline=False)
+                embed = info_embed(
+                    "Mitglied verlassen",
+                    message_text,
+                    fields=[
+                        ("Benutzer", f"{member.display_name} (`{member.id}`)", False),
+                    ],
+                    thumbnail=member.display_avatar.url,
+                )
                 await channel.send(embed=embed, embed_persistent=True)
             else:
                 await channel.send(content=message_text)
