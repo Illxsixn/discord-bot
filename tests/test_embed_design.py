@@ -148,11 +148,11 @@ def test_slot_embed_matches_mockup_layout():
 
     assert embed.title == "🎰 Gold Slots"
     assert embed.color.value == Config.COLOR_ARTWORK
-    field_names = [field.name for field in embed.fields]
-    assert field_names == ["\u200b"]
-    assert format_idle_reel_strip() in embed.fields[0].value
+    assert not embed.fields
+    assert format_idle_reel_strip() in (embed.description or "")
     assert "1,250" in (embed.description or "")
     assert "Einsatz **25**" in (embed.description or "")
+    assert "🍒" in (embed.description or "")
     assert embed.timestamp is not None
     assert Config.BOT_BRAND_NAME in (embed.footer.text or "")
 

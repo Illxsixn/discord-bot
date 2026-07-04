@@ -110,6 +110,20 @@ def test_slots_three_of_a_kind_pays_multiplier() -> None:
     result = resolve_spin(("7️⃣", "7️⃣", "7️⃣"), bet=10)
     assert result.payout == 1000
     assert result.jackpot is True
+    assert result.mega_jackpot is True
+
+
+def test_slots_mega_jackpot_roll_exists() -> None:
+    from utils.slots import MEGA_JACKPOT_SYMBOL, spin_reels
+
+    assert MEGA_JACKPOT_SYMBOL == "7️⃣"
+    seen_mega = False
+    for _ in range(5000):
+        reels = spin_reels()
+        if reels == ("7️⃣", "7️⃣", "7️⃣"):
+            seen_mega = True
+            break
+    assert seen_mega
 
 
 def test_slots_two_match_returns_half_bet() -> None:

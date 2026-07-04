@@ -4,6 +4,7 @@ Slot-Maschine: Embed mit Einsatz-Buttons und Dreh-Funktion.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import discord
@@ -14,7 +15,7 @@ from config import Config
 from database.database import Database
 from utils.embeds import error_embed
 from utils.slot_embeds import build_slots_embed
-from utils.slots import resolve_spin, spin_reels
+from utils.slots import random_reel_display, resolve_spin, spin_reels
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,19 @@ class SlotsCog(commands.Cog):
         await interaction.response.defer()
 
         economy.gold -= view.bet
+        await self.db.save_player_economy(economy)
+
+        for _ in range(Config.SLOT_SPIN_ANIMATION_STEPS):
+            preview = random_reel_display()
+            anim_embed = build_slots_embed(
+                gold=economy.gold,
+                bet=view.bet,
+                reels=preview,
+                spinning=True,
+            )
+            await interaction.edit_original_response(embed=anim_embed, view=view)
+            await asyncio.sleep(Config.SLOT_SPIN_ANIMATION_DELAY)
+
         reels = spin_reels()
         result = resolve_spin(reels, view.bet)
         economy.gold += result.payout
@@ -160,6 +174,7 @@ class SlotsCog(commands.Cog):
             result_line=result_line,
             won=won,
             jackpot=result.jackpot,
+            mega_jackpot=result.mega_jackpot,
         )
 
         view._spinning = False
