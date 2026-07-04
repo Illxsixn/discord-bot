@@ -143,6 +143,8 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
             finished = await self.db.update_giveaway_winners(giveaway.id, winner_ids)
         else:
             finished = await self.db.finish_giveaway(giveaway.id, winner_ids)
+            if finished is None:
+                return await self.db.get_giveaway(giveaway.id), None
 
         if finished:
             try:
