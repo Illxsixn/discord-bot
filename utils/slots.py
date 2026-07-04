@@ -1,7 +1,7 @@
 """
 Slot-Maschine: Symbole, Spin-Logik und Auszahlung.
 
-Auszahlungsquote (RTP) ist auf echte Spielotheken-Werte kalibriert (≤ 85 %).
+Auszahlungsquote (RTP) ist auf ca. 75 % kalibriert (Spielothek-Niveau).
 Drei unabhängige Walzen — keine künstlich erzwungenen Treffer.
 """
 
@@ -14,9 +14,9 @@ from config import Config
 
 # (Emoji, Gewicht, 3×-Multiplikator) — seltene Symbole stark reduziert
 _SYMBOLS: tuple[tuple[str, int, int], ...] = (
-    ("🍒", 38, 4),
-    ("🍋", 30, 6),
-    ("🍊", 14, 8),
+    ("🍒", 44, 4),
+    ("🍋", 29, 6),
+    ("🍊", 11, 8),
     ("🍇", 9, 12),
     ("🔔", 3, 20),
     ("💎", 2, 40),
@@ -65,7 +65,18 @@ def spin_reels() -> tuple[str, str, str]:
 
 
 def _pair_payout(bet: int) -> int:
-    return max(1, int(bet * Config.SLOT_PAIR_PAYOUT_FRACTION))
+    """Paar-Gewinn skaliert linear mit dem Einsatz (gleiche RTP für alle Einsätze)."""
+    units = bet // Config.SLOT_BET_UNIT
+    return max(1, units * Config.SLOT_PAIR_PAYOUT_PER_5_GOLD)
+
+
+def pair_payout_percent() -> int:
+    """Anzeige-Prozentsatz für Zwei-gleiche-Auszahlung."""
+    return int(
+        Config.SLOT_PAIR_PAYOUT_PER_5_GOLD
+        / Config.SLOT_BET_UNIT
+        * 100
+    )
 
 
 def format_reels(reels: tuple[str, str, str]) -> str:
@@ -90,7 +101,7 @@ def resolve_spin(reels: tuple[str, str, str], bet: int) -> SpinResult:
 
     if a == b or b == c or a == c:
         payout = _pair_payout(bet)
-        pct = int(Config.SLOT_PAIR_PAYOUT_FRACTION * 100)
+        pct = pair_payout_percent()
         return SpinResult(
             reels,
             payout,
@@ -103,7 +114,7 @@ def resolve_spin(reels: tuple[str, str, str], bet: int) -> SpinResult:
 def payout_table_text() -> str:
     """Kompakte Gewinntabelle."""
     lines = [f"{emoji} {emoji} {emoji} → **{mult}×**" for emoji, _, mult in _SYMBOLS]
-    pct = int(Config.SLOT_PAIR_PAYOUT_FRACTION * 100)
+    pct = pair_payout_percent()
     lines.append(f"Zwei gleiche → **{pct} %** des Einsatzes zurück")
     lines.append(f"Auszahlungsquote max. **{int(Config.SLOT_TARGET_RTP * 100)} %** (Spielothek)")
     return "\n".join(lines)
