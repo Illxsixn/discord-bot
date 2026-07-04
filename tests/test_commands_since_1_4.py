@@ -108,7 +108,7 @@ async def test_lootbox_commands_kept(bot_commands: set[str]) -> None:
 
 def test_slots_three_of_a_kind_pays_multiplier() -> None:
     result = resolve_spin(("7️⃣", "7️⃣", "7️⃣"), bet=10)
-    assert result.payout == 1340
+    assert result.payout == 1000
     assert result.jackpot is True
     assert result.mega_jackpot is True
 
@@ -122,7 +122,7 @@ def test_slots_rtp_at_most_target() -> None:
 
 def test_slots_two_match_returns_partial_bet() -> None:
     result = resolve_spin(("🍒", "🍒", "🍋"), bet=10)
-    assert result.payout == 5
+    assert result.payout == 3
     assert result.jackpot is False
 
 

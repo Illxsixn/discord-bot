@@ -12,15 +12,15 @@ from dataclasses import dataclass
 
 from config import Config
 
-# (Emoji, Gewicht, 3×-Multiplikator) — kalibriert auf ~84 % RTP
+# (Emoji, Gewicht, 3×-Multiplikator) — seltene Symbole stark reduziert
 _SYMBOLS: tuple[tuple[str, int, int], ...] = (
-    ("🍒", 34, 7),
-    ("🍋", 27, 9),
-    ("🍊", 19, 12),
-    ("🍇", 11, 19),
-    ("🔔", 5, 37),
-    ("💎", 3, 72),
-    ("7️⃣", 1, 134),
+    ("🍒", 38, 4),
+    ("🍋", 30, 6),
+    ("🍊", 14, 8),
+    ("🍇", 9, 12),
+    ("🔔", 3, 20),
+    ("💎", 2, 40),
+    ("7️⃣", 1, 100),
 )
 
 _WEIGHTS: list[int] = [s[1] for s in _SYMBOLS]
