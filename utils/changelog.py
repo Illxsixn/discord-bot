@@ -2,6 +2,9 @@
 Changelog laden und als Embed darstellen.
 
 Quelle: data/changelog.json
+
+Richtlinie: Kurze Releases (max. 5 Punkte), häufige Patch-Versionen,
+im Embed nur die 2 neuesten Versionen.
 """
 
 from __future__ import annotations
@@ -10,12 +13,11 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-import discord
-
 from utils.embeds import apply_brand_footer, info_embed
 
 CHANGELOG_PATH = Path(__file__).resolve().parent.parent / "data" / "changelog.json"
-MAX_RELEASES_IN_EMBED = 5
+MAX_RELEASES_IN_EMBED = 2
+MAX_CHANGES_PER_RELEASE_IN_EMBED = 5
 
 
 @dataclass(frozen=True)
@@ -47,16 +49,27 @@ def load_changelog() -> ChangelogData:
     return ChangelogData(version=str(raw["version"]), releases=releases)
 
 
-def build_changelog_embed(*, max_releases: int = MAX_RELEASES_IN_EMBED) -> discord.Embed:
-    """Erstellt ein übersichtliches Changelog-Embed."""
-    data = load_changelog()
-    sections: list[str] = []
+def _format_release_section(release: ChangelogRelease) -> str:
+    """Formatiert eine Version mit begrenzter Punktzahl fürs Embed."""
+    visible = release.changes[:MAX_CHANGES_PER_RELEASE_IN_EMBED]
+    bullets = "\n".join(f"• {change}" for change in visible)
+    remaining = len(release.changes) - len(visible)
+    if remaining > 0:
+        bullets += f"\n• … und {remaining} weitere"
+    return f"**v{release.version}**\n{bullets}"
 
-    for release in data.releases[:max_releases]:
-        bullets = "\n".join(f"• {change}" for change in release.changes)
-        sections.append(f"**v{release.version}**\n{bullets}")
+
+def build_changelog_embed(*, max_releases: int = MAX_RELEASES_IN_EMBED):
+    """Erstellt ein kompaktes Changelog-Embed (max. 2 Versionen)."""
+    import discord
+    data = load_changelog()
+    shown = data.releases[:max_releases]
+    sections = [_format_release_section(release) for release in shown]
 
     description = "\n\n".join(sections) if sections else "Noch keine Einträge."
+    if len(data.releases) > max_releases:
+        description += f"\n\n*Ältere Versionen: v{data.releases[-1].version} …*"
+
     embed = info_embed("📋 Changelog", description)
     apply_brand_footer(embed, prefix=f"Version {data.version}")
     return embed
