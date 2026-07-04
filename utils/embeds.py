@@ -288,6 +288,8 @@ def artwork_embed(
     thumbnail: str | None = None,
     image: str | None = None,
     footer_prefix: str | None = None,
+    author_name: str | None = None,
+    author_icon_url: str | None = None,
     with_icon: bool = True,
 ) -> discord.Embed:
     """
@@ -300,6 +302,8 @@ def artwork_embed(
         thumbnail: Optionale Thumbnail-URL.
         image: Optionale Bild-URL.
         footer_prefix: Optionaler Text vor der Marken-Signatur im Footer.
+        author_name: Optionaler Autor-Name über dem Embed.
+        author_icon_url: Optionale Autor-Icon-URL.
         with_icon: Ob das Marken-Icon im Footer erscheint.
 
     Returns:
@@ -318,6 +322,8 @@ def artwork_embed(
         embed.set_thumbnail(url=thumbnail)
     if image:
         embed.set_image(url=image)
+    if author_name:
+        embed.set_author(name=author_name, icon_url=author_icon_url)
     apply_brand_footer(embed, prefix=footer_prefix, with_icon=with_icon)
     return embed
 
@@ -444,6 +450,8 @@ def info_embed(
     thumbnail: str | None = None,
     image: str | None = None,
     footer_prefix: str | None = None,
+    author_name: str | None = None,
+    author_icon_url: str | None = None,
     with_icon: bool = True,
 ) -> discord.Embed:
     """
@@ -458,6 +466,8 @@ def info_embed(
         thumbnail=thumbnail,
         image=image,
         footer_prefix=footer_prefix,
+        author_name=author_name,
+        author_icon_url=author_icon_url,
         with_icon=with_icon,
     )
 

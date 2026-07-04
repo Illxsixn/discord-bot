@@ -45,6 +45,9 @@ COMMANDS_REMOVED_SINCE_1_4: frozenset[str] = frozenset(
         "dungeon status",
         "lootbox buy",
         "lootbox shop",
+        "guess",
+        "guess-start",
+        "guess-leaderboard",
     }
 )
 
@@ -118,6 +121,13 @@ def test_slots_rtp_at_most_target() -> None:
 
     rtp = simulate_rtp(spins=250_000, bet=10, seed=7)
     assert rtp <= Config.SLOT_TARGET_RTP + 0.01
+
+
+def test_slots_rtp_near_target() -> None:
+    from utils.slots import simulate_rtp
+
+    rtp = simulate_rtp(spins=250_000, bet=10, seed=7)
+    assert rtp >= Config.SLOT_TARGET_RTP - 0.02
 
 
 def test_slots_rtp_equal_for_all_bets() -> None:

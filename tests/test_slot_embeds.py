@@ -36,3 +36,9 @@ def test_slots_embed_shows_reels_and_table_in_description() -> None:
     assert "🍇" in embed.description
     assert "4×" in embed.description or "12×" in embed.description
     assert not embed.fields
+
+
+def test_slots_embed_win_uses_artwork_title() -> None:
+    embed = build_slots_embed(gold=500, bet=10, reels=("🍒", "🍒", "🍋"), won=True, result_line="Gewonnen!")
+    assert embed.title == "🎰 Gewonnen!"
+    assert not (embed.title or "").startswith("✅")

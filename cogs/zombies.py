@@ -23,14 +23,13 @@ from database.models import (
 from utils.embeds import error_embed, info_embed, spaced_list, warning_embed
 from utils.game_locks import game_lock
 from utils.pets import get_species_rarity
-from utils.zombie_assets import apply_zombie_visual
 from utils.zombie_combat import (
     perform_melee,
     perform_pet_action,
     resume_if_between_waves,
     spawn_wave,
 )
-from utils.zombie_content import get_zombie, player_max_hp
+from utils.zombie_content import player_max_hp
 from utils.zombie_embeds import (
     build_defeat_embed,
     build_expired_embed,
@@ -39,7 +38,7 @@ from utils.zombie_embeds import (
     build_interface_embed,
     build_pet_action_picker_embed,
     build_profile_embed,
-    build_run_embed,
+    build_run_message_embed,
     build_victory_embed,
 )
 from utils.zombie_rewards import finalize_expired_run, finalize_zombie_run, zombie_cooldown_remaining
@@ -445,24 +444,14 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         level = (await self.db.get_user_level(member.guild.id, member.id)).level
         pet = await self.db.get_active_pet(member.guild.id, member.id)
 
-        embed = build_run_embed(
+        embed, file = build_run_message_embed(
             run,
             pet=pet,
             economy=economy,
             player_level=level,
+            refresh_visual=refresh_visual,
+            use_attachment=use_attachment,
         )
-        file: discord.File | None = None
-        if run.in_combat and run.current_zombie_key:
-            zombie = get_zombie(run.current_zombie_key)
-            if zombie:
-                file = apply_zombie_visual(
-                    embed,
-                    run,
-                    run.current_zombie_key,
-                    is_boss=zombie.is_boss,
-                    use_attachment=use_attachment,
-                    refresh_visual=refresh_visual,
-                )
 
         view = await self._get_run_view(run, has_pet=pet is not None)
         return embed, file, view

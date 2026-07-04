@@ -67,9 +67,6 @@ class Config:
 
     # Level-System Standardwerte
     XP_PER_MESSAGE: int = 5
-    LEVEL_XP_MIN: int = 15
-    LEVEL_XP_MAX: int = 25
-    LEVEL_COOLDOWN: int = 10
     LEVEL_XP_COOLDOWN: int = 10
     LEVEL_LEADERBOARD_LIMIT: int = 10
     GAME_WIN_XP: int = 25
@@ -82,7 +79,6 @@ class Config:
     LOOTBOX_XP_CHANCE_MAX: int = 30
     LOOTBOX_XP_MIN: int = 1
     LOOTBOX_XP_MAX: int = 80
-    LOOTBOX_XP_REWARD: int = 50
     LOOTBOX_CONSOLATION_GOLD_MIN: int = 5
     LOOTBOX_CONSOLATION_GOLD_MAX: int = 12
     LOOTBOX_CONSOLATION_XP_MIN: int = 4
@@ -161,7 +157,6 @@ class Config:
     CHALLENGE_PET_XP_MIN: int = 20
     CHALLENGE_PET_XP_MAX: int = 50
     CHALLENGE_GENERATION_VERSION: int = 4
-    BOARD_GAME_TIMEOUT: float = 300.0
     DAILY_CHALLENGE_COUNT: int = 4
     DAILY_PET_CHALLENGE_COUNT: int = 2
     CHALLENGE_MESSAGE_TARGETS: tuple[int, ...] = (30, 35, 40, 45, 50, 55, 60, 65, 70)
