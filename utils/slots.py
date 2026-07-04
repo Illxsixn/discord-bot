@@ -1,5 +1,8 @@
 """
 Slot-Maschine: Symbole, Spin-Logik und Auszahlung.
+
+Auszahlungsquote (RTP) ist auf echte Spielotheken-Werte kalibriert (≤ 85 %).
+Drei unabhängige Walzen — keine künstlich erzwungenen Treffer.
 """
 
 from __future__ import annotations
@@ -9,15 +12,15 @@ from dataclasses import dataclass
 
 from config import Config
 
-# (Emoji, Gewicht, 3×-Multiplikator)
+# (Emoji, Gewicht, 3×-Multiplikator) — kalibriert auf ~84 % RTP
 _SYMBOLS: tuple[tuple[str, int, int], ...] = (
-    ("🍒", 26, 4),
-    ("🍋", 22, 6),
-    ("🍊", 18, 8),
-    ("🍇", 14, 12),
-    ("🔔", 10, 20),
-    ("💎", 7, 40),
-    ("7️⃣", 6, 100),
+    ("🍒", 34, 7),
+    ("🍋", 27, 9),
+    ("🍊", 19, 12),
+    ("🍇", 11, 19),
+    ("🔔", 5, 37),
+    ("💎", 3, 72),
+    ("7️⃣", 1, 134),
 )
 
 _WEIGHTS: list[int] = [s[1] for s in _SYMBOLS]
@@ -51,42 +54,18 @@ def _pick_symbol() -> str:
     return random.choices(_EMOJIS, weights=_WEIGHTS, k=1)[0]
 
 
-def _pick_other_symbol(exclude: str) -> str:
-    pool = [emoji for emoji in _EMOJIS if emoji != exclude] or _EMOJIS
-    weights = [_WEIGHTS[_EMOJIS.index(emoji)] for emoji in pool]
-    return random.choices(pool, weights=weights, k=1)[0]
-
-
 def random_reel_display() -> tuple[str, str, str]:
     """Zufällige Walzen nur für Spin-Animation (ohne Gewinnlogik)."""
-    return tuple(random.choices(_EMOJIS, weights=_WEIGHTS, k=3))  # type: ignore[return-value]
+    return spin_reels()
 
 
 def spin_reels() -> tuple[str, str, str]:
-    """
-    Dreht drei Walzen mit erhöhter Trefferquote.
+    """Dreht drei unabhängige Walzen."""
+    return (_pick_symbol(), _pick_symbol(), _pick_symbol())
 
-    ~13 % Dreier · ~28 % Doppel · 1 % Mega-Jackpot (777) · sonst Zufall.
-    """
-    if random.random() < Config.SLOT_MEGA_JACKPOT_CHANCE:
-        return (MEGA_JACKPOT_SYMBOL, MEGA_JACKPOT_SYMBOL, MEGA_JACKPOT_SYMBOL)
 
-    roll = random.random()
-    symbol = _pick_symbol()
-
-    if roll < Config.SLOT_TRIPLE_CHANCE:
-        return (symbol, symbol, symbol)
-
-    if roll < Config.SLOT_TRIPLE_CHANCE + Config.SLOT_DOUBLE_CHANCE:
-        other = _pick_other_symbol(symbol)
-        patterns = (
-            (symbol, symbol, other),
-            (symbol, other, symbol),
-            (other, symbol, symbol),
-        )
-        return random.choice(patterns)
-
-    return tuple(random.choices(_EMOJIS, weights=_WEIGHTS, k=3))  # type: ignore[return-value]
+def _pair_payout(bet: int) -> int:
+    return max(1, int(bet * Config.SLOT_PAIR_PAYOUT_FRACTION))
 
 
 def format_reels(reels: tuple[str, str, str]) -> str:
@@ -104,14 +83,19 @@ def resolve_spin(reels: tuple[str, str, str], bet: int) -> SpinResult:
         if mega:
             msg = f"**MEGA-JACKPOT!** Drei Siebenen — **{mult}×** Einsatz!"
             return SpinResult(reels, payout, msg, jackpot=True, mega_jackpot=True)
-        if mult >= 20:
+        if mult >= Config.SLOT_JACKPOT_MIN_MULTIPLIER:
             msg = f"**JACKPOT!** Drei {a} — **{mult}×** Einsatz!"
             return SpinResult(reels, payout, msg, jackpot=True)
         return SpinResult(reels, payout, f"Drei {a}! **{mult}×** — du gewinnst **{payout:,}** 🪙")
 
     if a == b or b == c or a == c:
-        payout = max(1, bet // 2)
-        return SpinResult(reels, payout, f"Zwei gleiche — kleiner Trost: **+{payout:,}** 🪙")
+        payout = _pair_payout(bet)
+        pct = int(Config.SLOT_PAIR_PAYOUT_FRACTION * 100)
+        return SpinResult(
+            reels,
+            payout,
+            f"Zwei gleiche — **{pct} %** Einsatz zurück: **+{payout:,}** 🪙",
+        )
 
     return SpinResult(reels, 0, "Kein Treffer — vielleicht beim nächsten Mal!")
 
@@ -119,5 +103,21 @@ def resolve_spin(reels: tuple[str, str, str], bet: int) -> SpinResult:
 def payout_table_text() -> str:
     """Kompakte Gewinntabelle."""
     lines = [f"{emoji} {emoji} {emoji} → **{mult}×**" for emoji, _, mult in _SYMBOLS]
-    lines.append("Zwei gleiche → **50 %** des Einsatzes zurück")
+    pct = int(Config.SLOT_PAIR_PAYOUT_FRACTION * 100)
+    lines.append(f"Zwei gleiche → **{pct} %** des Einsatzes zurück")
+    lines.append(f"Auszahlungsquote max. **{int(Config.SLOT_TARGET_RTP * 100)} %** (Spielothek)")
     return "\n".join(lines)
+
+
+def simulate_rtp(*, spins: int = 200_000, bet: int = 10, seed: int = 42) -> float:
+    """Monte-Carlo-RTP für Tests und Balancing."""
+    rng = random.Random(seed)
+    total_payout = 0
+    for _ in range(spins):
+        reels = (
+            rng.choices(_EMOJIS, weights=_WEIGHTS, k=1)[0],
+            rng.choices(_EMOJIS, weights=_WEIGHTS, k=1)[0],
+            rng.choices(_EMOJIS, weights=_WEIGHTS, k=1)[0],
+        )
+        total_payout += resolve_spin(reels, bet).payout
+    return total_payout / (spins * bet)

@@ -164,7 +164,7 @@ class SlotsCog(commands.Cog):
             result_line = f"{result.message}\n**Break-even** — Einsatz zurück."
             won = None
         else:
-            result_line = f"{result.message}\n**−{view.bet:,}** 🪙"
+            result_line = f"{result.message}\n**−{abs(net):,}** 🪙"
             won = False
 
         embed = build_slots_embed(
@@ -172,7 +172,7 @@ class SlotsCog(commands.Cog):
             bet=view.bet,
             reels=reels,
             result_line=result_line,
-            won=won,
+            won=won if not result.jackpot else True,
             jackpot=result.jackpot,
             mega_jackpot=result.mega_jackpot,
         )

@@ -108,27 +108,22 @@ async def test_lootbox_commands_kept(bot_commands: set[str]) -> None:
 
 def test_slots_three_of_a_kind_pays_multiplier() -> None:
     result = resolve_spin(("7️⃣", "7️⃣", "7️⃣"), bet=10)
-    assert result.payout == 1000
+    assert result.payout == 1340
     assert result.jackpot is True
     assert result.mega_jackpot is True
 
 
-def test_slots_mega_jackpot_roll_exists() -> None:
-    from utils.slots import MEGA_JACKPOT_SYMBOL, spin_reels
+def test_slots_rtp_at_most_target() -> None:
+    from utils.slots import simulate_rtp
 
-    assert MEGA_JACKPOT_SYMBOL == "7️⃣"
-    seen_mega = False
-    for _ in range(5000):
-        reels = spin_reels()
-        if reels == ("7️⃣", "7️⃣", "7️⃣"):
-            seen_mega = True
-            break
-    assert seen_mega
+    rtp = simulate_rtp(spins=250_000, bet=10, seed=7)
+    assert rtp <= Config.SLOT_TARGET_RTP + 0.01
 
 
-def test_slots_two_match_returns_half_bet() -> None:
+def test_slots_two_match_returns_partial_bet() -> None:
     result = resolve_spin(("🍒", "🍒", "🍋"), bet=10)
     assert result.payout == 5
+    assert result.jackpot is False
 
 
 def test_slots_no_match_zero_payout() -> None:

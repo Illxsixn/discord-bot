@@ -135,9 +135,9 @@ class Config:
     SLOT_BET_OPTIONS: tuple[int, ...] = (5, 10, 25, 50)
     SLOT_DEFAULT_BET: int = 10
     SLOT_VIEW_TIMEOUT: float = 180.0
-    SLOT_TRIPLE_CHANCE: float = 0.13
-    SLOT_DOUBLE_CHANCE: float = 0.28
-    SLOT_MEGA_JACKPOT_CHANCE: float = 0.01
+    SLOT_TARGET_RTP: float = 0.85
+    SLOT_PAIR_PAYOUT_FRACTION: float = 0.53
+    SLOT_JACKPOT_MIN_MULTIPLIER: int = 37
     SLOT_SPIN_ANIMATION_STEPS: int = 3
     SLOT_SPIN_ANIMATION_DELAY: float = 0.45
 
