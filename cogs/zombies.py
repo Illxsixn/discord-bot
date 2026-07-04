@@ -21,7 +21,7 @@ from database.models import (
 )
 from utils.embeds import error_embed, info_embed, spaced_list, warning_embed
 from utils.game_locks import game_lock
-from utils.zombie_assets import attach_zombie_visual, set_zombie_visual_url
+from utils.zombie_assets import apply_zombie_visual
 from utils.zombie_combat import (
     perform_melee,
     perform_pet_action,
@@ -176,15 +176,8 @@ class ZombieRunView(discord.ui.View):
             )
             return
 
-        remaining = self.action_cooldown_remaining()
-        if remaining > 0:
-            await interaction.response.send_message(
-                embed=warning_embed(
-                    "Cooldown",
-                    f"Kurz warten (**{remaining:.1f}** s), dann erneut.",
-                ),
-                ephemeral=True,
-            )
+        if self.action_cooldown_remaining() > 0:
+            await interaction.response.defer(ephemeral=True)
             return
 
         await self.cog._handle_run_action(
@@ -397,6 +390,16 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         await finalize_expired_run(self.db, self.bot, run, profile, member=member)
         return None
 
+    @staticmethod
+    def _embed_image_url(message: discord.Message) -> str | None:
+        """Liefert die Discord-CDN-URL des Embed-Bilds (nach attachment://-Upload)."""
+        if not message.embeds:
+            return None
+        image = message.embeds[0].image
+        if image and image.url and not image.url.startswith("attachment://"):
+            return image.url
+        return None
+
     async def _build_run_message(
         self,
         member: discord.Member,
@@ -416,13 +419,17 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             player_level=level,
         )
         file: discord.File | None = None
-        if refresh_visual and run.in_combat and run.current_zombie_key:
+        if run.in_combat and run.current_zombie_key:
             zombie = get_zombie(run.current_zombie_key)
             if zombie:
-                if use_attachment:
-                    file = attach_zombie_visual(embed, run.current_zombie_key, is_boss=zombie.is_boss)
-                else:
-                    set_zombie_visual_url(embed, run.current_zombie_key, is_boss=zombie.is_boss)
+                file = apply_zombie_visual(
+                    embed,
+                    run,
+                    run.current_zombie_key,
+                    is_boss=zombie.is_boss,
+                    use_attachment=use_attachment,
+                    refresh_visual=refresh_visual,
+                )
 
         view = await self._get_run_view(run, has_pet=pet is not None)
         return embed, file, view
@@ -449,9 +456,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 use_attachment=False,
             )
             view = view or run_view
-            payload = {"embed": embed, "view": view}
-            if refresh_visual:
-                payload["attachments"] = []
+            payload = {"embed": embed, "view": view, "attachments": []}
 
         try:
             if interaction.response.is_done():
@@ -735,6 +740,13 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             if file:
                 kwargs["file"] = file
             await interaction.response.send_message(**kwargs)
+            msg = await interaction.original_response()
+            image_url = self._embed_image_url(msg)
+            if image_url:
+                checked.current_zombie_image_url = image_url
+            checked.message_id = msg.id
+            await self.db.save_zombie_run(checked)
+            self._register_run_view(checked, view)
             return
 
         cooldown = await self._get_cooldown(interaction.guild.id, interaction.user.id)
@@ -780,6 +792,9 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             kwargs["file"] = file
         await interaction.response.send_message(**kwargs)
         msg = await interaction.original_response()
+        image_url = self._embed_image_url(msg)
+        if image_url:
+            run.current_zombie_image_url = image_url
         run.message_id = msg.id
         await self.db.save_zombie_run(run)
         self._register_run_view(run, view)
@@ -808,6 +823,9 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 kwargs["file"] = file
             await interaction.response.send_message(**kwargs)
             msg = await interaction.original_response()
+            image_url = self._embed_image_url(msg)
+            if image_url:
+                checked.current_zombie_image_url = image_url
             checked.message_id = msg.id
             checked.channel_id = self._channel(interaction).id if self._channel(interaction) else None
             await self.db.save_zombie_run(checked)

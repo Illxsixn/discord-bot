@@ -7,11 +7,15 @@ from __future__ import annotations
 import logging
 import random
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import discord
 
 from config import Config
 from utils.zombie_content import ZOMBIE_TYPE_BOSS, ZOMBIE_TYPE_RASENDER, ZOMBIE_TYPE_STREUNER
+
+if TYPE_CHECKING:
+    from database.models import ZombieRunRecord
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +74,50 @@ def boss_zombie_gif() -> str | Path | None:
     if local:
         return local
     return random.choice(FALLBACK_GIFS["boss"])
+
+
+def pick_zombie_visual_url(zombie_type: str, *, is_boss: bool = False) -> str:
+    """Wählt eine HTTP-Bild-URL für Embed-Updates ohne Datei-Anhang."""
+    source = boss_zombie_gif() if is_boss else random_zombie_gif(zombie_type)
+    if isinstance(source, Path):
+        folder = "boss" if is_boss else ZOMBIE_ASSET_MAP.get(zombie_type, "common")
+        urls = FALLBACK_GIFS.get(folder, FALLBACK_GIFS["common"])
+        return random.choice(urls)
+    return str(source)
+
+
+def apply_zombie_visual(
+    embed: discord.Embed,
+    run: ZombieRunRecord,
+    zombie_type: str,
+    *,
+    is_boss: bool = False,
+    use_attachment: bool = False,
+    refresh_visual: bool = False,
+) -> discord.File | None:
+    """
+    Setzt das Zombie-Bild im Embed.
+
+    Hält die Bild-URL pro Zombie stabil über Nachrichten-Edits hinweg.
+    """
+    if refresh_visual:
+        run.current_zombie_image_url = ""
+
+    if run.current_zombie_image_url:
+        embed.set_image(url=run.current_zombie_image_url)
+        return None
+
+    if use_attachment:
+        file = attach_zombie_visual(embed, zombie_type, is_boss=is_boss)
+        image = embed.image
+        if image and image.url and not image.url.startswith("attachment://"):
+            run.current_zombie_image_url = image.url
+        return file
+
+    url = pick_zombie_visual_url(zombie_type, is_boss=is_boss)
+    run.current_zombie_image_url = url
+    embed.set_image(url=url)
+    return None
 
 
 def set_zombie_visual_url(
