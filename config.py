@@ -60,6 +60,7 @@ class Config:
     # Cooldown in Sekunden für wiederholte Slash-Commands
     DEFAULT_COOLDOWN: float = 3.0
     EMOJI_USER_COOLDOWN: float = 30.0
+    EMOJI_RESPONSE_TIMEOUT: float = 60.0
 
     # Maximale Anzahl gespeicherter Warnungen pro User (0 = unbegrenzt)
     MAX_WARNINGS_DISPLAY: int = 25
