@@ -10,7 +10,7 @@ from config import Config
 from database.models import PetRecord, PlayerEconomyRecord, ZombiePlayerRecord, ZombieRunRecord
 from utils.embeds import info_embed, success_embed, error_embed, apply_brand_footer
 from utils.levels import progress_bar
-from utils.zombie_content import get_zombie, melee_base_damage, upgrade_lines, wave_intro_text, wave_location
+from utils.zombie_content import get_zombie, melee_base_damage, wave_intro_text, wave_location
 from utils.zombie_rewards import RunRewards
 
 
@@ -58,7 +58,7 @@ def build_run_embed(
             [
                 f"❤️ HP: {format_hp_bar(run.player_hp, run.player_max_hp)}",
                 f"🪙 Gold: **{economy.gold:,}** · Run-Punkte: **{run.run_gold}**",
-                f"⚔️ Nahkampf: **{melee_base_damage(player_level)}** · Upgrades: {upgrade_lines()}",
+                f"⚔️ Nahkampf: **{melee_base_damage(player_level)}**",
             ]
         ),
         inline=False,
@@ -214,7 +214,6 @@ def build_profile_embed(
                 False,
             ),
             ("Aktives Pet", pet_line, False),
-            ("Perks", upgrade_lines(), False),
         ],
     )
     embed.set_thumbnail(url=member.display_avatar.url)

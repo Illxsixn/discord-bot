@@ -235,7 +235,6 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             f"Jackpot **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** · "
             f"Bonus-XP **{Config.LOOTBOX_XP_MIN}–{Config.LOOTBOX_XP_MAX}**",
             "Öffnen weiterhin mit `/lootbox open`",
-            "Zombie-Perks — **Coming soon**",
         ],
     },
     HelpCategory.Zombies.value: {
