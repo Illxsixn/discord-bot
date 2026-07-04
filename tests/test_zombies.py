@@ -70,3 +70,14 @@ def test_pet_action_cooldown_last_three_melee_attacks():
     for expected in range(Config.ZOMBIE_PET_ACTION_COOLDOWN - 1, -1, -1):
         perform_melee(run, player_level=5, pet=None)
         assert run.pet_action_cooldown == expected
+
+
+def test_zombie_run_view_persistent_until_timeout():
+    from unittest.mock import MagicMock
+
+    from cogs.zombies import ZombieRunView
+
+    view = ZombieRunView(MagicMock(), 7, 99, has_pet=True, pet_on_cooldown=False)
+    assert view.is_persistent()
+    view.timeout = 900.0
+    assert not view.is_persistent()

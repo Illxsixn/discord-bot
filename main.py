@@ -139,6 +139,7 @@ class DiscordBot(commands.Bot):
                 name="/help | Slash Commands",
             )
         )
+        logger.info("successfully finished startup")
 
     async def on_app_command_error(
         self,

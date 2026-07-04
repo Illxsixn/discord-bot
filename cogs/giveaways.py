@@ -111,6 +111,8 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
         try:
             message = await channel.fetch_message(giveaway.message_id)
         except discord.NotFound:
+            if not reroll:
+                await self.db.finish_giveaway(giveaway.id, [])
             return None, "Gewinnspiel-Nachricht wurde gelöscht."
         except discord.Forbidden:
             return None, "Ich kann die Gewinnspiel-Nachricht nicht lesen."
@@ -168,11 +170,17 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
                 if giveaway.ends_at <= now:
                     _, error = await self._draw_winners(giveaway)
                     if error:
-                        logger.warning(
-                            "Giveaway #%s konnte nicht beendet werden: %s",
-                            giveaway.id,
-                            error,
-                        )
+                        if error == "Gewinnspiel-Nachricht wurde gelöscht.":
+                            logger.info(
+                                "Giveaway #%s geschlossen (Nachricht gelöscht).",
+                                giveaway.id,
+                            )
+                        else:
+                            logger.warning(
+                                "Giveaway #%s konnte nicht beendet werden: %s",
+                                giveaway.id,
+                                error,
+                            )
         except Exception as exc:
             logger.exception("Giveaway-Ablauf-Task fehlgeschlagen: %s", exc)
 

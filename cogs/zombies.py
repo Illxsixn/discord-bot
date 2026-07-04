@@ -293,7 +293,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         for run in await self.db.get_all_active_zombie_runs():
             if run.message_id:
                 view = await self._build_persistent_run_view(run)
-                self._register_run_view(run, view)
+                self._persist_run_view(view, run.message_id)
 
     async def _finalize_stale_run(self, run: ZombieRunRecord) -> None:
         """Schließt inaktive Runs beim Start ab — inkl. Trostbelohnung."""
@@ -318,10 +318,41 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         run.updated_at = datetime.now(timezone.utc)
         return await self.db.save_zombie_run(run)
 
-    def _register_run_view(self, run: ZombieRunRecord, view: ZombieRunView) -> None:
-        """Registriert persistente Buttons für Nachricht und Bot-Neustart."""
-        if run.message_id:
-            self.bot.add_view(view, message_id=run.message_id)
+    def _persist_run_view(self, view: ZombieRunView, message_id: int | None) -> None:
+        """
+        Registriert persistente Buttons für Nachricht und Bot-Neustart.
+
+        Ephemeral-Antworten setzen in discord.py timeout=900 — dann ist die View
+        nicht mehr persistent und add_view würde fehlschlagen.
+        """
+        if message_id and view.is_persistent() and not view.is_finished():
+            self.bot.add_view(view, message_id=message_id)
+
+    async def _send_run_panel(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        run: ZombieRunRecord,
+        *,
+        embed: discord.Embed,
+        view: ZombieRunView,
+        file: discord.File | None = None,
+    ) -> None:
+        """Sendet das Run-Panel als öffentliche Nachricht (persistent Views)."""
+        kwargs: dict = {"embed": embed, "view": view}
+        if file:
+            kwargs["file"] = file
+        await interaction.response.send_message(**kwargs)
+        msg = await interaction.original_response()
+        image_url = self._embed_image_url(msg)
+        if image_url:
+            run.current_zombie_image_url = image_url
+        run.message_id = msg.id
+        channel = self._channel(interaction)
+        if channel:
+            run.channel_id = channel.id
+        await self.db.save_zombie_run(run)
+        self._persist_run_view(view, msg.id)
 
     def _drop_run_view(self, run_id: int) -> None:
         self._run_views.pop(run_id, None)
@@ -464,7 +495,23 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             elif interaction.type is InteractionType.component:
                 await interaction.response.edit_message(**payload)
             else:
-                await interaction.response.send_message(**payload, ephemeral=True)
+                channel = self._channel(interaction)
+                if channel is None:
+                    await interaction.response.send_message(
+                        embed=error_embed("Kein Kanal", "Run-Panel kann hier nicht gesendet werden."),
+                        ephemeral=True,
+                    )
+                    return
+                sent = await channel.send(**payload)
+                run.message_id = sent.id
+                run.channel_id = channel.id
+                await self.db.save_zombie_run(run)
+                self._persist_run_view(view, sent.id)
+                await interaction.response.send_message(
+                    embed=info_embed("Run aktualisiert", f"Dein Run-Panel: {sent.jump_url}"),
+                    ephemeral=True,
+                )
+                return
         except (discord.NotFound, discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Run-Nachricht Update fehlgeschlagen: %s", exc)
             if not interaction.response.is_done():
@@ -478,7 +525,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             if interaction.message and run.message_id != interaction.message.id:
                 run.message_id = interaction.message.id
                 await self.db.save_zombie_run(run)
-            self._register_run_view(run, view)
+            self._persist_run_view(view, run.message_id)
 
     async def _restore_run_message(
         self,
@@ -736,17 +783,14 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             embed, file, view = await self._build_run_message(
                 interaction.user, checked, refresh_visual=True, use_attachment=True
             )
-            kwargs = {"embed": embed, "view": view, "ephemeral": True}
-            if file:
-                kwargs["file"] = file
-            await interaction.response.send_message(**kwargs)
-            msg = await interaction.original_response()
-            image_url = self._embed_image_url(msg)
-            if image_url:
-                checked.current_zombie_image_url = image_url
-            checked.message_id = msg.id
-            await self.db.save_zombie_run(checked)
-            self._register_run_view(checked, view)
+            await self._send_run_panel(
+                interaction,
+                interaction.user,
+                checked,
+                embed=embed,
+                view=view,
+                file=file,
+            )
             return
 
         cooldown = await self._get_cooldown(interaction.guild.id, interaction.user.id)
@@ -787,17 +831,14 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         embed, file, view = await self._build_run_message(
             interaction.user, run, refresh_visual=True, use_attachment=True
         )
-        kwargs: dict = {"embed": embed, "view": view, "ephemeral": True}
-        if file:
-            kwargs["file"] = file
-        await interaction.response.send_message(**kwargs)
-        msg = await interaction.original_response()
-        image_url = self._embed_image_url(msg)
-        if image_url:
-            run.current_zombie_image_url = image_url
-        run.message_id = msg.id
-        await self.db.save_zombie_run(run)
-        self._register_run_view(run, view)
+        await self._send_run_panel(
+            interaction,
+            interaction.user,
+            run,
+            embed=embed,
+            view=view,
+            file=file,
+        )
 
     @app_commands.command(name="status", description="Zeigt den aktiven Run oder Kurzprofil")
     @app_commands.guild_only()
@@ -818,18 +859,14 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             embed, file, view = await self._build_run_message(
                 interaction.user, checked, refresh_visual=True, use_attachment=True
             )
-            kwargs = {"embed": embed, "view": view, "ephemeral": True}
-            if file:
-                kwargs["file"] = file
-            await interaction.response.send_message(**kwargs)
-            msg = await interaction.original_response()
-            image_url = self._embed_image_url(msg)
-            if image_url:
-                checked.current_zombie_image_url = image_url
-            checked.message_id = msg.id
-            checked.channel_id = self._channel(interaction).id if self._channel(interaction) else None
-            await self.db.save_zombie_run(checked)
-            self._register_run_view(checked, view)
+            await self._send_run_panel(
+                interaction,
+                interaction.user,
+                checked,
+                embed=embed,
+                view=view,
+                file=file,
+            )
             return
 
         profile = await self.db.get_zombie_player(interaction.guild.id, interaction.user.id)
