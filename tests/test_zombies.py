@@ -54,7 +54,44 @@ def test_player_max_hp_scales():
     assert player_max_hp(5) > Config.ZOMBIE_PLAYER_HP_BASE
 
 
-def test_pet_action_cooldown_last_three_melee_attacks():
+def test_pet_focus_doubles_melee_damage():
+    run = _run()
+    spawn_wave(run)
+    run.focus_active = 1
+
+    class _Pet:
+        name = "Testi"
+        mood = "focus"
+        species = "cat"
+
+    damages: list[int] = []
+    for _ in range(20):
+        test_run = _run()
+        spawn_wave(test_run)
+        test_run.focus_active = 1
+        hp_before = test_run.current_zombie_hp
+        result = perform_melee(test_run, player_level=5, pet=_Pet())
+        damages.append(hp_before - test_run.current_zombie_hp)
+        assert result.lines
+        assert test_run.focus_active == 0
+
+    assert max(damages) >= 18
+
+
+def test_pet_energy_heals_and_damages():
+    run = _run()
+    spawn_wave(run)
+    run.player_hp = 50
+
+    class _Pet:
+        name = "Testi"
+        mood = "energy"
+        species = "robo_hamster"
+
+    result = perform_pet_action(run, _Pet(), action="energy")
+    assert run.total_damage > 0
+    assert any("Energie" in line and "+20" in line for line in result.lines)
+    assert run.player_hp > 50
     run = _run()
     spawn_wave(run)
 

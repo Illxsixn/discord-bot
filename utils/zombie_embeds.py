@@ -30,7 +30,7 @@ def _pet_action_label(run: ZombieRunRecord, pet: PetRecord | None) -> str:
         attacks = run.pet_action_cooldown
         label = "Angriff" if attacks == 1 else "Angriffe"
         return f"Cooldown: **{attacks}** {label} (Nahkampf)"
-    return "🎯 Fokus · ⚡ Power · 🍀 Glück — wähle im Menü"
+    return "🎯 Fokus · ⚡ Energie · 🍀 Glück — wähle im Menü"
 
 
 def build_run_embed(
@@ -107,8 +107,8 @@ def build_pet_action_picker_embed(pet: PetRecord, *, companion_rarity: str = "")
         f"🐾 Pet-Aktion — {pet.name}",
         "Wähle **eine** Spezialaktion für diesen Kampfzug.",
         fields=[
-            ("🎯 Fokus", "Nächster Nahkampf **+50 %** Schaden", True),
-            ("⚡ Power", "Sofort-Schaden am Zombie (schwächer bei Epic/Legendary)", True),
+            ("🎯 Fokus", "Nächster Nahkampf **+100 %** Schaden", True),
+            ("⚡ Energie", f"Sofort-Schaden + **{Config.ZOMBIE_PET_ENERGY_HEAL}** HP Heilung", True),
             (
                 "🍀 Glück",
                 f"Endbonus **+{Config.ZOMBIE_LUCK_BONUS_PERCENT} %** "

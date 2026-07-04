@@ -231,9 +231,9 @@ def perform_melee(
     base = melee_base_damage(player_level)
     damage = random.randint(max(1, base - 2), base + 3)
     if run.focus_active:
-        damage = int(damage * 1.5)
+        damage = int(damage * Config.ZOMBIE_PET_FOCUS_DAMAGE_MULTIPLIER)
         run.focus_active = 0
-        result.lines.append("**Fokus** — verstärkter Treffer!")
+        result.lines.append("**Fokus** — Doppelschlag!")
 
     run.current_zombie_hp = max(0, run.current_zombie_hp - damage)
     run.total_damage += damage
@@ -294,13 +294,20 @@ def perform_pet_action(
 
     if chosen == PetMood.FOCUS.value:
         run.focus_active = 1
-        result.lines.append(f"**{pet.name}** — **Fokus**: Nächster Nahkampf +50 % Schaden.")
+        result.lines.append(f"**{pet.name}** — **Fokus**: Nächster Nahkampf **+100 %** Schaden.")
     elif chosen == PetMood.ENERGY.value:
         low, high = _power_damage_range(_pet_rarity(pet))
         dmg = random.randint(low, high)
         run.current_zombie_hp = max(0, run.current_zombie_hp - dmg)
         run.total_damage += dmg
-        result.lines.append(f"**{pet.name}** — **Power**: **{dmg}** Schaden!")
+        before = run.player_hp
+        run.player_hp = min(run.player_max_hp, run.player_hp + Config.ZOMBIE_PET_ENERGY_HEAL)
+        healed = run.player_hp - before
+        result.lines.append(
+            f"**{pet.name}** — **Energie**: **{dmg}** Schaden"
+            + (f" · **+{healed}** HP" if healed > 0 else "")
+            + "!"
+        )
         if run.current_zombie_hp <= 0 and run.current_zombie_key:
             kill_result = _on_zombie_killed(run, run.current_zombie_key)
             result.lines.extend(kill_result.lines)

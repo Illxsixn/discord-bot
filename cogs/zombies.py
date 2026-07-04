@@ -218,7 +218,7 @@ class ZombiePetActionView(discord.ui.View):
         for action_id, emoji, label in (
             ("focus", "🎯", "Fokus"),
             ("luck", "🍀", "Glück"),
-            ("energy", "⚡", "Power"),
+            ("energy", "⚡", "Energie"),
         ):
             button = discord.ui.Button(
                 label=label,

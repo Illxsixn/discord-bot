@@ -90,6 +90,8 @@ class Config:
     ZOMBIE_PET_ACTION_COOLDOWN: int = 2
     ZOMBIE_PET_ACTION_COOLDOWN_EPIC: int = 3
     ZOMBIE_PET_ACTION_COOLDOWN_LEGENDARY: int = 4
+    ZOMBIE_PET_ENERGY_HEAL: int = 20
+    ZOMBIE_PET_FOCUS_DAMAGE_MULTIPLIER: float = 2.0
     # Multiplikatoren (HP, Angriff) wenn ein Pet den Run begleitet — Legendary = härtere Horde
     ZOMBIE_PET_DIFFICULTY_HP: dict[str, float] = {
         "gewöhnlich": 1.0,
