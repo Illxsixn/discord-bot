@@ -39,14 +39,8 @@ def apply_pet_image_layout(
     *,
     attachment_filename: str,
 ) -> discord.Embed:
-    """
-    Großes Pet-Bild unten, dasselbe Pet klein oben rechts (Thumbnail).
-
-    Nutzen, wenn ein Pet-Portrait als Anhang mitgesendet wird.
-    """
-    url = f"attachment://{attachment_filename}"
-    embed.set_image(url=url)
-    embed.set_thumbnail(url=url)
+    """Setzt das Pet-Portrait einmal als großes Embed-Bild (kein Thumbnail-Duplikat)."""
+    embed.set_image(url=f"attachment://{attachment_filename}")
     return embed
 
 
@@ -288,7 +282,7 @@ def build_pet_display_embed(
     portrait_label: str,
     attachment_filename: str | None = None,
 ) -> discord.Embed:
-    """Embed für KI-Portraits — großes Bild unten, Pet klein oben rechts."""
+    """Embed für KI-Portraits — ein großes Bild im Embed."""
     species = get_species_by_name(pet.species)
     emoji = species_display_emoji(species, pet.evolution_stage)
     rarity = rarity_display(species.rarity) if species else "—"

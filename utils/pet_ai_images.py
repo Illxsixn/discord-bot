@@ -6,6 +6,7 @@ Bilder werden einmal generiert, lokal gecacht und bei Evolution neu erzeugt.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from io import BytesIO
 from pathlib import Path
@@ -20,6 +21,8 @@ from utils.pets import PetSpeciesDefinition, evolution_display, get_species_by_n
 
 logger = logging.getLogger(__name__)
 
+_portrait_locks: dict[int, asyncio.Lock] = {}
+
 SPECIES_PROMPT_HINTS: dict[str, str] = {
     "schattenkatze": "shadowy mystical black cat with glowing eyes",
     "mini_drache": "tiny friendly dragon with small wings",
@@ -27,7 +30,7 @@ SPECIES_PROMPT_HINTS: dict[str, str] = {
     "robo_hamster": "cute robotic hamster with metal and LED details",
     "kristallwolf": "crystal wolf made of translucent blue ice shards",
     "wolkenschaf": "fluffy cloud sheep floating slightly",
-    "schleimfreund": "adorable green slime blob companion with a happy face",
+    "schleimfreund": "adorable green slime blob companion with one simple cute face",
     "mondhase": "moon rabbit with soft silver fur and crescent motifs",
     "feuergecko": "fire gecko with ember tail and warm orange scales",
     "buecher_eule": "wise owl wearing tiny round spectacles",
@@ -81,6 +84,36 @@ def pet_portrait_path(pet_id: int, evolution_stage: str) -> Path:
     return Config.PET_IMAGE_DIR / filename
 
 
+def clear_pet_portrait_cache() -> int:
+    """
+    Löscht alle gecachten Pet-Portraits im Asset-Ordner.
+
+    Returns:
+        Anzahl gelöschter Dateien.
+    """
+    directory = Config.PET_IMAGE_DIR
+    if not directory.is_dir():
+        return 0
+
+    removed = 0
+    for path in directory.glob("*.png"):
+        if path.is_file():
+            path.unlink()
+            removed += 1
+    return removed
+
+
+def invalidate_pet_portrait(pet: PetRecord) -> None:
+    """Entfernt alle gecachten Portraits eines Pets (alle Versionen/Evolutionen)."""
+    directory = Config.PET_IMAGE_DIR
+    if not directory.is_dir():
+        return
+    pattern = f"{pet.id}_"
+    for path in directory.glob(f"{pattern}*.png"):
+        if path.is_file():
+            path.unlink(missing_ok=True)
+
+
 def build_pet_portrait_prompt(pet: PetRecord, species: PetSpeciesDefinition | None) -> str:
     """Erstellt einen stabilen Prompt für die Bild-KI (inkl. versteckter Merkmale)."""
     species_key = species.key if species else "schleimfreund"
@@ -101,14 +134,17 @@ def build_pet_portrait_prompt(pet: PetRecord, species: PetSpeciesDefinition | No
     evolution_traits = secret_evolution_traits_prompt(pet.id, species_key, pet.evolution_stage)
 
     return (
-        f"Single unique individual {species_hint}, fantasy virtual pet creature, "
+        f"Single unique individual {species_hint}, one creature only, solo portrait, "
+        f"exactly one face, one head, no duplicate faces, no twins, no mirror reflection, "
+        f"no second character, fantasy virtual pet creature, "
         f"{evolution_hint}, {rarity_hint}, "
         f"distinct appearance: {unique_traits}, "
         f"evolved power traits: {evolution_traits}, "
-        "full body character design, soft digital illustration, clean soft gradient background, "
-        "wholesome game art style, clearly more powerful at higher evolution stages, "
+        "full body character design, centered composition, soft digital illustration, "
+        "clean soft gradient background, wholesome game art style, "
+        "clearly more powerful at higher evolution stages, "
         "highly distinct from other creatures of same species, "
-        "no text, no watermark, no human, no avatar, no frame"
+        "no text, no watermark, no human, no avatar, no frame, no collage"
     )
 
 
@@ -125,7 +161,7 @@ async def _request_portrait_image(prompt: str) -> bytes:
         raise PetPortraitError(str(exc)) from exc
 
 
-async def ensure_pet_portrait(pet: PetRecord) -> Path:
+async def ensure_pet_portrait(pet: PetRecord, *, force: bool = False) -> Path:
     """
     Liefert den Pfad zum Portrait (Cache oder neue Generierung).
 
@@ -133,22 +169,30 @@ async def ensure_pet_portrait(pet: PetRecord) -> Path:
         PetPortraitError: Bei fehlender Konfiguration oder API-Fehler.
     """
     path = pet_portrait_path(pet.id, pet.evolution_stage)
+    if force:
+        invalidate_pet_portrait(pet)
+
     if path.is_file():
         return path
 
-    species = get_species_by_name(pet.species)
-    prompt = build_pet_portrait_prompt(pet, species)
-    image_bytes = await _request_portrait_image(prompt)
+    lock = _portrait_locks.setdefault(pet.id, asyncio.Lock())
+    async with lock:
+        if path.is_file():
+            return path
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(image_bytes)
-    logger.info(
-        "Pet-Portrait generiert: pet_id=%s species=%s evolution=%s",
-        pet.id,
-        pet.species,
-        pet.evolution_stage,
-    )
-    return path
+        species = get_species_by_name(pet.species)
+        prompt = build_pet_portrait_prompt(pet, species)
+        image_bytes = await _request_portrait_image(prompt)
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(image_bytes)
+        logger.info(
+            "Pet-Portrait generiert: pet_id=%s species=%s evolution=%s",
+            pet.id,
+            pet.species,
+            pet.evolution_stage,
+        )
+        return path
 
 
 def apply_rarity_border(image: Image.Image, rarity: PetRarity) -> Image.Image:
