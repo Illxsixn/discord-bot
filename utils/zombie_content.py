@@ -137,7 +137,3 @@ def melee_base_damage(player_level: int) -> int:
     """Basis-Nahkampfschaden."""
     return 11 + max(0, player_level - 1) // 2
 
-
-def upgrade_lines() -> str:
-    """Coming-soon Upgrade-Hinweise."""
-    return "Glück · Fokus · Energie — **Coming soon**"

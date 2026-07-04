@@ -158,10 +158,9 @@ class SlotsCog(commands.Cog):
             bet=view.bet,
             reels=reels,
             result_line=result_line,
-            won=won if won is not None else False,
+            won=won,
+            jackpot=result.jackpot,
         )
-        if result.jackpot:
-            embed.title = "🎰 MEGA-JACKPOT!"
 
         view._spinning = False
         view._sync_spin_disabled()

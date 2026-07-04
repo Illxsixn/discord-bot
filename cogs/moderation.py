@@ -290,9 +290,11 @@ class ModerationCog(commands.Cog):
                     interaction.user,
                     reason_text,
                     color=Config.COLOR_WARNING,
+                    fields=[
+                        ("Warn-ID", str(record.id), True),
+                        ("Gesamt", f"{count} Warnung(en)", True),
+                    ],
                 )
-                log_embed.add_field(name="Warn-ID", value=str(record.id), inline=True)
-                log_embed.add_field(name="Gesamt", value=f"{count} Warnung(en)", inline=True)
                 await logs.send_log(interaction.guild, log_embed)
 
             try:

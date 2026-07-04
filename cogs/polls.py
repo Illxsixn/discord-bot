@@ -17,7 +17,7 @@ from discord.ext import commands, tasks
 from config import Config
 from database.database import Database
 from database.models import PollRecord, PollType
-from utils.embeds import apply_brand_footer, error_embed, info_embed, spaced_list, success_embed
+from utils.embeds import apply_brand_footer, error_embed, info_embed, spaced_lines, spaced_list, success_embed
 from utils.helpers import parse_duration_minutes
 from utils.permissions import bot_can_use_channel, can_manage_community
 from utils.reactions import (
@@ -59,13 +59,17 @@ class PollsCog(commands.GroupCog, group_name="poll", group_description="Umfragen
                 ]
             )
 
-        description = poll.question
+        description_parts = [poll.question]
         if poll.ends_at and not poll.ended:
-            description += f"\n\n⏱ Endet: {discord.utils.format_dt(poll.ends_at, 'R')}"
+            description_parts.append(f"⏱ Endet: {discord.utils.format_dt(poll.ends_at, 'R')}")
         if poll.ended:
-            description += "\n\n🔒 **Umfrage beendet**"
+            description_parts.append("🔒 **Umfrage beendet**")
 
-        embed = info_embed("Umfrage", description, fields=[("Optionen", options_text, False)])
+        embed = info_embed(
+            "Umfrage",
+            spaced_lines(*description_parts),
+            fields=[("Optionen", options_text, False)],
+        )
         apply_brand_footer(embed, prefix=footer or f"Umfrage #{poll.id} • Reagiere zum Abstimmen")
         return embed
 
@@ -138,7 +142,7 @@ class PollsCog(commands.GroupCog, group_name="poll", group_description="Umfragen
             fields=[
                 ("Stimmen gesamt", str(total), True),
                 ("Status", "Beendet", True),
-                ("Auswertung", "\n".join(lines), False),
+                ("Auswertung", spaced_list(lines), False),
             ],
         )
         apply_brand_footer(result_embed, prefix=f"Umfrage #{poll.id} • Beendet")

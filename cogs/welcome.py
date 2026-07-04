@@ -63,15 +63,19 @@ class WelcomeCog(commands.GroupCog, group_name="welcome", group_description="Wel
                     files.append(welcome_file)
 
             if settings.welcome_use_embed:
+                fields: list[tuple[str, str, bool]] = [
+                    ("Mitglied", member.mention, True),
+                    ("ID", str(member.id), True),
+                ]
+                if settings.welcome_show_join_date:
+                    fields.insert(0, ("Beigetreten", format_join_date(member), True))
+
                 embed = info_embed(
                     "Willkommen!",
                     message_text,
+                    fields=fields,
                     thumbnail=member.display_avatar.url,
                 )
-                if settings.welcome_show_join_date:
-                    embed.add_field(name="Beigetreten", value=format_join_date(member), inline=True)
-                embed.add_field(name="Mitglied", value=member.mention, inline=True)
-                embed.add_field(name="ID", value=str(member.id), inline=True)
 
                 if files:
                     embed.set_image(url="attachment://welcome.png")

@@ -6,8 +6,7 @@ from __future__ import annotations
 
 import discord
 
-from config import Config
-from utils.embeds import apply_brand_footer
+from utils.embeds import apply_brand_footer, artwork_embed, spaced_lines, success_embed
 from utils.slots import payout_table_text
 
 _INVISIBLE_FIELD = "\u200b"
@@ -47,37 +46,28 @@ def build_slots_embed(
     reels: tuple[str, str, str] | None = None,
     result_line: str | None = None,
     won: bool | None = None,
+    jackpot: bool = False,
 ) -> discord.Embed:
     """Slot-Maschinen-Embed mit Walzen-Streifen und Einsatz."""
-    if won is True:
-        color = Config.COLOR_SUCCESS
-        title = "🎰 Gewonnen!"
-    else:
-        color = Config.COLOR_ARTWORK
-        title = "🎰 Gold Slots"
-
-    description_parts = [_stats_line(bet=bet, gold=gold)]
+    stats = _stats_line(bet=bet, gold=gold)
     if reels is None:
-        description_parts.extend(
-            [
-                "",
-                "Wähle deinen **Einsatz** und drücke **Drehen**!",
-                "",
-                payout_table_text(),
-            ]
+        description = spaced_lines(
+            stats,
+            "Wähle deinen **Einsatz** und drücke **Drehen**!",
+            payout_table_text(),
         )
-
-    embed = discord.Embed(
-        title=title,
-        description="\n".join(description_parts),
-        color=color,
-    )
+    else:
+        description = spaced_lines(stats, result_line or " ")
 
     strip = format_reel_strip(reels, won=won is True) if reels else format_idle_reel_strip()
-    embed.add_field(name=_INVISIBLE_FIELD, value=strip, inline=False)
+    fields: list[tuple[str, str, bool]] = [(_INVISIBLE_FIELD, strip, False)]
 
-    if reels and result_line:
-        embed.add_field(name="Ergebnis", value=result_line, inline=False)
+    if jackpot:
+        embed = success_embed("🎰 MEGA-JACKPOT!", description, fields=fields)
+    elif won is True:
+        embed = success_embed("🎰 Gewonnen!", description, fields=fields)
+    else:
+        embed = artwork_embed("🎰 Gold Slots", description, fields=fields)
 
     apply_brand_footer(embed, prefix="Wähle Einsatz unten · /zombies & Spiele bringen Gold")
     return embed
