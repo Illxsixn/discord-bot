@@ -21,8 +21,6 @@ from database.models import (
     AutoModPunishment,
     GiveawayRecord,
     DailyChallengeRecord,
-    GuessGameRecord,
-    GuessStatsRecord,
     GuildSettings,
     PetCooldownType,
     PetRecord,
@@ -150,32 +148,6 @@ CREATE TABLE IF NOT EXISTS giveaways (
     creator_id INTEGER NOT NULL,
     winner_ids_json TEXT DEFAULT '[]',
     created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS guess_games (
-    channel_id INTEGER PRIMARY KEY,
-    guild_id INTEGER NOT NULL,
-    target_number INTEGER NOT NULL,
-    started_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS guess_user_attempts (
-    channel_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    attempts INTEGER DEFAULT 0,
-    PRIMARY KEY (channel_id, user_id)
-);
-
-CREATE TABLE IF NOT EXISTS guess_stats (
-    guild_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    games_played INTEGER DEFAULT 0,
-    games_won INTEGER DEFAULT 0,
-    total_guesses INTEGER DEFAULT 0,
-    win_attempts_sum INTEGER DEFAULT 0,
-    best_win_attempts INTEGER,
-    fastest_win_seconds INTEGER,
-    PRIMARY KEY (guild_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS daily_challenges (
@@ -373,7 +345,6 @@ _GUILD_SETTINGS_MIGRATIONS = [
     "ALTER TABLE guild_settings ADD COLUMN levels_cooldown INTEGER DEFAULT 60",
     "ALTER TABLE guild_settings ADD COLUMN levels_announce_channel_id INTEGER",
     "ALTER TABLE guild_settings ADD COLUMN levels_announce_enabled INTEGER DEFAULT 1",
-    "ALTER TABLE guess_stats ADD COLUMN win_attempts_sum INTEGER DEFAULT 0",
     "ALTER TABLE guild_settings ADD COLUMN tournament_channel_id INTEGER",
     "ALTER TABLE turnier_teams ADD COLUMN message_id INTEGER",
     "ALTER TABLE turnier_teams ADD COLUMN interface_channel_id INTEGER",
@@ -1315,180 +1286,6 @@ class Database:
         """Entfernt ein Gewinnspiel aus der Datenbank."""
         await self.conn.execute("DELETE FROM giveaways WHERE id = ?", (giveaway_id,))
         await self.conn.commit()
-
-    # ── Zahlenraten ─────────────────────────────────────────────────
-
-    async def get_guess_game(self, channel_id: int) -> GuessGameRecord | None:
-        """Lädt aktives Zahlenraten-Spiel in einem Kanal."""
-        cursor = await self.conn.execute(
-            "SELECT * FROM guess_games WHERE channel_id = ?",
-            (channel_id,),
-        )
-        row = await cursor.fetchone()
-        return GuessGameRecord.from_row(dict(row)) if row else None
-
-    async def create_guess_game(self, guild_id: int, channel_id: int, target_number: int) -> GuessGameRecord:
-        """Startet ein neues Zahlenraten-Spiel."""
-        started_at = datetime.now(timezone.utc).isoformat()
-        await self.conn.execute(
-            """
-            INSERT INTO guess_games (channel_id, guild_id, target_number, started_at)
-            VALUES (?, ?, ?, ?)
-            """,
-            (channel_id, guild_id, target_number, started_at),
-        )
-        await self.conn.execute(
-            "DELETE FROM guess_user_attempts WHERE channel_id = ?",
-            (channel_id,),
-        )
-        await self.conn.commit()
-        return GuessGameRecord(
-            guild_id=guild_id,
-            channel_id=channel_id,
-            target_number=target_number,
-            started_at=datetime.fromisoformat(started_at),
-        )
-
-    async def delete_guess_game(self, channel_id: int) -> None:
-        """Beendet und entfernt ein Zahlenraten-Spiel."""
-        await self.conn.execute("DELETE FROM guess_games WHERE channel_id = ?", (channel_id,))
-        await self.conn.execute("DELETE FROM guess_user_attempts WHERE channel_id = ?", (channel_id,))
-        await self.conn.commit()
-
-    async def increment_guess_attempt(self, channel_id: int, user_id: int) -> int:
-        """Erhöht Versuchszähler und gibt neue Anzahl zurück."""
-        await self.conn.execute(
-            """
-            INSERT INTO guess_user_attempts (channel_id, user_id, attempts)
-            VALUES (?, ?, 1)
-            ON CONFLICT(channel_id, user_id) DO UPDATE SET
-                attempts = attempts + 1
-            """,
-            (channel_id, user_id),
-        )
-        await self.conn.commit()
-        cursor = await self.conn.execute(
-            "SELECT attempts FROM guess_user_attempts WHERE channel_id = ? AND user_id = ?",
-            (channel_id, user_id),
-        )
-        row = await cursor.fetchone()
-        return int(row["attempts"]) if row else 1
-
-    async def get_guess_attempts(self, channel_id: int, user_id: int) -> int:
-        """Versuche eines Nutzers im aktuellen Spiel."""
-        cursor = await self.conn.execute(
-            "SELECT attempts FROM guess_user_attempts WHERE channel_id = ? AND user_id = ?",
-            (channel_id, user_id),
-        )
-        row = await cursor.fetchone()
-        return int(row["attempts"]) if row else 0
-
-    async def get_guess_participants(self, channel_id: int) -> list[tuple[int, int]]:
-        """Alle Teilnehmer (user_id, attempts) eines Kanal-Spiels."""
-        cursor = await self.conn.execute(
-            "SELECT user_id, attempts FROM guess_user_attempts WHERE channel_id = ?",
-            (channel_id,),
-        )
-        rows = await cursor.fetchall()
-        return [(int(row["user_id"]), int(row["attempts"])) for row in rows]
-
-    async def get_guess_stats(self, guild_id: int, user_id: int) -> GuessStatsRecord:
-        """Lädt oder erstellt Guess-Statistiken."""
-        cursor = await self.conn.execute(
-            "SELECT * FROM guess_stats WHERE guild_id = ? AND user_id = ?",
-            (guild_id, user_id),
-        )
-        row = await cursor.fetchone()
-        if row is None:
-            return GuessStatsRecord(guild_id=guild_id, user_id=user_id)
-        return GuessStatsRecord.from_row(dict(row))
-
-    async def save_guess_stats(self, stats: GuessStatsRecord) -> GuessStatsRecord:
-        """Speichert Guess-Statistiken."""
-        await self.conn.execute(
-            """
-            INSERT INTO guess_stats (
-                guild_id, user_id, games_played, games_won, total_guesses,
-                win_attempts_sum, best_win_attempts, fastest_win_seconds
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(guild_id, user_id) DO UPDATE SET
-                games_played = excluded.games_played,
-                games_won = excluded.games_won,
-                total_guesses = excluded.total_guesses,
-                win_attempts_sum = excluded.win_attempts_sum,
-                best_win_attempts = excluded.best_win_attempts,
-                fastest_win_seconds = excluded.fastest_win_seconds
-            """,
-            (
-                stats.guild_id,
-                stats.user_id,
-                stats.games_played,
-                stats.games_won,
-                stats.total_guesses,
-                stats.win_attempts_sum,
-                stats.best_win_attempts,
-                stats.fastest_win_seconds,
-            ),
-        )
-        await self.conn.commit()
-        return stats
-
-    async def get_guess_leaderboard_wins(
-        self,
-        guild_id: int,
-        *,
-        limit: int = 10,
-    ) -> list[GuessStatsRecord]:
-        """Top-N nach Siegen beim Zahlenraten."""
-        cursor = await self.conn.execute(
-            """
-            SELECT * FROM guess_stats
-            WHERE guild_id = ? AND games_won > 0
-            ORDER BY games_won DESC, best_win_attempts ASC
-            LIMIT ?
-            """,
-            (guild_id, limit),
-        )
-        rows = await cursor.fetchall()
-        return [GuessStatsRecord.from_row(dict(row)) for row in rows]
-
-    async def get_guess_leaderboard_attempts(
-        self,
-        guild_id: int,
-        *,
-        limit: int = 10,
-    ) -> list[GuessStatsRecord]:
-        """Top-N nach wenigsten Versuchen pro Sieg."""
-        cursor = await self.conn.execute(
-            """
-            SELECT * FROM guess_stats
-            WHERE guild_id = ? AND games_won > 0 AND win_attempts_sum > 0
-            ORDER BY (win_attempts_sum * 1.0 / games_won) ASC, games_won DESC
-            LIMIT ?
-            """,
-            (guild_id, limit),
-        )
-        rows = await cursor.fetchall()
-        return [GuessStatsRecord.from_row(dict(row)) for row in rows]
-
-    async def get_guess_leaderboard_fastest(
-        self,
-        guild_id: int,
-        *,
-        limit: int = 10,
-    ) -> list[GuessStatsRecord]:
-        """Top-N nach schnellstem Sieg in Sekunden."""
-        cursor = await self.conn.execute(
-            """
-            SELECT * FROM guess_stats
-            WHERE guild_id = ? AND fastest_win_seconds IS NOT NULL
-            ORDER BY fastest_win_seconds ASC
-            LIMIT ?
-            """,
-            (guild_id, limit),
-        )
-        rows = await cursor.fetchall()
-        return [GuessStatsRecord.from_row(dict(row)) for row in rows]
 
     # ── Tägliche Aufgaben ───────────────────────────────────────────
 
