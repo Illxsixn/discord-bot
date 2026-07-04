@@ -11,9 +11,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from config import Config
-from main import COGS, DiscordBot
-from tests.test_commands_since_1_4 import (
+from config import Config  # noqa: E402
+from main import COGS, DiscordBot  # noqa: E402
+from tests.test_commands_since_1_4 import (  # noqa: E402
     COMMANDS_ADDED_SINCE_1_4,
     COMMANDS_REMOVED_SINCE_1_4,
     LOOTBOX_COMMANDS_KEPT,

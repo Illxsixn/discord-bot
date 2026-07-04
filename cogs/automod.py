@@ -13,7 +13,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config import Config
 from database.database import Database
 from database.models import AutoModPunishment
 from utils.embeds import error_embed, info_embed, spaced_list, success_embed, warning_embed

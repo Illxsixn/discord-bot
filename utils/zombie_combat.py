@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from config import Config
 from database.models import PetMood, PetRecord, PetRarity, ZombieRunRecord
 from utils.pets import get_species_rarity
-from utils.zombie_content import ZOMBIES, get_zombie, melee_base_damage, wave_zombie_list
+from utils.zombie_content import get_zombie, melee_base_damage, wave_zombie_list
 
 _PASSIVE_HELP_CHANCE: dict[PetRarity, float] = {
     PetRarity.COMMON: 0.05,

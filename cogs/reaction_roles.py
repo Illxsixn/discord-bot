@@ -14,7 +14,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from database.database import Database
-from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, split_embed_fields, success_embed
+from utils.embeds import error_embed, info_embed, spaced_lines, split_embed_fields, success_embed
 from utils.permissions import bot_can_use_channel, is_admin
 from utils.reactions import (
     bot_can_manage_role,

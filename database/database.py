@@ -20,14 +20,11 @@ from database.models import (
     DEFAULT_WELCOME_MESSAGE,
     AutoModPunishment,
     GiveawayRecord,
-    ChallengeTask,
-    ChallengeType,
     DailyChallengeRecord,
     GuessGameRecord,
     GuessStatsRecord,
     GuildSettings,
     PetCooldownType,
-    PetEvolutionStage,
     PetRecord,
     PollRecord,
     PollType,
@@ -46,7 +43,6 @@ from database.models import (
     ZombiePlayerRecord,
     ZombieRunRecord,
     ZombieRunStatus,
-    ZombieCooldownType,
 )
 
 logger = logging.getLogger(__name__)

@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import discord
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 from config import Config
 from utils.embeds import spaced_lines

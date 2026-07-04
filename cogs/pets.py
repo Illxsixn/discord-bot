@@ -47,15 +47,12 @@ from utils.pet_play import (
 )
 from utils.pets import (
     apply_pet_xp_boost,
-    pet_xp_boost_label,
     default_pet_name,
     evolution_display,
     evolution_stage_from_level,
     get_species_by_name,
-    get_species_rarity,
     is_evolution_milestone,
     level_from_xp,
-    mood_display,
     random_catchphrase,
     random_favorite_activity,
     random_mood,
@@ -209,7 +206,6 @@ class PetSelectView(discord.ui.View):
         self.owner_id = owner_id
         options = []
         for pet in pets[:25]:
-            species = get_species_by_name(pet.species)
             options.append(
                 discord.SelectOption(
                     label=f"{pet.name} ({pet.species})",

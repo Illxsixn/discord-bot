@@ -8,7 +8,6 @@ Nickname, Mute/Unmute und integriertes Logging.
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import discord

@@ -25,7 +25,7 @@ from database.models import (
     TicketSettings,
     TicketStatus,
 )
-from utils.embeds import apply_brand_footer, error_embed, info_embed, log_event_embed, spaced_lines, spaced_list, split_embed_fields, success_embed
+from utils.embeds import apply_brand_footer, error_embed, info_embed, log_event_embed, spaced_lines, split_embed_fields, success_embed
 from utils.helpers import format_placeholders, truncate_text
 from utils.permissions import bot_can_use_channel, is_admin
 

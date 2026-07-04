@@ -13,7 +13,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config import Config
 from database.database import Database
 from database.models import DEFAULT_WELCOME_MESSAGE
 from utils.embeds import error_embed, info_embed, success_embed

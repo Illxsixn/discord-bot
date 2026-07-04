@@ -19,8 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from utils.agnes_images import AgnesImageError, agnes_configured
-from utils.zombie_ai_images import ensure_zombie_asset_library, list_cached_zombie_gifs
+from utils.agnes_images import AgnesImageError, agnes_configured  # noqa: E402
+from utils.zombie_ai_images import ensure_zombie_asset_library, list_cached_zombie_gifs  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 logger = logging.getLogger("generate_zombie_assets")

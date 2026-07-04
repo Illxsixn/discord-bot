@@ -14,7 +14,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from database.database import Database
-from utils.embeds import error_embed, info_embed, success_embed, warning_embed
+from utils.embeds import error_embed, info_embed, warning_embed
 from utils.helpers import guild_settings_to_fields
 from utils.permissions import is_admin
 

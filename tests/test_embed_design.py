@@ -142,15 +142,17 @@ def test_run_embed_matches_mockup_layout():
 
 
 def test_slot_embed_matches_mockup_layout():
-    from utils.slot_embeds import build_slots_embed
+    from utils.slot_embeds import build_slots_embed, format_idle_reel_strip
 
     embed = build_slots_embed(gold=1250, bet=25)
 
-    assert embed.title == "🎰 Slot-Maschine"
+    assert embed.title == "🎰 Gold Slots"
     assert embed.color.value == Config.COLOR_ARTWORK
     field_names = [field.name for field in embed.fields]
-    assert field_names == ["Einsatz", "Dein Gold"]
-    assert "1,250" in embed.fields[1].value
+    assert field_names == ["\u200b"]
+    assert format_idle_reel_strip() in embed.fields[0].value
+    assert "1,250" in (embed.description or "")
+    assert "Einsatz **25**" in (embed.description or "")
     assert embed.timestamp is not None
     assert Config.BOT_BRAND_NAME in (embed.footer.text or "")
 

@@ -10,7 +10,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from config import Config
 from database.database import Database
 from database.models import ChallengeTask, ChallengeType, DailyChallengeRecord, is_pet_challenge_type
 from utils.challenges import (

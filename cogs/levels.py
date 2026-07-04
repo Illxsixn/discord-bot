@@ -17,7 +17,7 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from utils.embeds import error_embed, info_embed, spaced_lines, spaced_list, success_embed
-from utils.economy_display import format_gold_line, format_zombie_stat_line, get_profile_economy
+from utils.economy_display import format_zombie_stat_line, get_profile_economy
 from utils.levels import level_from_xp, progress_bar, xp_progress
 from utils.permissions import bot_can_use_channel, is_admin
 from utils.pets import apply_pet_xp_boost

@@ -95,5 +95,5 @@ def resolve_spin(reels: tuple[str, str, str], bet: int) -> SpinResult:
 def payout_table_text() -> str:
     """Kompakte Gewinntabelle."""
     lines = [f"{emoji} {emoji} {emoji} → **{mult}×**" for emoji, _, mult in _SYMBOLS]
-    lines.append(f"Zwei gleiche → **50 %** des Einsatzes zurück")
+    lines.append("Zwei gleiche → **50 %** des Einsatzes zurück")
     return "\n".join(lines)

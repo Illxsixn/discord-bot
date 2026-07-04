@@ -8,7 +8,6 @@ Slash Commands zur Konfiguration des Log-Kanals.
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import discord
 from discord import app_commands

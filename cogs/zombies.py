@@ -465,6 +465,36 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         view = await self._get_run_view(run, has_pet=pet is not None)
         return embed, file, view
 
+    async def _restore_active_run_panel(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+    ) -> bool:
+        """Stellt das Run-Panel für einen aktiven Run wieder her."""
+        assert interaction.guild is not None
+        run = await self.db.get_active_zombie_run(interaction.guild.id, member.id)
+        if run is None:
+            return False
+        if run.status == ZombieRunStatus.EXPIRED.value:
+            await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
+            return True
+        checked = await self._check_expired_run(member, run)
+        if checked is None:
+            await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
+            return True
+        embed, file, view = await self._build_run_message(
+            member, checked, refresh_visual=True, use_attachment=True
+        )
+        await self._send_run_panel(
+            interaction,
+            member,
+            checked,
+            embed=embed,
+            view=view,
+            file=file,
+        )
+        return True
+
     async def _respond_run_update(
         self,
         interaction: discord.Interaction,
@@ -776,21 +806,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
 
         active = await self.db.get_active_zombie_run(interaction.guild.id, interaction.user.id)
         if active is not None:
-            checked = await self._check_expired_run(interaction.user, active)
-            if checked is None:
-                await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
-                return
-            embed, file, view = await self._build_run_message(
-                interaction.user, checked, refresh_visual=True, use_attachment=True
-            )
-            await self._send_run_panel(
-                interaction,
-                interaction.user,
-                checked,
-                embed=embed,
-                view=view,
-                file=file,
-            )
+            await self._restore_active_run_panel(interaction, interaction.user)
             return
 
         cooldown = await self._get_cooldown(interaction.guild.id, interaction.user.id)
@@ -804,7 +820,6 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             )
             return
 
-        profile = await self.db.get_zombie_player(interaction.guild.id, interaction.user.id)
         player_level = (await self.db.get_user_level(interaction.guild.id, interaction.user.id)).level
         hp_max = player_max_hp(player_level)
         now = datetime.now(timezone.utc)
@@ -847,26 +862,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         if not isinstance(interaction.user, discord.Member):
             return
 
-        run = await self.db.get_active_zombie_run(interaction.guild.id, interaction.user.id)
-        if run:
-            if run.status == ZombieRunStatus.EXPIRED.value:
-                await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
-                return
-            checked = await self._check_expired_run(interaction.user, run)
-            if checked is None:
-                await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
-                return
-            embed, file, view = await self._build_run_message(
-                interaction.user, checked, refresh_visual=True, use_attachment=True
-            )
-            await self._send_run_panel(
-                interaction,
-                interaction.user,
-                checked,
-                embed=embed,
-                view=view,
-                file=file,
-            )
+        if await self._restore_active_run_panel(interaction, interaction.user):
             return
 
         profile = await self.db.get_zombie_player(interaction.guild.id, interaction.user.id)
@@ -874,6 +870,28 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         cooldown = await self._get_cooldown(interaction.guild.id, interaction.user.id)
         embed = build_idle_status_embed(interaction.user, economy, profile, cooldown=cooldown)
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="resume", description="Stellt den aktiven Run nach Bot-Neustart wieder her")
+    @app_commands.guild_only()
+    async def resume(self, interaction: discord.Interaction) -> None:
+        assert interaction.guild is not None
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message(
+                embed=error_embed("Fehler", "Nur Server-Mitglieder können spielen."),
+                ephemeral=True,
+            )
+            return
+
+        if await self._restore_active_run_panel(interaction, interaction.user):
+            return
+
+        await interaction.response.send_message(
+            embed=error_embed(
+                "Kein aktiver Run",
+                "Du hast keinen laufenden Run. Starte mit **`/zombies start`**.",
+            ),
+            ephemeral=True,
+        )
 
     @app_commands.command(name="profil", description="Zeigt dein Zombie-Survival-Profil")
     @app_commands.guild_only()
