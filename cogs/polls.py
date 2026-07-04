@@ -42,6 +42,20 @@ class PollsCog(commands.GroupCog, group_name="poll", group_description="Umfragen
     def cog_unload(self) -> None:
         self.expire_polls.cancel()
 
+    async def _resolve_poll_channel(
+        self,
+        guild: discord.Guild,
+        channel_id: int,
+    ) -> discord.TextChannel | discord.Thread | None:
+        """Lädt Textkanal oder Thread für eine Umfrage-Nachricht."""
+        channel = guild.get_channel(channel_id)
+        if isinstance(channel, (discord.TextChannel, discord.Thread)):
+            return channel
+        fetched = await self.bot.fetch_channel(channel_id)
+        if isinstance(fetched, (discord.TextChannel, discord.Thread)):
+            return fetched
+        return None
+
     async def _build_poll_embed(self, poll: PollRecord, *, footer: str | None = None) -> discord.Embed:
         """Erstellt Umfrage-Embed."""
         if poll.poll_type == PollType.YES_NO:
@@ -99,8 +113,8 @@ class PollsCog(commands.GroupCog, group_name="poll", group_description="Umfragen
         if guild is None:
             return None
 
-        channel = guild.get_channel(poll.channel_id)
-        if not isinstance(channel, discord.TextChannel):
+        channel = await self._resolve_poll_channel(guild, poll.channel_id)
+        if channel is None:
             return None
 
         try:
@@ -210,7 +224,7 @@ class PollsCog(commands.GroupCog, group_name="poll", group_description="Umfragen
 
             temp_embed = info_embed("Umfrage", question)
             try:
-                message = await target.send(embed=temp_embed)
+                message = await target.send(embed=temp_embed, embed_persistent=True)
             except discord.Forbidden:
                 await interaction.followup.send(
                     embed=error_embed("Fehler", "Ich kann in diesem Kanal keine Nachrichten senden."),
@@ -304,7 +318,7 @@ class PollsCog(commands.GroupCog, group_name="poll", group_description="Umfragen
 
             temp_embed = info_embed("Umfrage", question)
             try:
-                message = await target.send(embed=temp_embed)
+                message = await target.send(embed=temp_embed, embed_persistent=True)
             except discord.Forbidden:
                 await interaction.followup.send(
                     embed=error_embed("Fehler", "Ich kann in diesem Kanal keine Nachrichten senden."),

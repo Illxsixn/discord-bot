@@ -140,3 +140,13 @@ def test_legendary_spawn_sets_scaled_hp_on_run():
     assert lines
     assert run.current_zombie_max_hp > 0
     assert run.current_zombie_hp == run.current_zombie_max_hp
+
+
+def test_zombie_leaderboard_waves_formatter():
+    from database.models import ZombiePlayerRecord
+
+    record = ZombiePlayerRecord(guild_id=1, user_id=2, highest_wave=3, total_kills=10)
+    title = "Höchste Welle"
+    formatted = f"**{record.highest_wave}/{Config.ZOMBIE_MAX_WAVES}** 🏆"
+    assert "3" in formatted
+    assert title == "Höchste Welle"

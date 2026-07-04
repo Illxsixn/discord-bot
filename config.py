@@ -19,6 +19,16 @@ BASE_DIR: Path = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 
+def _safe_int(value: str | None, default: int | None = None) -> int | None:
+    """Parst eine Ganzzahl aus Umgebungsvariablen ohne Import-Absturz."""
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
 class Config:
     """Zentrale Bot-Konfiguration aus Umgebungsvariablen."""
 
@@ -27,7 +37,7 @@ class Config:
 
     # Optional: Owner-ID für erweiterte Bot-Befehle
     OWNER_ID: int | None = (
-        int(os.getenv("OWNER_ID")) if os.getenv("OWNER_ID") else None
+        _safe_int(os.getenv("OWNER_ID")) if os.getenv("OWNER_ID") else None
     )
 
     # Logging-Stufe (DEBUG, INFO, WARNING, ERROR)
@@ -189,7 +199,7 @@ class Config:
     )
     AGNES_IMAGE_MODEL: str = os.getenv("AGNES_IMAGE_MODEL", "agnes-image-2.1-flash")
     AGNES_IMAGE_SIZE: str = os.getenv("AGNES_IMAGE_SIZE", "1024x1024")
-    AGNES_REQUEST_TIMEOUT: int = int(os.getenv("AGNES_REQUEST_TIMEOUT", "120"))
+    AGNES_REQUEST_TIMEOUT: int = _safe_int(os.getenv("AGNES_REQUEST_TIMEOUT"), 120) or 120
 
     @classmethod
     def validate(cls) -> None:
