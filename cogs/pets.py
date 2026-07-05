@@ -18,7 +18,7 @@ from discord.ext import commands
 from config import Config
 from database.database import Database
 from database.models import PetCooldownType, PetRarity, PetRecord
-from utils.embeds import error_embed, info_embed, spaced_lines, success_embed
+from utils.embeds import error_embed, info_embed, schedule_pet_display_delete, spaced_lines, success_embed
 from utils.permissions import bot_can_use_channel
 from utils.pet_ai_images import (
     PetPortraitError,
@@ -678,8 +678,16 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
     @app_commands.guild_only()
     async def display(self, interaction: discord.Interaction) -> None:
         """Generiert oder lädt das KI-Portrait des aktiven Pets."""
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
+            return
+
+        channel = interaction.channel
+        if not isinstance(channel, (discord.TextChannel, discord.Thread)):
+            await interaction.followup.send(
+                embed=error_embed("Kein Kanal", "Portraits können hier nicht gepostet werden."),
+                ephemeral=True,
+            )
             return
 
         allowed, msg = await self._ensure_bot_permissions(interaction)
@@ -735,7 +743,28 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             portrait_label=portrait_status_label(pet),
             attachment_filename=filename,
         )
-        await interaction.followup.send(embed=embed, files=[attachment], ephemeral=True)
+        try:
+            message = await channel.send(
+                content=interaction.user.mention,
+                embed=embed,
+                file=attachment,
+                embed_persistent=True,
+            )
+        except discord.Forbidden:
+            await interaction.followup.send(
+                embed=error_embed(
+                    "Senden fehlgeschlagen",
+                    "Der Bot braucht **Nachrichten senden** und **Dateien anhängen** in diesem Kanal.",
+                ),
+                ephemeral=True,
+            )
+            return
+
+        schedule_pet_display_delete(message)
+        await interaction.followup.send(
+            embed=info_embed("Portrait gepostet", f"Dein Pet-Portrait: {message.jump_url}"),
+            ephemeral=True,
+        )
 
     @app_commands.command(
         name="play",

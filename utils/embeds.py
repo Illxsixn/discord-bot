@@ -229,6 +229,11 @@ def schedule_zombie_message_delete(message: discord.Message) -> None:
     schedule_message_delete(message, delay=Config.ZOMBIE_MESSAGE_DELETE_SECONDS)
 
 
+def schedule_pet_display_delete(message: discord.Message) -> None:
+    """Löscht öffentliche /pet display-Nachrichten nach dem Lösch-Cooldown."""
+    schedule_message_delete(message, delay=Config.PET_DISPLAY_DELETE_SECONDS)
+
+
 def inject_brand_into_edit_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
     """Embed-Footer beim Bearbeiten — ohne files= (Message.edit nutzt attachments=)."""
     embeds = _collect_embeds(kwargs)
