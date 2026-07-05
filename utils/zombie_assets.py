@@ -153,6 +153,9 @@ def apply_zombie_visual(
 
     source = boss_zombie_gif() if is_boss else random_zombie_gif(zombie_type)
     if isinstance(source, Path):
+        if use_attachment:
+            return attach_zombie_visual(embed, zombie_type, is_boss=is_boss)
+        logger.debug("Lokales Zombie-GIF ohne CDN-URL — Bild bleibt unverändert bis Refresh")
         return None
 
     url = str(source) if source else _fallback_gif_url(zombie_type, is_boss=is_boss)

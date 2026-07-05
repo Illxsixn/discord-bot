@@ -132,9 +132,8 @@ def build_pet_action_picker_embed(
     pet: PetRecord,
     *,
     companion_rarity: str = "",
-    image_url: str = "",
 ) -> discord.Embed:
-    """Separates Menü zur Auswahl der Pet-Spezialaktion im Kampf."""
+    """Separates ephemeral Menü zur Pet-Spezialaktion (ohne Run-/Zombie-Embed)."""
     cooldown = pet_action_cooldown_attacks(companion_rarity or None)
     embed = info_embed(
         f"🐾 Pet-Aktion — {pet.name}",
@@ -155,8 +154,6 @@ def build_pet_action_picker_embed(
             ),
         ],
     )
-    if image_url:
-        embed.set_image(url=image_url)
     return embed
 
 

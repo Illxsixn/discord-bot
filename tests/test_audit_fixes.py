@@ -33,6 +33,22 @@ def test_pet_display_posts_publicly_and_schedules_delete():
     assert Config.PET_DISPLAY_DELETE_SECONDS == 300
 
 
+def test_zombie_run_update_edits_run_panel_by_message_id():
+    from cogs import zombies
+
+    source = inspect.getsource(zombies.ZombiesCog._respond_run_update)
+    assert "_fetch_run_panel_message" in source
+    assert "run_message.edit" in source
+
+
+def test_zombie_pet_action_uses_ephemeral_embed():
+    from cogs import zombies
+
+    source = inspect.getsource(zombies.ZombiesCog._open_pet_action_picker)
+    assert "ephemeral=True" in source
+    assert "interaction.message.edit" not in source
+
+
 def test_zombie_run_update_strips_embed_persistent_on_edit():
     from cogs import zombies
 
