@@ -375,6 +375,7 @@ _TOURNAMENT_MIGRATIONS = [
 _ZOMBIE_RUN_MIGRATIONS = [
     "ALTER TABLE zombie_runs ADD COLUMN companion_rarity TEXT DEFAULT ''",
     "ALTER TABLE zombie_runs ADD COLUMN current_zombie_max_hp INTEGER DEFAULT 0",
+    "ALTER TABLE zombie_runs ADD COLUMN current_zombie_image_url TEXT DEFAULT ''",
 ]
 
 class Database:
@@ -889,7 +890,7 @@ class Database:
                     zombies_remaining = ?,
                     pet_action_cooldown = ?, luck_bonus_uses = ?, focus_active = ?,
                     total_damage = ?, last_action_text = ?, shop_available = ?,
-                    companion_rarity = ?, updated_at = ?
+                    companion_rarity = ?, current_zombie_image_url = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -912,6 +913,7 @@ class Database:
                     run.last_action_text,
                     run.shop_available,
                     run.companion_rarity,
+                    run.current_zombie_image_url,
                     updated,
                     run.id,
                 ),
@@ -925,8 +927,8 @@ class Database:
                     player_hp, player_max_hp, run_gold, current_zombie_key, current_zombie_hp,
                     current_zombie_max_hp, zombies_remaining, pet_action_cooldown, luck_bonus_uses,
                     focus_active, total_damage, last_action_text, shop_available, companion_rarity,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    current_zombie_image_url, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run.guild_id,
@@ -950,6 +952,7 @@ class Database:
                     run.last_action_text,
                     run.shop_available,
                     run.companion_rarity,
+                    run.current_zombie_image_url,
                     created,
                     updated,
                 ),

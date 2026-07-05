@@ -128,10 +128,15 @@ def build_run_message_embed(
     return embed, file
 
 
-def build_pet_action_picker_embed(pet: PetRecord, *, companion_rarity: str = "") -> discord.Embed:
+def build_pet_action_picker_embed(
+    pet: PetRecord,
+    *,
+    companion_rarity: str = "",
+    image_url: str = "",
+) -> discord.Embed:
     """Separates Menü zur Auswahl der Pet-Spezialaktion im Kampf."""
     cooldown = pet_action_cooldown_attacks(companion_rarity or None)
-    return info_embed(
+    embed = info_embed(
         f"🐾 Pet-Aktion — {pet.name}",
         "Wähle **eine** Spezialaktion für diesen Kampfzug.",
         fields=[
@@ -150,6 +155,9 @@ def build_pet_action_picker_embed(pet: PetRecord, *, companion_rarity: str = "")
             ),
         ],
     )
+    if image_url:
+        embed.set_image(url=image_url)
+    return embed
 
 
 def build_victory_embed(

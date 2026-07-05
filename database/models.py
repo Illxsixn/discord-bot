@@ -286,6 +286,7 @@ class ZombieRunRecord:
             total_damage=int(row.get("total_damage") or 0),
             last_action_text=row.get("last_action_text") or "",
             shop_available=int(row.get("shop_available") or 0),
+            current_zombie_image_url=row.get("current_zombie_image_url") or "",
             companion_rarity=row.get("companion_rarity") or "",
             current_zombie_max_hp=int(row.get("current_zombie_max_hp") or 0),
             created_at=datetime.fromisoformat(created) if isinstance(created, str) else datetime.now(timezone.utc),

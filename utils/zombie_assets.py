@@ -21,18 +21,18 @@ logger = logging.getLogger(__name__)
 
 MAX_GIF_BYTES = 8 * 1024 * 1024
 
-# Freie Fallback-GIFs (kein CoD, generische Zombie-Optik)
+# Freie Fallback-GIFs (Giphy-CDN — Tenor-Links waren 404)
 FALLBACK_GIFS: dict[str, list[str]] = {
     "common": [
-        "https://media.tenor.com/m/5h0XqJqJqJAAAAAd/zombie-walk.gif",
-        "https://media.tenor.com/m/8tIUv8X9x0AAAAAd/zombie.gif",
+        "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif",
+        "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif",
     ],
     "fast": [
-        "https://media.tenor.com/m/2Rk8X9X9x0AAAAAd/running-zombie.gif",
-        "https://media.tenor.com/m/9X9X9X9X9XAAAAAd/zombie-run.gif",
+        "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif",
+        "https://media.giphy.com/media/3o7aD2saalBwwftBIY/giphy.gif",
     ],
     "boss": [
-        "https://media.tenor.com/m/3ov6Q2xXyQAAAAAd/monster.gif",
+        "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif",
     ],
 }
 
@@ -86,6 +86,23 @@ def pick_zombie_visual_url(zombie_type: str, *, is_boss: bool = False) -> str:
     return str(source)
 
 
+def ensure_run_combat_image(
+    run: ZombieRunRecord,
+    zombie_type: str,
+    *,
+    is_boss: bool = False,
+    refresh: bool = False,
+) -> str:
+    """Liefert die stabile Kampf-GIF-URL für diesen Zombie (pro Spawn)."""
+    if refresh:
+        run.current_zombie_image_url = ""
+    if run.current_zombie_image_url:
+        return run.current_zombie_image_url
+    url = pick_zombie_visual_url(zombie_type, is_boss=is_boss)
+    run.current_zombie_image_url = url
+    return url
+
+
 def apply_zombie_visual(
     embed: discord.Embed,
     run: ZombieRunRecord,
@@ -103,9 +120,8 @@ def apply_zombie_visual(
     if refresh_visual:
         run.current_zombie_image_url = ""
 
-    if run.current_zombie_image_url:
-        embed.set_image(url=run.current_zombie_image_url)
-        return None
+    url = ensure_run_combat_image(run, zombie_type, is_boss=is_boss)
+    embed.set_image(url=url)
 
     if use_attachment:
         file = attach_zombie_visual(embed, zombie_type, is_boss=is_boss)
@@ -114,9 +130,6 @@ def apply_zombie_visual(
             run.current_zombie_image_url = image.url
         return file
 
-    url = pick_zombie_visual_url(zombie_type, is_boss=is_boss)
-    run.current_zombie_image_url = url
-    embed.set_image(url=url)
     return None
 
 
