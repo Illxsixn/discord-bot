@@ -745,7 +745,6 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
         )
         try:
             message = await channel.send(
-                content=interaction.user.mention,
                 embed=embed,
                 file=attachment,
                 embed_persistent=True,
