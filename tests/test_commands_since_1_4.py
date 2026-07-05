@@ -116,6 +116,19 @@ def test_slots_three_of_a_kind_pays_multiplier() -> None:
     assert result.mega_jackpot is True
 
 
+def test_slots_jackpot_spin_forces_jackpot_flag() -> None:
+    result = resolve_spin(("🍒", "🍒", "🍒"), bet=10, jackpot_spin=True)
+    assert result.jackpot is True
+    assert result.mega_jackpot is False
+
+
+def test_slots_jackpot_rate_near_target() -> None:
+    from utils.slots import simulate_jackpot_rate
+
+    rate = simulate_jackpot_rate(spins=250_000, seed=7)
+    assert 0.09 <= rate <= 0.11
+
+
 def test_slots_rtp_at_most_target() -> None:
     from utils.slots import simulate_rtp
 
