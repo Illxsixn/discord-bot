@@ -172,19 +172,22 @@ class GiveawaysCog(commands.GroupCog, group_name="giveaway", group_description="
         try:
             for giveaway in await self.db.get_active_giveaways():
                 if giveaway.ends_at <= now:
-                    _, error = await self._draw_winners(giveaway)
-                    if error:
-                        if error == "Gewinnspiel-Nachricht wurde gelöscht.":
-                            logger.info(
-                                "Giveaway #%s geschlossen (Nachricht gelöscht).",
-                                giveaway.id,
-                            )
-                        else:
-                            logger.warning(
-                                "Giveaway #%s konnte nicht beendet werden: %s",
-                                giveaway.id,
-                                error,
-                            )
+                    try:
+                        _, error = await self._draw_winners(giveaway)
+                        if error:
+                            if error == "Gewinnspiel-Nachricht wurde gelöscht.":
+                                logger.info(
+                                    "Giveaway #%s geschlossen (Nachricht gelöscht).",
+                                    giveaway.id,
+                                )
+                            else:
+                                logger.warning(
+                                    "Giveaway #%s konnte nicht beendet werden: %s",
+                                    giveaway.id,
+                                    error,
+                                )
+                    except Exception as exc:
+                        logger.exception("Giveaway #%s konnte nicht beendet werden: %s", giveaway.id, exc)
         except Exception as exc:
             logger.exception("Giveaway-Ablauf-Task fehlgeschlagen: %s", exc)
 

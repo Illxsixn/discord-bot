@@ -793,6 +793,12 @@ class TicketsCog(commands.GroupCog, group_name="ticket", group_description="Supp
             )
             return
 
+        is_component_interaction = (
+            interaction.type is discord.InteractionType.component and interaction.message is not None
+        )
+        if not is_component_interaction and not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
         updated = await self.db.update_ticket(
             ticket.id,
             status=TicketStatus.CLAIMED,
@@ -802,10 +808,9 @@ class TicketsCog(commands.GroupCog, group_name="ticket", group_description="Supp
         settings = await self.db.get_ticket_settings(interaction.guild.id)
         embed = _build_ticket_embed(updated, interaction.guild, settings)
 
-        if interaction.type is discord.InteractionType.component and interaction.message:
+        if is_component_interaction:
             await interaction.response.edit_message(embed=embed)
         else:
-            await interaction.response.defer(ephemeral=True)
             await self._refresh_ticket_message(updated, interaction.guild)
             await interaction.followup.send(
                 embed=success_embed("Ticket übernommen", f"Du hast Ticket **#{ticket.id}** übernommen."),
@@ -975,7 +980,15 @@ class TicketsCog(commands.GroupCog, group_name="ticket", group_description="Supp
             return
 
         await self.db.update_ticket_settings(interaction.guild.id, enabled=1)
-        message = await self._send_panel_to_channel(interaction.channel, interaction.guild)
+        try:
+            message = await self._send_panel_to_channel(interaction.channel, interaction.guild)
+        except discord.HTTPException as exc:
+            logger.warning("Ticket-Panel konnte nicht gesendet werden: %s", exc)
+            await interaction.followup.send(
+                embed=error_embed("Fehler", "Ticket-Panel konnte nicht gesendet werden."),
+                ephemeral=True,
+            )
+            return
 
         await interaction.followup.send(
             embed=success_embed("Panel gesendet", f"Ticket-Panel in {message.channel.mention} erstellt."),

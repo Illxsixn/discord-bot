@@ -63,8 +63,7 @@ async def buy_lootboxes(
                 "Nicht genug Gold",
                 spaced_lines(
                     f"Du brauchst **{total_cost:,}** Gold, hast aber nur **{economy.gold:,}** 🪙.",
-                    f"Gold z. B. durch **`/zombies`**, Spielsiege "
-                    f"(**{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}**) oder **`/slots`**.",
+                    "Gold z. B. durch **`/zombies`** oder **`/slots`**.",
                 ),
             )
             return False, embed, economy

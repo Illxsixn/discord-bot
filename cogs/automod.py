@@ -80,7 +80,7 @@ class AutoModCog(commands.GroupCog, group_name="automod", group_description="Aut
             elif punishment == AutoModPunishment.KICK:
                 await member.kick(reason=moderator_reason)
             elif punishment == AutoModPunishment.BAN:
-                await member.ban(reason=moderator_reason, delete_message_days=0)
+                await member.ban(reason=moderator_reason, delete_message_seconds=0)
         except discord.Forbidden:
             logger.warning("AutoMod konnte Strafe nicht anwenden: %s", reason)
         except Exception as exc:

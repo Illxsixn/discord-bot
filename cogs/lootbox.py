@@ -32,9 +32,15 @@ class LootboxCog(commands.GroupCog, group_name="lootbox", group_description="Loo
         error: app_commands.AppCommandError,
     ) -> None:
         if isinstance(error, app_commands.CheckFailure):
-            return
-        logger.exception("Lootbox-Befehl Fehler: %s", error)
-        embed = error_embed("Lootbox-Befehl fehlgeschlagen", str(error))
+            if interaction.response.is_done():
+                return
+            embed = error_embed(
+                "Keine Berechtigung",
+                str(error) or "Du kannst diesen Befehl nicht ausführen.",
+            )
+        else:
+            logger.exception("Lootbox-Befehl Fehler: %s", error)
+            embed = error_embed("Lootbox-Befehl fehlgeschlagen", str(error))
         try:
             if interaction.response.is_done():
                 await interaction.followup.send(embed=embed, ephemeral=True)

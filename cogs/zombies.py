@@ -377,8 +377,11 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         kwargs: dict = {"embed": embed, "view": view, "embed_persistent": True}
         if file:
             kwargs["file"] = file
-        await interaction.response.send_message(**kwargs)
-        msg = await interaction.original_response()
+        if interaction.response.is_done():
+            msg = await interaction.followup.send(**kwargs, wait=True)
+        else:
+            await interaction.response.send_message(**kwargs)
+            msg = await interaction.original_response()
         self._schedule_public_message_delete(msg)
         image_url = self._embed_image_url(msg)
         if image_url:
@@ -424,9 +427,15 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         error: app_commands.AppCommandError,
     ) -> None:
         if isinstance(error, app_commands.CheckFailure):
-            return
-        logger.exception("Zombie-Befehl Fehler: %s", error)
-        embed = error_embed("Zombie-Befehl fehlgeschlagen", str(error))
+            if interaction.response.is_done():
+                return
+            embed = error_embed(
+                "Keine Berechtigung",
+                str(error) or "Du kannst diesen Befehl nicht ausführen.",
+            )
+        else:
+            logger.exception("Zombie-Befehl Fehler: %s", error)
+            embed = error_embed("Zombie-Befehl fehlgeschlagen", str(error))
         try:
             if interaction.response.is_done():
                 await interaction.followup.send(embed=embed, ephemeral=True)
@@ -650,7 +659,12 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 return
         except (discord.NotFound, discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Run-Nachricht Update fehlgeschlagen: %s", exc)
-            if not interaction.response.is_done():
+            if interaction.response.is_done():
+                await interaction.followup.send(
+                    embed=error_embed("Update fehlgeschlagen", "Nutze `/zombies status`."),
+                    ephemeral=True,
+                )
+            else:
                 await interaction.response.send_message(
                     embed=error_embed("Update fehlgeschlagen", "Nutze `/zombies status`."),
                     ephemeral=True,
@@ -883,6 +897,10 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
     async def _send_profile(self, interaction: discord.Interaction) -> None:
         assert interaction.guild is not None
         if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message(
+                embed=error_embed("Fehler", "Mitgliedsdaten konnten nicht geladen werden."),
+                ephemeral=True,
+            )
             return
         profile = await self.db.get_zombie_player(interaction.guild.id, interaction.user.id)
         economy = await self.db.get_player_economy(interaction.guild.id, interaction.user.id)
@@ -925,6 +943,8 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             if active is not None:
                 await self._restore_active_run_panel(interaction, interaction.user)
                 return
+
+            await interaction.response.defer()
 
             player_level = (await self.db.get_user_level(interaction.guild.id, interaction.user.id)).level
             hp_max = player_max_hp(player_level)
@@ -978,6 +998,10 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
     async def status(self, interaction: discord.Interaction) -> None:
         assert interaction.guild is not None
         if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message(
+                embed=error_embed("Fehler", "Mitgliedsdaten konnten nicht geladen werden."),
+                ephemeral=True,
+            )
             return
 
         if await self._restore_active_run_panel(interaction, interaction.user):

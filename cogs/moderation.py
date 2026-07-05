@@ -102,7 +102,7 @@ class ModerationCog(commands.Cog):
                 return
 
             reason_text = reason or "Kein Grund angegeben"
-            await user.ban(reason=f"{reason_text} | Von: {interaction.user}", delete_message_days=0)
+            await user.ban(reason=f"{reason_text} | Von: {interaction.user}", delete_message_seconds=0)
 
             embed = moderation_embed("Ban", user, interaction.user, reason_text, color=Config.COLOR_ERROR)
             await interaction.followup.send(embed=success_embed("Mitglied gebannt", f"{user.mention} wurde gebannt."), ephemeral=True)

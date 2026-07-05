@@ -12,7 +12,7 @@ from discord.ext import commands
 
 from config import Config
 from database.database import Database
-from utils.embeds import info_embed
+from utils.embeds import error_embed, info_embed
 from utils.shop_actions import buy_lootboxes
 from utils.shop_embeds import build_shop_embed
 
@@ -98,8 +98,19 @@ class ShopCog(commands.Cog):
         error: app_commands.AppCommandError,
     ) -> None:
         if isinstance(error, app_commands.CheckFailure):
+            if interaction.response.is_done():
+                return
+            await interaction.response.send_message(
+                embed=error_embed("Keine Berechtigung", str(error) or "Du kannst diesen Befehl nicht ausführen."),
+                ephemeral=True,
+            )
             return
         logger.exception("Shop-Befehl Fehler: %s", error)
+        embed = error_embed("Shop-Befehl fehlgeschlagen", str(error))
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def send_shop(
         self,
@@ -119,16 +130,15 @@ class ShopCog(commands.Cog):
 
     async def _purchase(self, interaction: discord.Interaction, *, count: int) -> None:
         assert interaction.guild is not None
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
         _, embed, _ = await buy_lootboxes(
             self.db,
             interaction.guild.id,
             interaction.user.id,
             count,
         )
-        if interaction.response.is_done():
-            await interaction.followup.send(embed=embed, ephemeral=True)
-        else:
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="shop", description="Shop — Lootboxen und kaufbare Produkte")
     @app_commands.guild_only()

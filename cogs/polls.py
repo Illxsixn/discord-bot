@@ -174,7 +174,10 @@ class PollsCog(commands.GroupCog, group_name="poll", group_description="Umfragen
         try:
             for poll in await self.db.get_active_polls():
                 if poll.ends_at and poll.ends_at <= now:
-                    await self.finalize_poll(poll)
+                    try:
+                        await self.finalize_poll(poll)
+                    except Exception as exc:
+                        logger.exception("Poll #%s konnte nicht abgeschlossen werden: %s", poll.id, exc)
         except Exception as exc:
             logger.exception("Poll-Ablauf-Task fehlgeschlagen: %s", exc)
 

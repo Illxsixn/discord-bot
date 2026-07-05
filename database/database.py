@@ -378,6 +378,11 @@ _ZOMBIE_RUN_MIGRATIONS = [
     "ALTER TABLE zombie_runs ADD COLUMN current_zombie_image_url TEXT DEFAULT ''",
 ]
 
+
+def _is_duplicate_column_error(exc: Exception) -> bool:
+    """True, wenn SQLite nur über bereits existierende Spalte klagt."""
+    return "duplicate column name" in str(exc).lower()
+
 class Database:
     """
     Asynchrone SQLite-Datenbankverbindung für den Bot.
@@ -401,6 +406,7 @@ class Database:
         self._connection.row_factory = aiosqlite.Row
         await self._connection.execute("PRAGMA foreign_keys = ON")
         await self._connection.execute("PRAGMA journal_mode = WAL")
+        await self._connection.execute("PRAGMA busy_timeout = 5000")
         await self._connection.commit()
         logger.info("Datenbank verbunden: %s", self.path)
 
@@ -429,40 +435,55 @@ class Database:
         for sql in _GUILD_SETTINGS_MIGRATIONS:
             try:
                 await self._connection.execute(sql)
-            except aiosqlite.OperationalError:
-                pass
+            except aiosqlite.OperationalError as exc:
+                if _is_duplicate_column_error(exc):
+                    continue
+                logger.exception("Migration fehlgeschlagen: %s", sql)
+                raise
 
     async def _migrate_ticket_settings(self) -> None:
         """Fügt neue Spalten zu ticket_settings hinzu (idempotent)."""
         for sql in _TICKET_SETTINGS_MIGRATIONS:
             try:
                 await self._connection.execute(sql)
-            except aiosqlite.OperationalError:
-                pass
+            except aiosqlite.OperationalError as exc:
+                if _is_duplicate_column_error(exc):
+                    continue
+                logger.exception("Migration fehlgeschlagen: %s", sql)
+                raise
 
     async def _migrate_player_economy(self) -> None:
         """Fügt Legacy-Spalten zu player_economy hinzu (idempotent, ungenutzt)."""
         for sql in _PLAYER_ECONOMY_MIGRATIONS:
             try:
                 await self._connection.execute(sql)
-            except aiosqlite.OperationalError:
-                pass
+            except aiosqlite.OperationalError as exc:
+                if _is_duplicate_column_error(exc):
+                    continue
+                logger.exception("Migration fehlgeschlagen: %s", sql)
+                raise
 
     async def _migrate_tournaments(self) -> None:
         """Fügt Interface-Spalten zu turniere hinzu (idempotent)."""
         for sql in _TOURNAMENT_MIGRATIONS:
             try:
                 await self._connection.execute(sql)
-            except aiosqlite.OperationalError:
-                pass
+            except aiosqlite.OperationalError as exc:
+                if _is_duplicate_column_error(exc):
+                    continue
+                logger.exception("Migration fehlgeschlagen: %s", sql)
+                raise
 
     async def _migrate_zombie_runs(self) -> None:
         """Fügt Pet-Schwierigkeit und Zombie-Max-HP zu zombie_runs hinzu (idempotent)."""
         for sql in _ZOMBIE_RUN_MIGRATIONS:
             try:
                 await self._connection.execute(sql)
-            except aiosqlite.OperationalError:
-                pass
+            except aiosqlite.OperationalError as exc:
+                if _is_duplicate_column_error(exc):
+                    continue
+                logger.exception("Migration fehlgeschlagen: %s", sql)
+                raise
 
     @property
     def conn(self) -> aiosqlite.Connection:
@@ -753,9 +774,21 @@ class Database:
 
     async def add_player_gold(self, guild_id: int, user_id: int, amount: int) -> PlayerEconomyRecord:
         """Addiert Gold (negativ zum Abziehen)."""
-        record = await self.get_player_economy(guild_id, user_id)
-        record.gold = max(0, record.gold + amount)
-        return await self.save_player_economy(record)
+        delta = int(amount)
+        if delta == 0:
+            return await self.get_player_economy(guild_id, user_id)
+
+        await self.conn.execute(
+            """
+            INSERT INTO player_economy (guild_id, user_id, gold, lootbox_count)
+            VALUES (?, ?, ?, 0)
+            ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                gold = MAX(0, player_economy.gold + ?)
+            """,
+            (guild_id, user_id, max(0, delta), delta),
+        )
+        await self.conn.commit()
+        return await self.get_player_economy(guild_id, user_id)
 
     async def add_lootboxes(self, guild_id: int, user_id: int, count: int) -> PlayerEconomyRecord:
         """Addiert oder entfernt Lootboxen im Inventar."""
@@ -2097,6 +2130,8 @@ class Database:
     async def update_tournament_match(
         self,
         match_id: int,
+        *,
+        expected_status: TournamentMatchStatus | None = None,
         **fields: Any,
     ) -> TournamentMatchRecord | None:
         """Aktualisiert Match-Felder."""
@@ -2105,12 +2140,19 @@ class Database:
         if not fields:
             return await self.get_tournament_match(match_id)
         columns = ", ".join(f"{key} = ?" for key in fields)
-        values = list(fields.values()) + [match_id]
-        await self.conn.execute(
-            f"UPDATE turnier_matches SET {columns} WHERE id = ?",
+        values = list(fields.values())
+        where_clause = "id = ?"
+        values.append(match_id)
+        if expected_status is not None:
+            where_clause += " AND status = ?"
+            values.append(expected_status.value)
+        cursor = await self.conn.execute(
+            f"UPDATE turnier_matches SET {columns} WHERE {where_clause}",
             values,
         )
         await self.conn.commit()
+        if cursor.rowcount == 0:
+            return None
         return await self.get_tournament_match(match_id)
 
     async def redistribute_match_maps(
