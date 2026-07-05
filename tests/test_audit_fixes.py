@@ -22,6 +22,17 @@ def test_zombie_public_messages_use_zombie_delete_cooldown():
     assert Config.ZOMBIE_MESSAGE_DELETE_SECONDS == 300
 
 
+def test_pet_display_posts_publicly_and_schedules_delete():
+    from cogs import pets
+    from config import Config
+
+    source = inspect.getsource(pets.PetsCog.display.callback)
+    assert "channel.send" in source
+    assert "embed_persistent" in source
+    assert "schedule_pet_display_delete" in source
+    assert Config.PET_DISPLAY_DELETE_SECONDS == 300
+
+
 def test_zombie_run_update_strips_embed_persistent_on_edit():
     from cogs import zombies
 
