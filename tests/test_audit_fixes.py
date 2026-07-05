@@ -30,6 +30,7 @@ def test_pet_display_posts_publicly_and_schedules_delete():
     assert "channel.send" in source
     assert "embed_persistent" in source
     assert "schedule_pet_display_delete" in source
+    assert "content=" not in source
     assert Config.PET_DISPLAY_DELETE_SECONDS == 300
 
 
