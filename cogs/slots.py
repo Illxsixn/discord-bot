@@ -152,8 +152,8 @@ class SlotsCog(commands.Cog):
                 await interaction.edit_original_response(embed=anim_embed, view=view)
                 await asyncio.sleep(Config.SLOT_SPIN_ANIMATION_DELAY)
 
-            reels = spin_reels()
-            result = resolve_spin(reels, view.bet)
+            reels, jackpot_spin = spin_reels()
+            result = resolve_spin(reels, view.bet, jackpot_spin=jackpot_spin)
             economy.gold += result.payout
             await self.db.save_player_economy(economy)
 
