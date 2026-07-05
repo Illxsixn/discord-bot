@@ -5,11 +5,21 @@ from __future__ import annotations
 import inspect
 
 
-def test_zombie_run_panel_uses_embed_persistent():
+def test_zombie_run_panel_schedules_auto_delete():
     from cogs import zombies
 
     source = inspect.getsource(zombies.ZombiesCog._send_run_panel)
+    assert "_schedule_public_message_delete" in source
     assert "embed_persistent" in source
+
+
+def test_zombie_public_messages_use_zombie_delete_cooldown():
+    from cogs import zombies
+    from config import Config
+
+    source = inspect.getsource(zombies.ZombiesCog._schedule_public_message_delete)
+    assert "schedule_zombie_message_delete" in source
+    assert Config.ZOMBIE_MESSAGE_DELETE_SECONDS == 300
 
 
 def test_zombie_run_update_strips_embed_persistent_on_edit():
