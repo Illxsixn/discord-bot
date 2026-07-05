@@ -12,6 +12,30 @@ def test_zombie_run_panel_uses_embed_persistent():
     assert "embed_persistent" in source
 
 
+def test_zombie_run_update_strips_embed_persistent_on_edit():
+    from cogs import zombies
+
+    source = inspect.getsource(zombies.ZombiesCog._respond_run_update)
+    assert '"embed_persistent"' not in source
+
+
+def test_zombie_persist_view_registers_by_custom_id():
+    from cogs import zombies
+
+    source = inspect.getsource(zombies.ZombiesCog._persist_run_view)
+    assert "add_view(view)" in source
+    assert "message_id=message_id" not in source
+
+
+def test_edit_hooks_strip_embed_persistent():
+    from utils.embeds import install_brand_send_hooks
+
+    source = inspect.getsource(install_brand_send_hooks)
+    assert "InteractionResponse.edit_message" in source
+    assert "edit_original_response" in source
+    assert "_pop_embed_send_flags(kwargs)" in source
+
+
 def test_poll_posts_use_embed_persistent():
     from cogs import polls
 

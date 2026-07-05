@@ -328,13 +328,14 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
 
     def _persist_run_view(self, view: ZombieRunView, message_id: int | None) -> None:
         """
-        Registriert persistente Buttons für Nachricht und Bot-Neustart.
+        Registriert persistente Buttons (custom_id) für Bot-Neustarts.
 
-        Ephemeral-Antworten setzen in discord.py timeout=900 — dann ist die View
-        nicht mehr persistent und add_view würde fehlschlagen.
+        Views mit custom_id werden global registriert — message_id wäre zu strikt
+        und bricht nach Edits oder Kanalwechseln.
         """
-        if message_id and view.is_persistent() and not view.is_finished():
-            self.bot.add_view(view, message_id=message_id)
+        _ = message_id
+        if view.is_persistent() and not view.is_finished():
+            self.bot.add_view(view)
 
     async def _send_run_panel(
         self,
@@ -533,11 +534,14 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 use_attachment=False,
             )
             view = view or run_view
-            payload = {"embed": embed, "view": view, "attachments": [], "embed_persistent": True}
+            payload = {"embed": embed, "view": view, "attachments": []}
 
         try:
             if interaction.response.is_done():
-                await interaction.edit_original_response(**payload)
+                if interaction.message is not None:
+                    await interaction.message.edit(**payload)
+                else:
+                    await interaction.edit_original_response(**payload)
             elif interaction.type is InteractionType.component:
                 await interaction.response.edit_message(**payload)
             else:
@@ -602,15 +606,18 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         if not isinstance(interaction.user, discord.Member):
             return
 
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+
         run = await self.db.get_zombie_run(run_id)
         if run is None or run.status != ZombieRunStatus.ACTIVE.value:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Kein aktiver Run", "Starte mit `/zombies start`."),
                 ephemeral=True,
             )
             return
         if run.user_id != interaction.user.id:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Nicht dein Run", "Das ist nicht dein Run."),
                 ephemeral=True,
             )
@@ -618,12 +625,12 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
 
         checked = await self._check_expired_run(interaction.user, run)
         if checked is None:
-            await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
+            await interaction.followup.send(embed=build_expired_embed(), ephemeral=True)
             return
         run = checked
 
         if not run.in_combat:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=warning_embed("Kein Kampf", "Es ist gerade kein Zombie aktiv."),
                 ephemeral=True,
             )
@@ -631,7 +638,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         if run.pet_action_cooldown > 0:
             attacks = run.pet_action_cooldown
             label = "Angriff" if attacks == 1 else "Angriffe"
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=warning_embed(
                     "Cooldown",
                     f"Pet-Aktion in **{attacks}** {label} (Nahkampf) wieder verfügbar.",
@@ -642,7 +649,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
 
         pet = await self.db.get_active_pet(interaction.guild.id, interaction.user.id)
         if pet is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=warning_embed("Kein Pet", "Du brauchst ein aktives Pet für Spezialaktionen."),
                 ephemeral=True,
             )
@@ -650,7 +657,10 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
 
         embed = build_pet_action_picker_embed(pet, companion_rarity=run.companion_rarity)
         view = ZombiePetActionView(self, run_id, interaction.user.id)
-        await interaction.response.edit_message(embed=embed, view=view)
+        if interaction.message is not None:
+            await interaction.message.edit(embed=embed, view=view)
+        else:
+            await interaction.edit_original_response(embed=embed, view=view)
 
     async def _handle_run_action(
         self,
@@ -667,15 +677,18 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
 
         member = interaction.user
 
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+
         run = await self.db.get_zombie_run(run_id)
         if run is None or run.status != ZombieRunStatus.ACTIVE.value:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Kein aktiver Run", "Starte mit `/zombies start`."),
                 ephemeral=True,
             )
             return
         if run.user_id != member.id:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Nicht dein Run", "Das ist nicht dein Run."),
                 ephemeral=True,
             )
@@ -683,15 +696,12 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
 
         checked = await self._check_expired_run(member, run)
         if checked is None:
-            await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
+            await interaction.followup.send(embed=build_expired_embed(), ephemeral=True)
             return
         run = await self._normalize_run(checked)
 
         if view is not None:
             view.set_busy(True)
-
-        if not interaction.response.is_done():
-            await interaction.response.defer()
 
         followup_embed: discord.Embed | None = None
         final_embed: discord.Embed | None = None
@@ -777,10 +787,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 view.set_busy(False)
 
         if followup_embed is not None:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(embed=followup_embed, ephemeral=True)
-            else:
-                await interaction.followup.send(embed=followup_embed, ephemeral=True)
+            await interaction.followup.send(embed=followup_embed, ephemeral=True)
             return
 
         if final_embed is not None:

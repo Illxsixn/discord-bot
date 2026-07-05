@@ -267,6 +267,7 @@ def install_brand_send_hooks() -> None:
 
     def _wrap_edit(method: Any) -> Any:
         async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            _pop_embed_send_flags(kwargs)
             kwargs = inject_brand_into_edit_kwargs(kwargs)
             return await method(self, *args, **kwargs)
 
@@ -275,6 +276,12 @@ def install_brand_send_hooks() -> None:
     discord.abc.Messageable.send = _wrap_send(discord.abc.Messageable.send)
     discord.interactions.InteractionResponse.send_message = _wrap_send(
         discord.interactions.InteractionResponse.send_message
+    )
+    discord.interactions.InteractionResponse.edit_message = _wrap_edit(
+        discord.interactions.InteractionResponse.edit_message
+    )
+    discord.interactions.Interaction.edit_original_response = _wrap_edit(
+        discord.interactions.Interaction.edit_original_response
     )
     webhook_async.Webhook.send = _wrap_send(webhook_async.Webhook.send)
     discord.Message.edit = _wrap_edit(discord.Message.edit)
