@@ -104,7 +104,7 @@ def build_run_message_embed(
     economy: PlayerEconomyRecord,
     player_level: int,
     refresh_visual: bool = False,
-    use_attachment: bool = False,
+    use_attachment: bool = True,
 ) -> tuple[discord.Embed, discord.File | None]:
     """Run-Embed inkl. optionalem Zombie-GIF (zentral gebaut, keine Cog-Mutation)."""
     embed = build_run_embed(

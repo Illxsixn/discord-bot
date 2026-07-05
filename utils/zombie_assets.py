@@ -1,5 +1,7 @@
 """
 Zombie Survival: GIF-Auswahl und Embed-Bilder.
+
+Priorität: Agnes-generierte lokale GIFs → Giphy-Fallback nur ohne lokale Dateien.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from typing import TYPE_CHECKING
 import discord
 
 from config import Config
+from utils.agnes_images import agnes_configured
 from utils.zombie_content import ZOMBIE_TYPE_BOSS, ZOMBIE_TYPE_RASENDER, ZOMBIE_TYPE_STREUNER
 
 if TYPE_CHECKING:
@@ -21,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 MAX_GIF_BYTES = 8 * 1024 * 1024
 
-# Freie Fallback-GIFs (Giphy-CDN — Tenor-Links waren 404)
+# Nur wenn keine lokalen Agnes-GIFs in assets/zombies/ liegen
 FALLBACK_GIFS: dict[str, list[str]] = {
     "common": [
         "https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif",
@@ -47,8 +50,14 @@ def _asset_dir(folder: str) -> Path:
     return Config.ZOMBIE_ASSETS_DIR / folder
 
 
+def _asset_folder(zombie_type: str, *, is_boss: bool = False) -> str:
+    if is_boss:
+        return "boss"
+    return ZOMBIE_ASSET_MAP.get(zombie_type, "common")
+
+
 def _pick_local_gif(folder: str) -> Path | None:
-    """Wählt zufällige lokale GIF-Datei."""
+    """Wählt zufällige lokale GIF-Datei (Agnes-Cache)."""
     directory = _asset_dir(folder)
     if not directory.is_dir():
         return None
@@ -58,18 +67,32 @@ def _pick_local_gif(folder: str) -> Path | None:
     return random.choice(files) if files else None
 
 
-def random_zombie_gif(zombie_type: str) -> str | Path | None:
-    """Zufälliges GIF für normalen Zombie."""
-    folder = ZOMBIE_ASSET_MAP.get(zombie_type, "common")
-    local = _pick_local_gif(folder)
-    if local:
-        return local
+def is_agnes_zombie_asset_configured() -> bool:
+    """True wenn Agnes für die Zombie-GIF-Bibliothek konfiguriert ist."""
+    return agnes_configured()
+
+
+def has_local_zombie_gif(zombie_type: str, *, is_boss: bool = False) -> bool:
+    """True wenn ein Agnes-GIF für diesen Typ im Asset-Ordner liegt."""
+    return _pick_local_gif(_asset_folder(zombie_type, is_boss=is_boss)) is not None
+
+
+def _fallback_gif_url(zombie_type: str, *, is_boss: bool = False) -> str:
+    folder = _asset_folder(zombie_type, is_boss=is_boss)
     urls = FALLBACK_GIFS.get(folder, FALLBACK_GIFS["common"])
     return random.choice(urls)
 
 
+def random_zombie_gif(zombie_type: str) -> str | Path | None:
+    """Lokales Agnes-GIF oder Giphy-Fallback-URL."""
+    local = _pick_local_gif(_asset_folder(zombie_type))
+    if local:
+        return local
+    return random.choice(FALLBACK_GIFS.get(_asset_folder(zombie_type), FALLBACK_GIFS["common"]))
+
+
 def boss_zombie_gif() -> str | Path | None:
-    """Boss-GIF."""
+    """Boss-GIF — lokal oder Fallback."""
     local = _pick_local_gif("boss")
     if local:
         return local
@@ -77,13 +100,10 @@ def boss_zombie_gif() -> str | Path | None:
 
 
 def pick_zombie_visual_url(zombie_type: str, *, is_boss: bool = False) -> str:
-    """Wählt eine HTTP-Bild-URL für Embed-Updates ohne Datei-Anhang."""
-    source = boss_zombie_gif() if is_boss else random_zombie_gif(zombie_type)
-    if isinstance(source, Path):
-        folder = "boss" if is_boss else ZOMBIE_ASSET_MAP.get(zombie_type, "common")
-        urls = FALLBACK_GIFS.get(folder, FALLBACK_GIFS["common"])
-        return random.choice(urls)
-    return str(source)
+    """HTTP-URL nur für Fallback (keine lokale Datei)."""
+    if has_local_zombie_gif(zombie_type, is_boss=is_boss):
+        return ""
+    return _fallback_gif_url(zombie_type, is_boss=is_boss)
 
 
 def ensure_run_combat_image(
@@ -93,12 +113,14 @@ def ensure_run_combat_image(
     is_boss: bool = False,
     refresh: bool = False,
 ) -> str:
-    """Liefert die stabile Kampf-GIF-URL für diesen Zombie (pro Spawn)."""
+    """Liefert die stabile Kampf-GIF-URL (nur bei Giphy-Fallback)."""
     if refresh:
         run.current_zombie_image_url = ""
     if run.current_zombie_image_url:
         return run.current_zombie_image_url
-    url = pick_zombie_visual_url(zombie_type, is_boss=is_boss)
+    if has_local_zombie_gif(zombie_type, is_boss=is_boss):
+        return ""
+    url = _fallback_gif_url(zombie_type, is_boss=is_boss)
     run.current_zombie_image_url = url
     return url
 
@@ -109,40 +131,34 @@ def apply_zombie_visual(
     zombie_type: str,
     *,
     is_boss: bool = False,
-    use_attachment: bool = False,
+    use_attachment: bool = True,
     refresh_visual: bool = False,
 ) -> discord.File | None:
     """
     Setzt das Zombie-Bild im Embed.
 
-    Hält die Bild-URL pro Zombie stabil über Nachrichten-Edits hinweg.
+    Lokale Agnes-GIFs werden als Attachment gesetzt; CDN-URL wird nach dem Senden gespeichert.
     """
     if refresh_visual:
         run.current_zombie_image_url = ""
 
-    url = ensure_run_combat_image(run, zombie_type, is_boss=is_boss)
-    embed.set_image(url=url)
+    if run.current_zombie_image_url:
+        embed.set_image(url=run.current_zombie_image_url)
+        return None
 
     if use_attachment:
         file = attach_zombie_visual(embed, zombie_type, is_boss=is_boss)
-        image = embed.image
-        if image and image.url and not image.url.startswith("attachment://"):
-            run.current_zombie_image_url = image.url
-        return file
+        if file is not None:
+            return file
 
+    source = boss_zombie_gif() if is_boss else random_zombie_gif(zombie_type)
+    if isinstance(source, Path):
+        return None
+
+    url = str(source) if source else _fallback_gif_url(zombie_type, is_boss=is_boss)
+    run.current_zombie_image_url = url
+    embed.set_image(url=url)
     return None
-
-
-def set_zombie_visual_url(
-    embed: discord.Embed,
-    zombie_type: str,
-    *,
-    is_boss: bool = False,
-) -> None:
-    """Setzt Zombie-GIF per URL (für Embed-Updates ohne Datei-Anhang)."""
-    folder = "boss" if is_boss else ZOMBIE_ASSET_MAP.get(zombie_type, "common")
-    urls = FALLBACK_GIFS.get(folder, FALLBACK_GIFS["common"])
-    embed.set_image(url=random.choice(urls))
 
 
 def attach_zombie_visual(
@@ -152,10 +168,10 @@ def attach_zombie_visual(
     is_boss: bool = False,
 ) -> discord.File | None:
     """
-    Hängt Zombie-Bild an Embed an.
+    Hängt ein lokales Agnes-Zombie-GIF an.
 
     Returns:
-        discord.File wenn Attachment nötig, sonst None (URL bereits gesetzt).
+        discord.File wenn Attachment nötig, sonst None (URL-Fallback bereits gesetzt).
     """
     try:
         source = boss_zombie_gif() if is_boss else random_zombie_gif(zombie_type)
