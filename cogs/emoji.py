@@ -40,6 +40,7 @@ class EmojiCog(commands.Cog):
         name="emoji",
         description="Fügt ein Server-Emoji hinzu — kopieren oder eigenes Bild hochladen.",
     )
+    @app_commands.default_permissions(manage_emojis_and_stickers=True)
     @app_commands.guild_only()
     async def emoji(self, interaction: discord.Interaction) -> None:
         """Wartet auf eine Nachricht mit Custom-Emoji oder Bild und erstellt ein Server-Emoji."""
@@ -82,6 +83,21 @@ class EmojiCog(commands.Cog):
                 embed=error_embed(
                     "Bot-Berechtigung fehlt",
                     "Mir fehlt die Berechtigung **Emojis verwalten** auf diesem Server.",
+                ),
+                ephemeral=True,
+            )
+            return
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.followup.send(
+                embed=error_embed("Fehler", "Mitgliedsdaten konnten nicht geladen werden."),
+                ephemeral=True,
+            )
+            return
+        if not interaction.user.guild_permissions.manage_emojis_and_stickers:
+            await interaction.followup.send(
+                embed=error_embed(
+                    "Keine Berechtigung",
+                    "Du benötigst die Berechtigung **Emojis und Sticker verwalten**.",
                 ),
                 ephemeral=True,
             )

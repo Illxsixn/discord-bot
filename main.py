@@ -160,7 +160,11 @@ class DiscordBot(commands.Bot):
                 f"Bitte warte **{error.retry_after:.1f}** Sekunden.",
             )
         elif isinstance(error, app_commands.CheckFailure):
-            return  # Bereits in Checks behandelt
+            # Viele Checks senden selbst bereits ein Embed und markieren die Response als done.
+            if interaction.response.is_done():
+                return
+            message = str(error).strip() or "Du kannst diesen Befehl hier nicht ausführen."
+            embed = error_embed("Keine Berechtigung", message)
         elif isinstance(error, app_commands.TransformerError):
             logger.warning("Slash Command Transform-Fehler: %s", error)
             embed = error_embed(

@@ -35,8 +35,7 @@ def build_shop_embed(economy: PlayerEconomyRecord) -> discord.Embed:
             ),
             (
                 "Gold verdienen",
-                f"Spielsiege: **{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}** · "
-                f"Zombie Survival · Slots",
+                "Hauptquellen: Zombie Survival · Slots · Lootbox-Ergebnisse",
                 False,
             ),
         ],

@@ -194,8 +194,8 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             ("/slots", "Gold-Slot-Maschine mit Einsatz-Buttons"),
         ],
         "hints": [
-            f"Gewinner erhalten **{Config.GAME_WIN_XP} XP** (wenn Level-System aktiv ist)",
-            f"Gewinner erhalten **{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX} Gold**",
+            "Gold- und XP-Fortschritt kommen vor allem über `/zombies`, `/slots` und Lootboxen",
+            "Nutze `/levels level` für deinen Fortschritt und `/shop` für Käufe",
             f"`/slots` — Einsatz **{', '.join(str(b) for b in Config.SLOT_BET_OPTIONS)}** Gold",
         ],
     },
@@ -213,7 +213,7 @@ HELP_CATEGORIES: dict[str, dict[str, object]] = {
             f"**{Config.LOOTBOX_CONSOLATION_XP_MIN}–{Config.LOOTBOX_CONSOLATION_XP_MAX}** Spieler-XP **+** Pet-XP",
             f"Jackpot: **{Config.LOOTBOX_XP_CHANCE_MIN}–{Config.LOOTBOX_XP_CHANCE_MAX} %** extra "
             f"**{Config.LOOTBOX_XP_MIN}–{Config.LOOTBOX_XP_MAX}** XP",
-            f"Gold durch Spielsiege (**{Config.GAME_WIN_GOLD_MIN}–{Config.GAME_WIN_GOLD_MAX}**)",
+            "Gold vor allem über `/zombies`, `/slots` und Lootboxen",
             "Pet-XP nur mit aktivem Pet; Spieler-XP wenn Level-System aktiv ist",
         ],
     },

@@ -108,8 +108,19 @@ class SlotsCog(commands.Cog):
         error: app_commands.AppCommandError,
     ) -> None:
         if isinstance(error, app_commands.CheckFailure):
+            if interaction.response.is_done():
+                return
+            await interaction.response.send_message(
+                embed=error_embed("Keine Berechtigung", str(error) or "Du kannst diesen Befehl nicht ausführen."),
+                ephemeral=True,
+            )
             return
         logger.exception("Slots-Fehler: %s", error)
+        embed = error_embed("Slots-Befehl fehlgeschlagen", str(error))
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _refresh_view(self, interaction: discord.Interaction, view: SlotsView) -> None:
         economy = await self.db.get_player_economy(view.guild_id, view.owner_id)

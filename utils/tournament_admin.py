@@ -363,11 +363,11 @@ class TournamentChannelSelect(discord.ui.ChannelSelect):
                 embed=error_embed("Ungültig", "Bitte einen Textkanal wählen."),
             )
             return
+        await interaction.response.defer(ephemeral=True)
         error = await self.cog._save_tournament_channel(interaction.guild, channel)
         if error:
-            await interaction.response.send_message(embed=error_embed("Kanal nicht nutzbar", error))
+            await interaction.followup.send(embed=error_embed("Kanal nicht nutzbar", error), ephemeral=True)
             return
-        await interaction.response.defer()
         await refresh_wizard_panel(interaction, self.cog)
 
 
@@ -450,6 +450,7 @@ class MaxTeamsPickView(TournamentAdminView):
         async def callback(interaction: discord.Interaction) -> None:
             if interaction.guild is None:
                 return
+            await interaction.response.defer(ephemeral=True)
             tournament = await self.cog.db.create_tournament(
                 interaction.guild.id,
                 self.name,
@@ -457,7 +458,6 @@ class MaxTeamsPickView(TournamentAdminView):
                 max_teams,
                 description=self.description,
             )
-            await interaction.response.defer(ephemeral=True)
             await refresh_wizard_panel(
                 interaction,
                 self.cog,
@@ -494,20 +494,26 @@ class AddMapModal(discord.ui.Modal, title="Map hinzufügen"):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         from cogs.tournament import _normalize_map_name
 
+        if not isinstance(interaction.user, discord.Member) or not self.cog._is_admin(interaction.user):
+            await interaction.response.send_message(
+                embed=error_embed("Keine Berechtigung", "Nur Administratoren."),
+                ephemeral=True,
+            )
+            return
         map_name = _normalize_map_name(self.map_input.value)
         if not map_name:
             await interaction.response.send_message(
                 embed=error_embed("Ungültig", "Map-Name darf nicht leer sein."),
             )
             return
+        await interaction.response.defer(ephemeral=True)
         added = await self.cog.db.add_tournament_map(self.tournament_id, map_name)
         if not added:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Bereits vorhanden", f"**{map_name}** ist schon im Pool."),
                 ephemeral=True,
             )
             return
-        await interaction.response.defer(ephemeral=True)
         await refresh_wizard_panel(interaction, self.cog, tournament_id=self.tournament_id)
         await interaction.followup.send(
             embed=success_embed("Map hinzugefügt", f"**{map_name}** ist im Pool."),
@@ -532,6 +538,12 @@ class CreateTeamModal(discord.ui.Modal, title="Team erstellen"):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         from cogs.tournament import _normalize_team_name
 
+        if not isinstance(interaction.user, discord.Member) or not self.cog._is_admin(interaction.user):
+            await interaction.response.send_message(
+                embed=error_embed("Keine Berechtigung", "Nur Administratoren."),
+                ephemeral=True,
+            )
+            return
         name = _normalize_team_name(self.name_input.value)
         if not name:
             await interaction.response.send_message(
@@ -568,6 +580,7 @@ class CaptainPickView(TournamentAdminView):
             await interaction.response.send_message(embed=error_embed("Fehler", "Kein User ausgewählt."))
             return
         captain_id = int(next(iter(users)))
+        await interaction.response.defer(ephemeral=True)
         error = await self.cog._admin_create_team(
             interaction.guild,
             self.tournament_id,
@@ -575,9 +588,8 @@ class CaptainPickView(TournamentAdminView):
             captain_id,
         )
         if error:
-            await interaction.response.send_message(embed=error_embed("Nicht möglich", error), ephemeral=True)
+            await interaction.followup.send(embed=error_embed("Nicht möglich", error), ephemeral=True)
             return
-        await interaction.response.defer(ephemeral=True)
         await refresh_wizard_panel(interaction, self.cog, tournament_id=self.tournament_id)
         await interaction.followup.send(
             embed=success_embed("Team erstellt", f"**{self.team_name}** · Captain <@{captain_id}>"),

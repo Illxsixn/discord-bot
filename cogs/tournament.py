@@ -4,6 +4,7 @@ Turnier-System mit Slash-Commands und button-basiertem Match-Management.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import discord
@@ -70,6 +71,7 @@ class TournamentCog(commands.Cog):
         self.db = db
         self._wizard_panels: dict[int, tuple[int, int]] = {}
         self._tournament_interfaces: dict[int, tuple[int, int]] = {}
+        self._round_locks: dict[int, asyncio.Lock] = {}
 
     def register_wizard_panel(self, guild_id: int, channel_id: int, message_id: int) -> None:
         """Merkt die Wizard-Panel-Nachricht pro Server."""
@@ -117,6 +119,14 @@ class TournamentCog(commands.Cog):
 
     def _is_admin(self, member: discord.Member) -> bool:
         return member.guild_permissions.administrator
+
+    def _round_lock(self, tournament_id: int) -> asyncio.Lock:
+        """Serialisiert Bracket-Fortschritt pro Turnier."""
+        lock = self._round_locks.get(tournament_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._round_locks[tournament_id] = lock
+        return lock
 
     async def _get_tournament_channel(
         self,
@@ -427,23 +437,25 @@ class TournamentCog(commands.Cog):
         reporting_team_id: int,
     ) -> None:
         """Team meldet Sieg."""
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
         match = await self.db.get_tournament_match(match_id)
         if match is None or interaction.guild is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Fehler", "Match nicht gefunden."),
                 ephemeral=True,
             )
             return
 
         if match.status != TournamentMatchStatus.OPEN:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Nicht möglich", "Dieses Match ist nicht mehr offen."),
                 ephemeral=True,
             )
             return
 
         if not await self.db.is_team_member(reporting_team_id, interaction.user.id):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Keine Berechtigung", "Du bist kein Mitglied dieses Teams."),
                 ephemeral=True,
             )
@@ -454,16 +466,22 @@ class TournamentCog(commands.Cog):
         opponent = await self._team_name(interaction.guild, opponent_id)
         updated = await self.db.update_tournament_match(
             match_id,
+            expected_status=TournamentMatchStatus.OPEN,
             status=TournamentMatchStatus.PENDING_CONFIRMATION,
             reported_by_team_id=reporting_team_id,
         )
-        assert updated is not None
+        if updated is None:
+            await interaction.followup.send(
+                embed=error_embed("Konflikt", "Das Match wurde parallel aktualisiert. Bitte erneut prüfen."),
+                ephemeral=True,
+            )
+            return
         note = (
             f"**{team.name if team else 'Team'}** hat einen Sieg gemeldet.\n"
             f"**{opponent}** muss bestätigen oder Einspruch erheben."
         )
         await self._refresh_match_message(updated, interaction.guild, extra_note=note)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=success_embed("Sieg gemeldet", "Der Gegner muss bestätigen oder Einspruch erheben."),
             ephemeral=True,
         )
@@ -474,16 +492,18 @@ class TournamentCog(commands.Cog):
         match_id: int,
     ) -> None:
         """Gegner bestätigt Siegmeldung."""
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
         match = await self.db.get_tournament_match(match_id)
         if match is None or interaction.guild is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Fehler", "Match nicht gefunden."),
                 ephemeral=True,
             )
             return
 
         if match.status != TournamentMatchStatus.PENDING_CONFIRMATION:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Nicht möglich", "Es liegt keine offene Meldung vor."),
                 ephemeral=True,
             )
@@ -491,7 +511,7 @@ class TournamentCog(commands.Cog):
 
         reported = match.reported_by_team_id
         if reported is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Fehler", "Keine Meldung vorhanden."),
                 ephemeral=True,
             )
@@ -499,7 +519,7 @@ class TournamentCog(commands.Cog):
 
         opponent_id = match.team2_id if reported == match.team1_id else match.team1_id
         if opponent_id is None or not await self.db.is_team_member(opponent_id, interaction.user.id):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Keine Berechtigung", "Nur das gegnerische Team kann bestätigen."),
                 ephemeral=True,
             )
@@ -508,17 +528,24 @@ class TournamentCog(commands.Cog):
         winner_id = reported
         updated = await self.db.update_tournament_match(
             match_id,
+            expected_status=TournamentMatchStatus.PENDING_CONFIRMATION,
             status=TournamentMatchStatus.FINISHED,
             winner_id=winner_id,
             reported_by_team_id=None,
         )
-        assert updated is not None
+        if updated is None:
+            await interaction.followup.send(
+                embed=error_embed("Konflikt", "Das Match wurde parallel aktualisiert. Bitte erneut prüfen."),
+                ephemeral=True,
+            )
+            return
         await self._refresh_match_message(updated, interaction.guild)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=success_embed("Bestätigt", "Match abgeschlossen."),
             ephemeral=True,
         )
-        await self._check_round_complete(match.tournament_id, interaction.guild)
+        async with self._round_lock(match.tournament_id):
+            await self._check_round_complete(match.tournament_id, interaction.guild)
 
     async def handle_dispute(
         self,
@@ -526,16 +553,18 @@ class TournamentCog(commands.Cog):
         match_id: int,
     ) -> None:
         """Gegner erhebt Einspruch."""
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
         match = await self.db.get_tournament_match(match_id)
         if match is None or interaction.guild is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Fehler", "Match nicht gefunden."),
                 ephemeral=True,
             )
             return
 
         if match.status != TournamentMatchStatus.PENDING_CONFIRMATION:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Nicht möglich", "Es liegt keine offene Meldung vor."),
                 ephemeral=True,
             )
@@ -543,7 +572,7 @@ class TournamentCog(commands.Cog):
 
         reported = match.reported_by_team_id
         if reported is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Fehler", "Keine Meldung vorhanden."),
                 ephemeral=True,
             )
@@ -551,7 +580,7 @@ class TournamentCog(commands.Cog):
 
         opponent_id = match.team2_id if reported == match.team1_id else match.team1_id
         if opponent_id is None or not await self.db.is_team_member(opponent_id, interaction.user.id):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed(
                     "Keine Berechtigung",
                     "Nur das gegnerische Team kann Einspruch erheben.",
@@ -562,15 +591,21 @@ class TournamentCog(commands.Cog):
 
         updated = await self.db.update_tournament_match(
             match_id,
+            expected_status=TournamentMatchStatus.PENDING_CONFIRMATION,
             status=TournamentMatchStatus.DISPUTED,
         )
-        assert updated is not None
+        if updated is None:
+            await interaction.followup.send(
+                embed=error_embed("Konflikt", "Das Match wurde parallel aktualisiert. Bitte erneut prüfen."),
+                ephemeral=True,
+            )
+            return
         await self._refresh_match_message(
             updated,
             interaction.guild,
             extra_note="⚠️ Einspruch – ein Admin muss entscheiden.",
         )
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=success_embed("Einspruch", "Ein Admin muss über den Admin-Button entscheiden."),
             ephemeral=True,
         )
@@ -582,10 +617,12 @@ class TournamentCog(commands.Cog):
         decision: str,
     ) -> None:
         """Admin-Entscheidung nach Einspruch oder manuell."""
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
             return
         if not self._is_admin(interaction.user):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Keine Berechtigung", "Nur Administratoren."),
                 ephemeral=True,
             )
@@ -593,7 +630,7 @@ class TournamentCog(commands.Cog):
 
         match = await self.db.get_tournament_match(match_id)
         if match is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Fehler", "Match nicht gefunden."),
                 ephemeral=True,
             )
@@ -608,7 +645,7 @@ class TournamentCog(commands.Cog):
             )
             assert updated is not None
             await self._refresh_match_message(updated, interaction.guild, extra_note="Match wird wiederholt.")
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=success_embed("Wiederholung", "Match zurückgesetzt."),
                 ephemeral=True,
             )
@@ -619,14 +656,14 @@ class TournamentCog(commands.Cog):
         elif decision == "team_b":
             winner_id = match.team2_id
         else:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Fehler", "Ungültige Entscheidung."),
                 ephemeral=True,
             )
             return
 
         if winner_id is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Fehler", "Kein gültiges Team für diese Entscheidung."),
                 ephemeral=True,
             )
@@ -640,11 +677,12 @@ class TournamentCog(commands.Cog):
         )
         assert updated is not None
         await self._refresh_match_message(updated, interaction.guild)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=success_embed("Entscheidung", "Match abgeschlossen."),
             ephemeral=True,
         )
-        await self._check_round_complete(match.tournament_id, interaction.guild)
+        async with self._round_lock(match.tournament_id):
+            await self._check_round_complete(match.tournament_id, interaction.guild)
 
     async def handle_map_change(
         self,
@@ -653,10 +691,12 @@ class TournamentCog(commands.Cog):
         new_map: str,
     ) -> None:
         """Admin ändert die Map eines Matches."""
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
             return
         if not self._is_admin(interaction.user):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Keine Berechtigung", "Nur Administratoren."),
                 ephemeral=True,
             )
@@ -664,7 +704,7 @@ class TournamentCog(commands.Cog):
 
         match = await self.db.get_tournament_match(match_id)
         if match is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Fehler", "Match nicht gefunden."),
                 ephemeral=True,
             )
@@ -672,7 +712,7 @@ class TournamentCog(commands.Cog):
 
         map_name = _normalize_map_name(new_map)
         if not map_name:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=error_embed("Ungültig", "Map-Name darf nicht leer sein."),
                 ephemeral=True,
             )
@@ -681,7 +721,7 @@ class TournamentCog(commands.Cog):
         updated = await self.db.update_tournament_match(match_id, map=map_name)
         assert updated is not None
         await self._refresh_match_message(updated, interaction.guild)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=success_embed("Map geändert", f"Neue Map: **{map_name}**"),
             ephemeral=True,
         )
@@ -1178,13 +1218,14 @@ class TournamentCog(commands.Cog):
 
             )
             return
+        await interaction.response.defer(ephemeral=True)
         matches = await self.db.get_tournament_matches(turnier_id)
         for match in matches:
             if match.status != TournamentMatchStatus.FINISHED:
                 await self._refresh_match_message(match, interaction.guild)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=success_embed("Verteilt", f"Maps auf **{count}** Match(es) neu verteilt."),
-
+            ephemeral=True,
         )
 
     @app_commands.command(name="turnier_team", description="Gründet ein Team per Interface (Captain)")
@@ -1619,6 +1660,7 @@ class TournamentCog(commands.Cog):
         tournament = await self._get_tournament_for_guild(interaction, turnier_id)
         if tournament is None or interaction.guild is None:
             return
+        await interaction.response.defer(ephemeral=True)
         channel = await self._get_tournament_channel(interaction.guild)
         message_ids = await self.db.delete_tournament_matches(turnier_id)
         if channel:
@@ -1629,12 +1671,12 @@ class TournamentCog(commands.Cog):
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                     pass
         await self.db.update_tournament_status(turnier_id, TournamentStatus.OPEN)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=success_embed(
                 "Abgebrochen",
                 f"Turnier #{turnier_id} zurückgesetzt (Status: offen, Matches gelöscht).",
             ),
-
+            ephemeral=True,
         )
 
     @app_commands.command(name="turnier_kanal_setzen", description="Legt den Turnier-Kanal fest (Admin)")
