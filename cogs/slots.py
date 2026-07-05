@@ -32,34 +32,47 @@ class SlotsView(discord.ui.View):
         self.bet = bet
         self._spinning = False
         self._spin_btn: discord.ui.Button | None = None
-        self._build_bet_buttons()
+        self._build_controls()
 
-    def _build_bet_buttons(self) -> None:
-        """Einsatz-Buttons dynamisch erzeugen."""
-        for amount in Config.SLOT_BET_OPTIONS:
-            style = (
-                discord.ButtonStyle.primary
-                if amount == self.bet
-                else discord.ButtonStyle.secondary
+    def _build_controls(self) -> None:
+        """Einsatz-Dropdown und Dreh-Button."""
+        options = [
+            discord.SelectOption(
+                label=f"{amount:,} Gold",
+                value=str(amount),
+                default=amount == self.bet,
+                emoji="🪙",
             )
-            btn = discord.ui.Button(
-                label=f"{amount} 🪙",
-                style=style,
-                custom_id=f"slot_bet_{amount}",
-            )
-            btn.callback = self._make_bet_callback(amount)
-            self.add_item(btn)
+            for amount in Config.SLOT_BET_OPTIONS
+        ]
+        bet_select = discord.ui.Select(
+            placeholder=f"Einsatz: {self.bet:,} Gold",
+            options=options,
+            min_values=1,
+            max_values=1,
+            row=0,
+            custom_id="slot_bet_select",
+        )
+        bet_select.callback = self._bet_select_callback
+        self.add_item(bet_select)
 
         spin_btn = discord.ui.Button(
             label="Drehen",
             style=discord.ButtonStyle.success,
             emoji="🎰",
-            row=1,
+            row=0,
             custom_id="slot_spin",
         )
         spin_btn.callback = self._spin_callback
         self._spin_btn = spin_btn
         self.add_item(spin_btn)
+
+    async def _bet_select_callback(self, interaction: discord.Interaction) -> None:
+        select = interaction.data.get("values", []) if interaction.data else []
+        if not select:
+            return
+        amount = int(select[0])
+        await self.cog._set_bet(interaction, self, amount)
 
     def _set_spin_disabled(self, disabled: bool) -> None:
         if self._spin_btn is not None:
@@ -68,12 +81,6 @@ class SlotsView(discord.ui.View):
     def _sync_spin_disabled(self) -> None:
         """Spin-Button während laufender Drehung deaktivieren."""
         self._set_spin_disabled(self._spinning)
-
-    def _make_bet_callback(self, amount: int):
-        async def callback(interaction: discord.Interaction) -> None:
-            await self.cog._set_bet(interaction, self, amount)
-
-        return callback
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -112,7 +119,7 @@ class SlotsCog(commands.Cog):
     async def _set_bet(self, interaction: discord.Interaction, view: SlotsView, amount: int) -> None:
         view.bet = amount
         view.clear_items()
-        view._build_bet_buttons()
+        view._build_controls()
         view._sync_spin_disabled()
         await self._refresh_view(interaction, view)
 
