@@ -30,8 +30,12 @@ def test_portrait_prompt_requests_single_face() -> None:
     species = get_species_by_name(pet.species)
     prompt = build_pet_portrait_prompt(pet, species)
     assert "exactly one face" in prompt
+    assert "exactly one tail" in prompt
     assert "no duplicate faces" in prompt
     assert "no twins" in prompt
+    assert "no mirrored body parts" in prompt
+    assert "no double tail" in prompt
+    assert "asymmetric pose" in prompt
 
 
 def test_portrait_path_uses_config_version() -> None:
