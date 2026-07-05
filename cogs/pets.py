@@ -678,7 +678,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
     @app_commands.guild_only()
     async def display(self, interaction: discord.Interaction) -> None:
         """Generiert oder lädt das KI-Portrait des aktiven Pets."""
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
             return
 
