@@ -574,7 +574,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         if final_embed is None and view is not None:
             if interaction.message and run.message_id != interaction.message.id:
                 run.message_id = interaction.message.id
-                await self.db.save_zombie_run(run)
+            await self.db.save_zombie_run(run)
             self._persist_run_view(view, run.message_id)
 
     async def _restore_run_message(
@@ -655,7 +655,11 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             )
             return
 
-        embed = build_pet_action_picker_embed(pet, companion_rarity=run.companion_rarity)
+        embed = build_pet_action_picker_embed(
+            pet,
+            companion_rarity=run.companion_rarity,
+            image_url=run.current_zombie_image_url,
+        )
         view = ZombiePetActionView(self, run_id, interaction.user.id)
         if interaction.message is not None:
             await interaction.message.edit(embed=embed, view=view)
