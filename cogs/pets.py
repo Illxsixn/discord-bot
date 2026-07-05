@@ -678,7 +678,7 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
     @app_commands.guild_only()
     async def display(self, interaction: discord.Interaction) -> None:
         """Generiert oder lädt das KI-Portrait des aktiven Pets."""
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
         if interaction.guild is None or not isinstance(interaction.user, discord.Member):
             return
 
@@ -760,10 +760,10 @@ class PetsCog(commands.GroupCog, group_name="pet", group_description="Virtuelle 
             return
 
         schedule_pet_display_delete(message)
-        await interaction.followup.send(
-            embed=info_embed("Portrait gepostet", f"Dein Pet-Portrait: {message.jump_url}"),
-            ephemeral=True,
-        )
+        try:
+            await interaction.delete_original_response()
+        except discord.HTTPException:
+            pass
 
     @app_commands.command(
         name="play",
