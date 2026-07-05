@@ -65,19 +65,22 @@ def build_zombie_frame_prompt(
 
     if zombie.is_boss:
         return (
-            f"Large stylized fantasy boss monster, {traits}, "
-            f"{motion}, dramatic lighting, {scene}, low-angle shot, {STYLE_SUFFIX}"
+            "Large stylized fantasy boss monster, mutated plague colossus Seuchenbrecher, "
+            f"massive hunched body, heavy shoulders, {traits}, menacing idle walk cycle, "
+            f"{motion}, dramatic lighting, low-angle shot, {scene}, {STYLE_SUFFIX}"
         )
 
     if zombie_key == ZOMBIE_TYPE_RASENDER:
         return (
-            f"Stylized fast fantasy enemy creature, {traits}, {motion}, "
-            f"motion blur, slim build, red glowing eyes, {scene}, {STYLE_SUFFIX}"
+            "Stylized fast fantasy undead runner, sprinting aggressive zombie, "
+            f"{traits}, {motion}, motion blur on limbs, red glowing eyes, slim build, "
+            f"{scene}, {STYLE_SUFFIX}"
         )
 
     return (
-        f"Stylized slow fantasy enemy creature, {traits}, {motion}, "
-        f"grey-green skin, worn clothes, {scene}, {STYLE_SUFFIX}"
+        "Stylized slow fantasy undead shambler, shambling zombie walker, "
+        f"{traits}, {motion}, grey-green decaying skin, torn dirty clothes, "
+        f"{scene}, {STYLE_SUFFIX}"
     )
 
 

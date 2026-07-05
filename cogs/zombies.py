@@ -4,6 +4,7 @@ Zombie Survival Cog: Wellen, Kampf, Shop und Profil.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from datetime import datetime, timezone
@@ -29,6 +30,8 @@ from utils.zombie_combat import (
     resume_if_between_waves,
     spawn_wave,
 )
+from utils.zombie_ai_images import ensure_zombie_asset_library, list_cached_zombie_gifs
+from utils.zombie_assets import is_agnes_zombie_asset_configured
 from utils.zombie_content import player_max_hp
 from utils.zombie_embeds import (
     build_defeat_embed,
@@ -303,6 +306,21 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                 view = await self._build_persistent_run_view(run)
                 self._persist_run_view(view, run.message_id)
 
+        if is_agnes_zombie_asset_configured() and not list_cached_zombie_gifs():
+
+            async def _warm_zombie_assets() -> None:
+                await asyncio.sleep(2)
+                try:
+                    created = await ensure_zombie_asset_library()
+                    logger.info(
+                        "Agnes-Zombie-GIFs erzeugt: %s",
+                        ", ".join(p.name for p in created),
+                    )
+                except Exception:
+                    logger.exception("Agnes-Zombie-GIF-Bibliothek konnte nicht vorbereitet werden")
+
+            asyncio.create_task(_warm_zombie_assets())
+
     async def _finalize_stale_run(self, run: ZombieRunRecord) -> None:
         """Schließt inaktive Runs beim Start ab — inkl. Trostbelohnung."""
         profile = await self.db.get_zombie_player(run.guild_id, run.user_id)
@@ -487,7 +505,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             await interaction.response.send_message(embed=build_expired_embed(), ephemeral=True)
             return True
         embed, file, view = await self._build_run_message(
-            member, checked, refresh_visual=True, use_attachment=False
+            member, checked, refresh_visual=False, use_attachment=False
         )
         if run.message_id and run.channel_id:
             channel = interaction.guild.get_channel(run.channel_id)
@@ -528,27 +546,31 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         view: ZombieRunView | None = None,
     ) -> None:
         """Aktualisiert die Run-Nachricht über die Interaction (ephemeral-sicher)."""
+        msg_after_edit: discord.Message | None = None
         if final_embed is not None:
             self._drop_run_view(run.id)
             payload: dict = {"embed": final_embed, "view": None, "attachments": []}
         else:
-            embed, _file, run_view = await self._build_run_message(
+            embed, file, run_view = await self._build_run_message(
                 member,
                 run,
                 refresh_visual=refresh_visual,
-                use_attachment=False,
+                use_attachment=refresh_visual,
             )
             view = view or run_view
-            payload = {"embed": embed, "view": view, "attachments": []}
+            if refresh_visual and file is not None:
+                payload = {"embed": embed, "view": view, "attachments": [file]}
+            else:
+                payload = {"embed": embed, "view": view, "attachments": []}
 
         try:
             if interaction.response.is_done():
                 if interaction.message is not None:
-                    await interaction.message.edit(**payload)
+                    msg_after_edit = await interaction.message.edit(**payload)
                 else:
-                    await interaction.edit_original_response(**payload)
+                    msg_after_edit = await interaction.edit_original_response(**payload)
             elif interaction.type is InteractionType.component:
-                await interaction.response.edit_message(**payload)
+                msg_after_edit = await interaction.response.edit_message(**payload)
             else:
                 channel = self._channel(interaction)
                 if channel is None:
@@ -580,6 +602,10 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         if final_embed is None and view is not None:
             if interaction.message and run.message_id != interaction.message.id:
                 run.message_id = interaction.message.id
+            if refresh_visual and msg_after_edit is not None:
+                image_url = self._embed_image_url(msg_after_edit)
+                if image_url:
+                    run.current_zombie_image_url = image_url
             await self.db.save_zombie_run(run)
             self._persist_run_view(view, run.message_id)
 
@@ -898,7 +924,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             run = await self.db.save_zombie_run(run)
 
             embed, file, view = await self._build_run_message(
-                interaction.user, run, refresh_visual=True, use_attachment=False
+                interaction.user, run, refresh_visual=True, use_attachment=True
             )
             await self._send_run_panel(
                 interaction,
