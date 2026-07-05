@@ -135,12 +135,15 @@ def build_pet_portrait_prompt(pet: PetRecord, species: PetSpeciesDefinition | No
 
     return (
         f"Single unique individual {species_hint}, one creature only, solo portrait, "
-        f"exactly one face, one head, no duplicate faces, no twins, no mirror reflection, "
+        f"exactly one face, one head, exactly one tail, one body, one set of limbs, "
+        f"no duplicate faces, no twins, no mirror reflection, no mirrored body parts, "
+        f"no double tail, no bifurcated tail, no symmetrical duplicate limbs, "
         f"no second character, fantasy virtual pet creature, "
         f"{evolution_hint}, {rarity_hint}, "
         f"distinct appearance: {unique_traits}, "
         f"evolved power traits: {evolution_traits}, "
-        "full body character design, centered composition, soft digital illustration, "
+        "full body character design, three-quarter view from one side, asymmetric pose, "
+        "centered composition, soft digital illustration, "
         "clean soft gradient background, wholesome game art style, "
         "clearly more powerful at higher evolution stages, "
         "highly distinct from other creatures of same species, "

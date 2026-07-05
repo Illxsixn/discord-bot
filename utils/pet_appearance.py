@@ -89,14 +89,14 @@ ACCESSORIES: tuple[str, ...] = (
 )
 
 POSES: tuple[str, ...] = (
-    "sitting upright three-quarter view",
-    "standing proudly with head turned",
-    "playful crouch ready to pounce",
-    "relaxed lounging pose",
-    "mid-step walking pose",
-    "sitting with tail curled around paws",
+    "sitting upright three-quarter view facing left",
+    "standing proudly with head turned to the side",
+    "playful crouch ready to pounce, asymmetric stance",
+    "relaxed lounging pose on one hip",
+    "mid-step walking pose to the side",
+    "sitting with single tail curled once beside the body",
     "stretching pose with one paw forward",
-    "alert stance ears perked up",
+    "alert stance ears perked up, body angled slightly",
 )
 
 COLOR_ACCENTS: tuple[str, ...] = (
