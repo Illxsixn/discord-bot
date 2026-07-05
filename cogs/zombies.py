@@ -20,7 +20,7 @@ from database.models import (
     ZombieRunRecord,
     ZombieRunStatus,
 )
-from utils.embeds import error_embed, info_embed, spaced_list, warning_embed
+from utils.embeds import error_embed, info_embed, schedule_zombie_message_delete, spaced_list, warning_embed
 from utils.game_locks import game_lock
 from utils.pets import get_species_rarity
 from utils.zombie_combat import (
@@ -337,6 +337,10 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
         if view.is_persistent() and not view.is_finished():
             self.bot.add_view(view)
 
+    def _schedule_public_message_delete(self, message: discord.Message) -> None:
+        """Plant Auto-Löschung für öffentliche Zombie-Nachrichten."""
+        schedule_zombie_message_delete(message)
+
     async def _send_run_panel(
         self,
         interaction: discord.Interaction,
@@ -353,6 +357,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
             kwargs["file"] = file
         await interaction.response.send_message(**kwargs)
         msg = await interaction.original_response()
+        self._schedule_public_message_delete(msg)
         image_url = self._embed_image_url(msg)
         if image_url:
             run.current_zombie_image_url = image_url
@@ -553,6 +558,7 @@ class ZombiesCog(commands.GroupCog, group_name="zombies", group_description="Zom
                     )
                     return
                 sent = await channel.send(**payload)
+                self._schedule_public_message_delete(sent)
                 run.message_id = sent.id
                 run.channel_id = channel.id
                 await self.db.save_zombie_run(run)

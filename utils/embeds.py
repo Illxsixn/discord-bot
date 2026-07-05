@@ -204,9 +204,10 @@ def _pop_embed_send_flags(kwargs: dict[str, Any]) -> bool:
     return bool(_collect_embeds(kwargs))
 
 
-def schedule_embed_message_delete(message: discord.Message) -> None:
-    """Löscht eine Embed-Nachricht nach der konfigurierten Wartezeit."""
-    delay = Config.EMBED_AUTO_DELETE_SECONDS
+def schedule_message_delete(message: discord.Message, *, delay: int) -> None:
+    """Löscht eine Nachricht nach delay Sekunden (0 = aus)."""
+    if delay <= 0:
+        return
 
     async def _worker() -> None:
         await asyncio.sleep(delay)
@@ -216,6 +217,16 @@ def schedule_embed_message_delete(message: discord.Message) -> None:
             pass
 
     asyncio.create_task(_worker())
+
+
+def schedule_embed_message_delete(message: discord.Message) -> None:
+    """Löscht eine Embed-Nachricht nach der konfigurierten Wartezeit."""
+    schedule_message_delete(message, delay=Config.EMBED_AUTO_DELETE_SECONDS)
+
+
+def schedule_zombie_message_delete(message: discord.Message) -> None:
+    """Löscht öffentliche Zombie-Nachrichten nach dem Zombie-Lösch-Cooldown."""
+    schedule_message_delete(message, delay=Config.ZOMBIE_MESSAGE_DELETE_SECONDS)
 
 
 def inject_brand_into_edit_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
